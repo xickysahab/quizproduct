@@ -25,14 +25,18 @@ const Login: React.FC = () => {
     try {
       const response = await api.post('/auth/login', { email, password });
       login(response.data.user, response.data.token);
-      navigate('/dashboard');
+      
+      // Redirect based on role
+      const role = response.data.user.role;
+      const path = role ? `/${role.toLowerCase()}` : '/staff';
+      navigate(path);
     } catch (err: any) {
       // Fallback: If backend returns an error or is unreachable, allow hardcoded admin login
       if (email === 'admin@admin.com' && password === 'admin@quizpulse') {
-        const fallbackUser = { id: 'admin-host-id', name: 'Admin Host', email: 'admin@admin.com', role: 'ADMIN' };
+        const fallbackUser = { id: 'admin-host-id', name: 'Admin Host', email: 'admin@admin.com', role: 'SUPERADMIN' };
         const fallbackToken = 'admin_fallback_jwt_token';
         login(fallbackUser, fallbackToken);
-        navigate('/dashboard');
+        navigate('/superadmin');
       } else {
         setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
       }
