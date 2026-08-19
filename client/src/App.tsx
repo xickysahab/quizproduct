@@ -27,6 +27,15 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
   return <>{children}</>;
 };
 
+// Global redirect for legacy /dashboard paths
+const DashboardRedirect = () => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const role = user?.role;
+  const path = role ? `/${role.toLowerCase()}` : '/staff';
+  return <Navigate to={path} replace />;
+};
+
 function AppRoutes() {
   return (
     <Routes>
@@ -36,6 +45,7 @@ function AppRoutes() {
 
       {/* Host Auth Routes */}
       <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={<DashboardRedirect />} />
 
       {/* Role-Specific Dashboards */}
       <Route 
