@@ -6,16 +6,26 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  SUPERADMIN
+  SUBADMIN
+  TENANT
+  STAFF
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name        String
-  role        String        @default("ADMIN")
-  events      Event[]
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  name         String
+  role         Role          @default(STAFF)
+  parentUserId String?
+  parentUser   User?         @relation("UserHierarchy", fields: [parentUserId], references: [id])
+  subUsers     User[]        @relation("UserHierarchy")
+  events       Event[]
   activityLogs ActivityLog[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model Event {

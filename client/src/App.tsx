@@ -3,6 +3,10 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import SubAdminDashboard from './pages/SubAdminDashboard';
+import TenantDashboard from './pages/TenantDashboard';
+import StaffDashboard from './pages/StaffDashboard';
 import EventDetails from './pages/EventDetails';
 import HostLive from './pages/HostLive';
 import Join from './pages/Join';
@@ -10,11 +14,16 @@ import LiveQuiz from './pages/LiveQuiz';
 import ActivityLogs from './pages/ActivityLogs';
 
 // Protected Route Wrapper for Host Pages
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+  const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />; // Or unauthorized page
+  }
+
   return <>{children}</>;
 };
 
@@ -28,27 +37,55 @@ function AppRoutes() {
       {/* Host Auth Routes */}
       <Route path="/login" element={<Login />} />
 
-      {/* Host Protected Routes */}
+      {/* Role-Specific Dashboards */}
       <Route 
-        path="/dashboard" 
+        path="/superadmin" 
         element={
-          <ProtectedRoute>
-            <Dashboard />
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}>
+            <SuperAdminDashboard />
           </ProtectedRoute>
         } 
       />
       <Route 
+        path="/subadmin" 
+        element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}>
+            <SubAdminDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/tenant" 
+        element={
+          <ProtectedRoute allowedRoles={['TENANT']}>
+            <TenantDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/staff" 
+        element={
+          <ProtectedRoute allowedRoles={['STAFF']}>
+            <StaffDashboard />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Shared Admin Routes */}
+      <Route 
         path="/admin/logs" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN']}>
             <ActivityLogs />
           </ProtectedRoute>
         } 
       />
+      
+      {/* Event Management Routes (Staff/Tenant) */}
       <Route 
         path="/events/:id" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['STAFF', 'TENANT']}>
             <EventDetails />
           </ProtectedRoute>
         } 
@@ -57,7 +94,7 @@ function AppRoutes() {
       <Route 
         path="/host/live/:id" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['STAFF', 'TENANT']}>
             <HostLive />
           </ProtectedRoute>
         } 

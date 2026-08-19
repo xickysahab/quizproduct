@@ -9,6 +9,10 @@ import questionRoutes from './routes/question.routes';
 import participantRoutes from './routes/participant.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import logRoutes from './routes/log.routes';
+import superadminRoutes from './routes/superadmin.routes';
+import subadminRoutes from './routes/subadmin.routes';
+import tenantRoutes from './routes/tenant.routes';
+import staffRoutes from './routes/staff.routes';
 import { initializeSocket } from './socket';
 
 dotenv.config();
@@ -42,6 +46,10 @@ app.use('/questions', questionRoutes);
 app.use('/participants', participantRoutes);
 app.use('/analytics', analyticsRoutes);
 app.use('/logs', logRoutes);
+app.use('/superadmin', superadminRoutes);
+app.use('/subadmin', subadminRoutes);
+app.use('/tenant', tenantRoutes);
+app.use('/staff', staffRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Slido server is healthy' });
