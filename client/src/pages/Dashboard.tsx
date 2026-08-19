@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
               <UserPlus className="w-4 h-4" />
               Add Sub-Admin
             </button>
-            {user?.role === 'ADMIN' && (
+            {user?.role === 'SUPERADMIN' && (
               <button
                 onClick={() => navigate('/admin/logs')}
                 className="flex items-center gap-2 bg-[#1E293B] hover:bg-[#334155] text-[#FB7185] px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors border border-[#F43F5E]/20"
@@ -306,7 +306,7 @@ const Dashboard: React.FC = () => {
                       <span>Manage & Host</span>
                       <ArrowUpRight className="w-3.5 h-3.5 group-hover/btn:text-white transition-colors" />
                     </button>
-                    {user?.role === 'ADMIN' && (
+                    {user?.role === 'SUPERADMIN' && (
                       <button
                         onClick={() => handleDeleteEvent(event.id)}
                         className="p-3 rounded-2xl text-[#64748B] hover:text-[#F43F5E] hover:bg-[#F43F5E]/10 border border-transparent hover:border-[#F43F5E]/20 transition-all"
