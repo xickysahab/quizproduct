@@ -45,18 +45,18 @@ const ActivityLogs: React.FC = () => {
   };
 
   const getActionIcon = (action: string) => {
-    if (action.includes('CREATE') || action.includes('ADD')) return <Play className="w-4 h-4 text-[#8B5CF6]" />;
-    if (action.includes('DELETE') || action.includes('CLEAR')) return <Trash2 className="w-4 h-4 text-[#F43F5E]" />;
-    if (action.includes('UPDATE') || action.includes('EDIT')) return <Edit2 className="w-4 h-4 text-[#F59E0B]" />;
-    return <Server className="w-4 h-4 text-[#64748B]" />;
+    if (action.includes('CREATE') || action.includes('ADD')) return <Play className="w-4 h-4 text-indigo-600" />;
+    if (action.includes('DELETE') || action.includes('CLEAR')) return <Trash2 className="w-4 h-4 text-red-500" />;
+    if (action.includes('UPDATE') || action.includes('EDIT')) return <Edit2 className="w-4 h-4 text-amber-500" />;
+    return <Server className="w-4 h-4 text-gray-500" />;
   };
 
   const getActionBadge = (action: string) => {
     const baseClasses = "px-2.5 py-1 text-[11px] font-bold rounded-md tracking-wide";
-    if (action.includes('CREATE') || action.includes('ADD')) return `${baseClasses} bg-[#8B5CF6]/15 text-[#A78BFA]`;
-    if (action.includes('DELETE') || action.includes('CLEAR')) return `${baseClasses} bg-[#F43F5E]/15 text-[#FB7185]`;
-    if (action.includes('UPDATE') || action.includes('EDIT')) return `${baseClasses} bg-[#F59E0B]/15 text-[#FBBF24]`;
-    return `${baseClasses} bg-[#1E293B] text-[#64748B]`;
+    if (action.includes('CREATE') || action.includes('ADD')) return `${baseClasses} bg-indigo-50 text-indigo-700`;
+    if (action.includes('DELETE') || action.includes('CLEAR')) return `${baseClasses} bg-red-50 text-red-600`;
+    if (action.includes('UPDATE') || action.includes('EDIT')) return `${baseClasses} bg-amber-50 text-amber-700`;
+    return `${baseClasses} bg-gray-100 text-gray-600`;
   };
 
   const filteredLogs = logs.filter(log => 
@@ -67,51 +67,51 @@ const ActivityLogs: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A] text-[#F1F5F9] flex flex-col font-sans relative selection:bg-[#8B5CF6]/30">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 pt-32 pb-12 md:pb-24 max-w-6xl">
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate('/dashboard')}
-            className="p-2.5 bg-[#1E293B] hover:bg-[#334155] text-[#8B5CF6] rounded-xl transition-all border border-[#8B5CF6]/20"
+            className="p-2.5 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl transition-all border border-gray-200 shadow-sm"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8B5CF6]">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
               System Records
             </span>
-            <h1 className="text-4xl font-heading font-bold text-white flex items-center gap-3 mt-1">
-              <FileText className="w-8 h-8 text-[#8B5CF6]" />
+            <h1 className="text-4xl font-heading font-bold text-gray-900 flex items-center gap-3 mt-1">
+              <FileText className="w-8 h-8 text-indigo-600" />
               Audit Logs
             </h1>
-            <p className="text-sm text-[#64748B] mt-1">Track platform activities and administrative actions</p>
+            <p className="text-sm text-gray-500 mt-1">Track platform activities and administrative actions</p>
           </div>
         </div>
 
-        <div className="bg-[#111827] rounded-3xl shadow-card border border-[#8B5CF6]/10 overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Search Header */}
-          <div className="p-4 border-b border-[#1E293B] bg-[#0B0F1A]/50 flex items-center justify-between">
+          <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
             <div className="relative max-w-md w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
                 placeholder="Search by action, user, or details..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-[#1E293B] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B5CF6]/30 focus:border-[#8B5CF6]/50 transition-all bg-[#111827] text-white placeholder:text-[#475569]"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all bg-white text-gray-900 placeholder:text-gray-400 shadow-sm"
               />
             </div>
-            <div className="text-sm text-[#64748B] font-medium font-mono bg-[#0B0F1A] px-3 py-1 rounded-full border border-[#1E293B]">
+            <div className="text-sm text-gray-600 font-medium font-mono bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
               Total records: {filteredLogs.length}
             </div>
           </div>
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-[#94A3B8]">
-              <thead className="text-[10px] uppercase tracking-wider bg-[#0B0F1A] text-[#8B5CF6] font-semibold border-b border-[#1E293B]">
+            <table className="w-full text-left text-sm text-gray-600">
+              <thead className="text-[10px] uppercase tracking-wider bg-gray-50 text-gray-500 font-bold border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4">Timestamp</th>
                   <th className="px-6 py-4">User</th>
@@ -124,7 +124,7 @@ const ActivityLogs: React.FC = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={5} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-3 text-[#64748B]">
+                      <div className="flex flex-col items-center gap-3 text-gray-400">
                         <Settings className="w-8 h-8 animate-spin" />
                         <span>Loading logs...</span>
                       </div>
@@ -132,19 +132,19 @@ const ActivityLogs: React.FC = () => {
                   </tr>
                 ) : filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-12 text-[#64748B]">
+                    <td colSpan={5} className="text-center py-12 text-gray-400">
                       No logs found.
                     </td>
                   </tr>
                 ) : (
                   filteredLogs.map((log) => (
-                    <tr key={log.id} className="border-b border-[#1E293B] hover:bg-[#1E293B]/50 transition-colors">
-                      <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-[#64748B]">
+                    <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-gray-500">
                         {format(new Date(log.createdAt), 'MMM dd, yyyy HH:mm:ss')}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-medium text-white">{log.user.name}</div>
-                        <div className="text-xs text-[#475569]">{log.user.email}</div>
+                        <div className="font-medium text-gray-900">{log.user.name}</div>
+                        <div className="text-xs text-gray-500">{log.user.email}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -152,11 +152,11 @@ const ActivityLogs: React.FC = () => {
                           <span className={getActionBadge(log.action)}>{log.action}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-medium text-[#94A3B8]">
+                      <td className="px-6 py-4 font-medium text-gray-700">
                         {log.resource}
                       </td>
                       <td className="px-6 py-4">
-                        <pre className="text-xs bg-[#0B0F1A] p-2.5 rounded-xl border border-[#1E293B] overflow-x-auto max-w-xs text-[#64748B]">
+                        <pre className="text-xs bg-gray-50 p-2.5 rounded-xl border border-gray-200 overflow-x-auto max-w-xs text-gray-600">
                           {log.details ? JSON.stringify(log.details, null, 2) : 'No details'}
                         </pre>
                       </td>

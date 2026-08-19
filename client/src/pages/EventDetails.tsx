@@ -99,7 +99,7 @@ const EventDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B0F1A] text-white flex items-center justify-center font-heading text-lg">
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-heading text-lg">
         Loading event details...
       </div>
     );
@@ -108,35 +108,35 @@ const EventDetails: React.FC = () => {
   if (!event) return null;
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A] text-[#F1F5F9] flex flex-col font-sans relative selection:bg-[#8B5CF6]/30">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
       <Navbar />
 
       <main className="flex-1 pt-32 pb-24 px-6 md:px-12 max-w-5xl mx-auto w-full">
         {/* Back Button */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#64748B] hover:text-white mb-8 transition-colors group"
+          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-900 mb-8 transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span>Back to Dashboard</span>
         </button>
 
         {/* Event Header Banner Card */}
-        <div className="bg-[#111827] rounded-3xl p-8 md:p-10 shadow-card border border-[#8B5CF6]/10 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-8 hover-glow transition-all">
+        <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-gray-200 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-8 hover-card transition-all">
           <div className="space-y-3 max-w-xl">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8B5CF6]">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
                 Event Studio
               </span>
-              <span className="px-3 py-1 rounded-full bg-[#0B0F1A] border border-[#1E293B] text-xs font-mono font-bold text-white">
+              <span className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-700">
                 PIN: {event.roomCode}
               </span>
             </div>
-            <h1 className="font-heading text-4xl md:text-5xl font-bold text-white">
+            <h1 className="font-heading text-4xl md:text-5xl font-bold text-gray-900">
               {event.title}
             </h1>
-            <p className="text-sm text-[#64748B] leading-relaxed">
-              Share the PIN code <span className="font-mono font-bold text-white bg-[#0B0F1A] px-2 py-0.5 rounded-md border border-[#1E293B]">{event.roomCode}</span> with your participants to join live.
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Share the PIN code <span className="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">{event.roomCode}</span> with your participants to join live.
             </p>
           </div>
 
@@ -166,42 +166,42 @@ const EventDetails: React.FC = () => {
                   toast.error(error.response?.data?.message || 'Failed to download analytics report');
                 }
               }}
-              className="bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-white px-6 py-3 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-[#8B5CF6]/10"
+              className="bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 px-6 py-3 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-gray-200 shadow-sm"
             >
-              <Download className="w-3.5 h-3.5 text-[#8B5CF6]" />
+              <Download className="w-3.5 h-3.5 text-indigo-600" />
               <span>Export CSV Report</span>
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="bg-[#0B0F1A] border border-[#1E293B] text-[#94A3B8] hover:text-white hover:border-[#334155] px-6 py-3 rounded-2xl font-medium text-xs transition-all flex items-center justify-center gap-2 group"
+              className="bg-gray-50 border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300 px-6 py-3 rounded-2xl font-medium text-xs transition-all flex items-center justify-center gap-2 group shadow-sm"
             >
-              <Settings className="w-3.5 h-3.5 text-[#64748B] group-hover:rotate-45 transition-transform duration-300" />
+              <Settings className="w-3.5 h-3.5 text-gray-500 group-hover:rotate-45 transition-transform duration-300" />
               <span>Customize Results UI</span>
             </button>
             <button
               onClick={() => setClearDataModal(true)}
-              className="bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#FB7185] hover:bg-[#F43F5E]/20 px-6 py-3 rounded-2xl font-medium text-xs transition-all flex items-center justify-center gap-2 group"
+              className="bg-red-50 border border-red-100 text-red-600 hover:bg-red-100 px-6 py-3 rounded-2xl font-medium text-xs transition-all flex items-center justify-center gap-2 group shadow-sm"
             >
-              <Eraser className="w-3.5 h-3.5 text-[#F43F5E] group-hover:rotate-12 transition-transform duration-300" />
+              <Eraser className="w-3.5 h-3.5 text-red-500 group-hover:rotate-12 transition-transform duration-300" />
               <span>Clear Participants Data</span>
             </button>
           </div>
         </div>
 
         {/* Questions Header & Add Button */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#1E293B]">
+        <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
           <div>
-            <h2 className="font-heading text-3xl font-bold text-white">
+            <h2 className="font-heading text-3xl font-bold text-gray-900">
               Questions & Polls ({event.questions.length})
             </h2>
-            <p className="text-xs text-[#64748B] mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               Draft questions to be presented sequentially during the live session
             </p>
           </div>
 
           <button
             onClick={openAddModal}
-            className="gradient-btn text-white px-5 py-3 rounded-2xl font-semibold text-sm transition-all shadow-glow-sm hover:shadow-glow-md flex items-center gap-2"
+            className="gradient-btn text-white px-5 py-3 rounded-2xl font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>Add Question</span>
@@ -210,17 +210,17 @@ const EventDetails: React.FC = () => {
 
         {/* Questions List */}
         {event.questions.length === 0 ? (
-          <div className="text-center bg-[#111827] rounded-3xl border border-[#8B5CF6]/10 p-16 space-y-4">
-            <div className="w-14 h-14 rounded-full bg-[#8B5CF6]/15 flex items-center justify-center text-[#8B5CF6] mx-auto">
+          <div className="text-center bg-white rounded-3xl border border-gray-200 p-16 space-y-4 shadow-sm">
+            <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mx-auto">
               <HelpCircle className="w-6 h-6" />
             </div>
-            <h3 className="font-heading text-2xl font-bold text-white">No questions added yet</h3>
-            <p className="text-sm text-[#64748B] max-w-md mx-auto">
+            <h3 className="font-heading text-2xl font-bold text-gray-900">No questions added yet</h3>
+            <p className="text-sm text-gray-500 max-w-md mx-auto">
               Add your first multiple-choice question or poll prompt to start your quiz collection.
             </p>
-            <button
+              <button
               onClick={openAddModal}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#A78BFA] hover:underline pt-2"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:underline pt-2"
             >
               <Plus className="w-4 h-4" />
               <span>Create First Question</span>
@@ -235,7 +235,7 @@ const EventDetails: React.FC = () => {
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96 }}
-                  className="bg-[#111827] rounded-3xl border border-[#8B5CF6]/10 p-7 shadow-card flex flex-col md:flex-row gap-6 justify-between items-start hover-glow transition-all"
+                  className="bg-white rounded-3xl border border-gray-200 p-7 shadow-sm flex flex-col md:flex-row gap-6 justify-between items-start hover-card transition-all"
                 >
                   <div className="flex-1 space-y-4">
                     {/* Header: Question Number & Title */}
@@ -244,11 +244,11 @@ const EventDetails: React.FC = () => {
                         Q{index + 1}
                       </span>
                       <div className="space-y-1">
-                        <h3 className="font-heading text-2xl font-bold text-white leading-snug">
+                        <h3 className="font-heading text-2xl font-bold text-gray-900 leading-snug">
                           {q.text}
                         </h3>
-                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
-                          <Clock className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600" />
                           <span>{q.timeLimit > 0 ? `${q.timeLimit} seconds timer` : 'Manual advance (No timer)'}</span>
                         </div>
                       </div>
@@ -263,18 +263,18 @@ const EventDetails: React.FC = () => {
                             key={optIdx}
                             className={`p-3.5 rounded-2xl border text-sm transition-all flex items-center gap-3 ${
                               isCorrect
-                                ? 'bg-[#8B5CF6]/10 border-[#8B5CF6]/40 text-white font-semibold shadow-glow-sm'
-                                : 'bg-[#0B0F1A] border-[#1E293B] text-[#94A3B8]'
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold shadow-sm'
+                                : 'bg-gray-50 border-gray-200 text-gray-700'
                             }`}
                           >
                             <span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                              isCorrect ? 'bg-[#8B5CF6] text-white' : 'bg-[#1E293B] text-[#64748B]'
+                              isCorrect ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-500'
                             }`}>
                               {['A', 'B', 'C', 'D'][optIdx]}
                             </span>
                             <span className="flex-1">{opt}</span>
                             {isCorrect && (
-                              <CheckCircle className="w-4 h-4 text-[#8B5CF6]" />
+                              <CheckCircle className="w-4 h-4 text-indigo-600" />
                             )}
                           </div>
                         );
@@ -283,17 +283,17 @@ const EventDetails: React.FC = () => {
                   </div>
 
                   {/* Question Controls */}
-                  <div className="flex md:flex-col gap-2 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-[#1E293B] md:pl-6 w-full md:w-auto justify-end">
+                  <div className="flex md:flex-col gap-2 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-gray-200 md:pl-6 w-full md:w-auto justify-end">
                     <button
                       onClick={() => openEditModal(q)}
-                      className="p-3 rounded-2xl bg-[#0B0F1A] hover:bg-[#1E293B] text-[#64748B] hover:text-white border border-[#1E293B] transition-colors"
+                      className="p-3 rounded-2xl bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-900 border border-gray-200 transition-colors shadow-sm"
                       title="Edit Question"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteQuestion(q.id)}
-                      className="p-3 rounded-2xl bg-[#0B0F1A] hover:bg-[#F43F5E]/10 text-[#64748B] hover:text-[#F43F5E] border border-[#1E293B] hover:border-[#F43F5E]/20 transition-colors"
+                      className="p-3 rounded-2xl bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-500 border border-gray-200 hover:border-red-200 transition-colors shadow-sm"
                       title="Delete Question"
                     >
                       <Trash2 className="w-4 h-4" />

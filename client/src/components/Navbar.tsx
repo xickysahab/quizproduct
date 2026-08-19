@@ -29,7 +29,7 @@ const Navbar: React.FC = () => {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-[#0B0F1A]/80 backdrop-blur-xl border-b border-[#8B5CF6]/10 py-3 shadow-[0_4px_30px_-10px_rgba(139,92,246,0.15)]'
+          ? 'bg-white/80 backdrop-blur-xl border-b border-gray-200 py-3 shadow-sm'
           : 'bg-transparent py-5'
       }`}
     >
@@ -38,10 +38,10 @@ const Navbar: React.FC = () => {
         <Link to="/" className="flex items-center gap-3 group">
           <Logo size={38} className="group-hover:scale-105 transition-transform duration-300" />
           <div className="flex flex-col">
-            <span className="font-heading text-xl font-bold tracking-tight text-white group-hover:text-[#A78BFA] transition-colors">
+            <span className="font-heading text-xl font-bold tracking-tight text-gray-900 group-hover:text-indigo-600 transition-colors">
               QuizPulse
             </span>
-            <span className="text-[9px] tracking-[0.2em] text-[#64748B] uppercase font-medium -mt-0.5">
+            <span className="text-[9px] tracking-[0.2em] text-gray-500 uppercase font-medium -mt-0.5">
               Live Engagement
             </span>
           </div>
@@ -51,16 +51,16 @@ const Navbar: React.FC = () => {
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <Link
             to="/"
-            className={`transition-colors hover:text-white ${
-              location.pathname === '/' ? 'text-white font-semibold' : 'text-[#94A3B8]'
+            className={`transition-colors hover:text-indigo-600 ${
+              location.pathname === '/' ? 'text-indigo-600 font-semibold' : 'text-gray-600'
             }`}
           >
             Join Quiz
           </Link>
-          <a href="#features" className="transition-colors hover:text-white text-[#94A3B8]">
+          <a href="#features" className="transition-colors hover:text-indigo-600 text-gray-600">
             Features
           </a>
-          <a href="#how-it-works" className="transition-colors hover:text-white text-[#94A3B8]">
+          <a href="#how-it-works" className="transition-colors hover:text-indigo-600 text-gray-600">
             How It Works
           </a>
         </nav>
@@ -71,14 +71,14 @@ const Navbar: React.FC = () => {
             <div className="flex items-center gap-3">
               <Link
                 to="/dashboard"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E293B] text-white text-sm font-medium border border-[#8B5CF6]/20 hover:border-[#8B5CF6]/40 hover:bg-[#1E293B]/80 transition-all hover-glow"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all shadow-sm"
               >
-                <LayoutDashboard className="w-4 h-4 text-[#8B5CF6]" />
+                <LayoutDashboard className="w-4 h-4 text-indigo-600" />
                 <span>Dashboard</span>
               </Link>
               <button
                 onClick={handleLogout}
-                className="p-2 rounded-xl text-[#64748B] hover:text-white hover:bg-[#1E293B] transition-all"
+                className="p-2 rounded-xl text-gray-500 hover:text-red-600 hover:bg-red-50 transition-all"
                 title="Log out"
               >
                 <LogOut className="w-4 h-4" />
@@ -100,7 +100,7 @@ const Navbar: React.FC = () => {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 rounded-xl text-white hover:bg-[#1E293B] transition-colors"
+          className="md:hidden p-2 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -113,27 +113,27 @@ const Navbar: React.FC = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#111827] border-b border-[#8B5CF6]/10 px-6 py-6"
+            className="md:hidden bg-white border-b border-gray-200 px-6 py-6 shadow-md"
           >
             <div className="flex flex-col gap-4">
               <Link
                 to="/"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-medium text-white py-2 border-b border-[#1E293B]"
+                className="text-lg font-medium text-gray-900 py-2 border-b border-gray-100"
               >
                 Join Quiz
               </Link>
               <a
                 href="#features"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-medium text-[#94A3B8] py-2 border-b border-[#1E293B]"
+                className="text-lg font-medium text-gray-600 py-2 border-b border-gray-100"
               >
                 Features
               </a>
               <a
                 href="#how-it-works"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-medium text-[#94A3B8] py-2 border-b border-[#1E293B]"
+                className="text-lg font-medium text-gray-600 py-2 border-b border-gray-100"
               >
                 How It Works
               </a>
@@ -153,7 +153,7 @@ const Navbar: React.FC = () => {
                       setMobileMenuOpen(false);
                       handleLogout();
                     }}
-                    className="py-2 text-[#94A3B8] hover:text-white font-medium"
+                    className="py-2 text-gray-500 hover:text-red-600 font-medium"
                   >
                     Log Out ({user?.name})
                   </button>

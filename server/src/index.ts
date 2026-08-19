@@ -18,7 +18,7 @@ import { initializeSocket } from './socket';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Create HTTP server to attach Socket.IO
 const httpServer = createServer(app);

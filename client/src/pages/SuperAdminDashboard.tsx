@@ -23,7 +23,7 @@ const SuperAdminDashboard = () => {
   return (
     <DashboardLayout title="SuperAdmin Panel" sidebarItems={sidebarItems} showCreateQuiz={true}>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-[#94A3B8]">
+        <h1 className="text-3xl font-bold text-gray-900">
           Platform Overview
         </h1>
         
@@ -35,17 +35,17 @@ const SuperAdminDashboard = () => {
             { label: 'Total Active Staff', value: '156' },
             { label: 'Quizzes Hosted', value: '892' }
           ].map((stat, i) => (
-            <div key={i} className="bg-[#111827] border border-[#8B5CF6]/20 p-6 rounded-2xl shadow-glow-sm">
-              <p className="text-[#94A3B8] text-sm font-medium">{stat.label}</p>
-              <p className="text-3xl font-bold text-white mt-2">{stat.value}</p>
+            <div key={i} className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover-card">
+              <p className="text-gray-500 text-sm font-medium">{stat.label}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
             </div>
           ))}
         </div>
 
         {/* Recent Activity Table Placeholder */}
-        <div className="mt-12 bg-[#111827] border border-[#8B5CF6]/20 rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Recent SubAdmin Activity</h2>
-          <p className="text-[#94A3B8]">Activity table will be displayed here...</p>
+        <div className="mt-12 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Recent SubAdmin Activity</h2>
+          <p className="text-gray-500">Activity table will be displayed here...</p>
         </div>
       </div>
     </DashboardLayout>

@@ -23,18 +23,18 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-[#0B0F1A] text-white font-sans flex flex-col">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col">
       {/* Navbar will handle the top navigation and logo */}
       <Navbar />
 
       <div className="flex flex-1 pt-[72px]">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex w-64 flex-col bg-[#111827] border-r border-[#8B5CF6]/10 pt-8 px-4">
+        <aside className="hidden md:flex w-64 flex-col bg-white border-r border-gray-200 pt-8 px-4 shadow-sm z-10">
           <div className="mb-8 px-2">
-            <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+            <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-indigo-800">
               {title}
             </h2>
-            <p className="text-sm text-[#94A3B8] mt-1">Welcome, {user?.name}</p>
+            <p className="text-sm text-gray-500 mt-1">Welcome, {user?.name}</p>
           </div>
 
           <nav className="flex-1 space-y-2">
@@ -48,11 +48,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
                   to={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                     isActive
-                      ? 'bg-[#8B5CF6]/10 text-white border border-[#8B5CF6]/20'
-                      : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]'
+                      ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-[#8B5CF6]' : ''}`} />
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : ''}`} />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               );

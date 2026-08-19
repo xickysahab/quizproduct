@@ -21,8 +21,8 @@ const Logo: React.FC<LogoProps> = ({ size = 36, className = '' }) => {
         {/* Background circle with gradient */}
         <defs>
           <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#8B5CF6" />
-            <stop offset="100%" stopColor="#F43F5E" />
+            <stop offset="0%" stopColor="#4F46E5" />
+            <stop offset="100%" stopColor="#4338CA" />
           </linearGradient>
           <linearGradient id="boltGrad" x1="18" y1="8" x2="30" y2="40" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#FFFFFF" />
