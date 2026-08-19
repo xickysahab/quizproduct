@@ -6,10 +6,10 @@ export const getActivityLogs = async (req: AuthRequest, res: Response): Promise<
   try {
     const userId = req.user?.userId;
     
-    // Validate ADMIN role
+    // Validate SUPERADMIN role
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.role !== 'ADMIN') {
-      res.status(403).json({ message: 'Forbidden: Only ADMIN users can view activity logs.' });
+    if (!user || user.role !== 'SUPERADMIN') {
+      res.status(403).json({ message: 'Forbidden: Only SUPERADMIN users can view activity logs.' });
       return;
     }
 

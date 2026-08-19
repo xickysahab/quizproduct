@@ -108,8 +108,8 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
     const hostId = req.user?.userId;
 
     const user = await prisma.user.findUnique({ where: { id: hostId } });
-    if (!user || user.role !== 'ADMIN') {
-      res.status(403).json({ message: 'Forbidden: Only ADMIN users can delete a quiz.' });
+    if (!user || user.role !== 'SUPERADMIN') {
+      res.status(403).json({ message: 'Forbidden: Only SUPERADMIN users can delete a quiz.' });
       return;
     }
 
@@ -163,8 +163,8 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
     
     // Check if user is an ADMIN
     const user = await prisma.user.findUnique({ where: { id: req.user?.userId } });
-    if (!user || user.role !== 'ADMIN') {
-      res.status(403).json({ message: 'Forbidden: Only ADMIN users can clear data.' });
+    if (!user || user.role !== 'SUPERADMIN') {
+      res.status(403).json({ message: 'Forbidden: Only SUPERADMIN users can clear data.' });
       return;
     }
 
