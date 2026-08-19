@@ -107,16 +107,21 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
     const id = req.params.id as string;
     const hostId = req.user?.userId;
 
-    const user = await prisma.user.findUnique({ where: { id: hostId } });
-    if (!user || user.role !== 'SUPERADMIN') {
-      res.status(403).json({ message: 'Forbidden: Only SUPERADMIN users can delete a quiz.' });
-      return;
-    }
-
     const event = await prisma.event.findUnique({ where: { id } });
 
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: hostId } });
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    if (user.role !== 'SUPERADMIN' && event.hostId !== user.id) {
+      res.status(403).json({ message: 'Forbidden: You can only delete your own events.' });
       return;
     }
 
@@ -161,21 +166,20 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
   try {
     const id = req.params.id as string;
     
-    // Check if user is an ADMIN
-    const user = await prisma.user.findUnique({ where: { id: req.user?.userId } });
-    if (!user || user.role !== 'SUPERADMIN') {
-      res.status(403).json({ message: 'Forbidden: Only SUPERADMIN users can clear data.' });
-      return;
-    }
-
     const event = await prisma.event.findUnique({ where: { id } });
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
       return;
     }
 
-    if (event.hostId !== user.id) {
-      res.status(403).json({ message: 'Forbidden: You do not own this event.' });
+    const user = await prisma.user.findUnique({ where: { id: req.user?.userId } });
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    if (user.role !== 'SUPERADMIN' && event.hostId !== user.id) {
+      res.status(403).json({ message: 'Forbidden: You can only clear data for your own events.' });
       return;
     }
 
