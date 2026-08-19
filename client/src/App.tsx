@@ -91,11 +91,11 @@ function AppRoutes() {
         } 
       />
       
-      {/* Event Management Routes (Staff/Tenant) */}
+      {/* Event Management Routes */}
       <Route 
         path="/events/:id" 
         element={
-          <ProtectedRoute allowedRoles={['STAFF', 'TENANT']}>
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}>
             <EventDetails />
           </ProtectedRoute>
         } 
@@ -104,7 +104,7 @@ function AppRoutes() {
       <Route 
         path="/host/live/:id" 
         element={
-          <ProtectedRoute allowedRoles={['STAFF', 'TENANT']}>
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}>
             <HostLive />
           </ProtectedRoute>
         } 
