@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name        String
+  role        String        @default("ADMIN")
+  events      Event[]
+  activityLogs ActivityLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id                String        @id @default(uuid())
+  title             String
+  roomCode          String        @unique
+  hostId            String
+  host              User          @relation(fields: [hostId], references: [id])
+  isLive            Boolean       @default(false)
+  currentQuestionId String?
+  concludeConfig    Json?
+  questions         Question[]
+  participants      Participant[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Question {
+  id            String     @id @default(uuid())
+  eventId       String
+  event         Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  text          String
+  options       String[]
+  correctOption Int?
+  order         Int
+  timeLimit     Int?
+  responses     Response[]
+}
+
+model Participant {
+  id        String     @id @default(uuid())
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  socketId  String?
+  responses Response[]
+  joinedAt  DateTime   @default(now())
+}
+
+model Response {
+  id             String      @id @default(uuid())
+  questionId     String
+  question       Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  selectedOption Int
+  isCorrect      Boolean     @default(false)
+  respondedAt    DateTime    @default(now())
+
+  @@unique([questionId, participantId])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  createdAt  DateTime @default(now())
+}

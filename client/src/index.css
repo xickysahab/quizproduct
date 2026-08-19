@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  --color-ivory-bg: #FFFFFF;
+  --color-ivory-surface: #F0F9FF;
+  --color-ivory-border: #E0F2FE;
+  --color-ivory-hover: #E0F2FE;
+
+  --color-accent-brown: #F97316;
+  --color-accent-gold: #06B6D4;
+  --color-accent-taupe: #67E8F9;
+  --color-accent-gold-light: #ECFEFF;
+
+  --color-text-main: #0F172A;
+  --color-text-muted: #475569;
+  --color-text-subtle: #94A3B8;
+
+  --shadow-lux: 0 10px 30px -10px rgba(45, 42, 38, 0.05), 0 4px 12px -4px rgba(45, 42, 38, 0.03);
+  --shadow-lux-hover: 0 20px 40px -15px rgba(45, 42, 38, 0.09), 0 8px 20px -6px rgba(45, 42, 38, 0.04);
+  --shadow-lux-lg: 0 25px 50px -12px rgba(45, 42, 38, 0.12);
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-ivory-bg);
+    color: var(--color-text-main);
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-heading {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Glassmorphism & Surface Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(232, 223, 213, 0.8);
+}
+
+.glass-panel-dark {
+  background: rgba(45, 42, 38, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.shadow-lux {
+  box-shadow: 0 12px 32px -8px rgba(45, 42, 38, 0.06), 0 4px 12px -4px rgba(45, 42, 38, 0.03);
+}
+
+.shadow-lux-lg {
+  box-shadow: 0 24px 48px -12px rgba(45, 42, 38, 0.09), 0 8px 24px -6px rgba(45, 42, 38, 0.04);
+}
+
+/* Subtle Animated Ambient Gradients */
+.bg-ambient-glow {
+  background: radial-gradient(circle at 50% 0%, rgba(244, 236, 225, 0.8) 0%, rgba(250, 248, 246, 0) 70%);
+}
+
+.bg-ambient-glow-bottom {
+  background: radial-gradient(circle at 50% 100%, rgba(244, 236, 225, 0.6) 0%, rgba(250, 248, 246, 0) 70%);
+}
+
+/* Smooth Input Caret & Autofill Styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: #0F172A !important;
+}
+
+/* Custom Smooth Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FFFFFF;
+}
+::-webkit-scrollbar-thumb {
+  background: #D8CCC0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #67E8F9;
+}
