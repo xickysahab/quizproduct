@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { ArrowLeft, Server, FileText, Settings, Trash2, Edit2, Play, Search } from 'lucide-react';
+import { Server, FileText, Settings, Trash2, Edit2, Play, Search } from 'lucide-react';
 import { format } from 'date-fns';
+import DashboardLayout from '../components/DashboardLayout';
+import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
+import { useAuth } from '../context/AuthContext';
 
 interface Log {
   id: string;
@@ -22,6 +23,7 @@ interface Log {
 
 const ActivityLogs: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -67,27 +69,17 @@ const ActivityLogs: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
-      <Navbar />
-      
-      <main className="flex-grow container mx-auto px-4 pt-32 pb-12 md:pb-24 max-w-6xl">
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-2.5 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl transition-all border border-gray-200 shadow-sm"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
-              System Records
-            </span>
-            <h1 className="text-4xl font-heading font-bold text-gray-900 flex items-center gap-3 mt-1">
-              <FileText className="w-8 h-8 text-indigo-600" />
-              Audit Logs
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Track platform activities and administrative actions</p>
-          </div>
+    <DashboardLayout title={dashboardTitleForRole(user?.role)} sidebarItems={sidebarForRole(user?.role)}>
+      <div className="space-y-8">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+            System Records
+          </span>
+          <h1 className="text-4xl font-heading font-bold text-gray-900 flex items-center gap-3 mt-1">
+            <FileText className="w-8 h-8 text-indigo-600" />
+            Audit Logs
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Track platform activities and administrative actions</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
@@ -167,10 +159,8 @@ const ActivityLogs: React.FC = () => {
             </table>
           </div>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

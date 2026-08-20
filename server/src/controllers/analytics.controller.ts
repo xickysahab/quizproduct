@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Parser } from 'json2csv';
+import { canAccessEvent } from '../utils/access';
 
 export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -15,7 +16,7 @@ export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Pro
       }
     });
 
-    if (!question || question.event.hostId !== req.user?.userId) {
+    if (!question || !(await canAccessEvent(req.user!.userId, req.user!.role, question.event.hostId))) {
       res.status(403).json({ message: 'Forbidden or not found' });
       return;
     }
@@ -62,7 +63,7 @@ export const exportEventAnalytics = async (req: AuthRequest, res: Response): Pro
       }
     });
 
-    if (!event || event.hostId !== req.user?.userId) {
+    if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
       res.status(403).json({ message: 'Forbidden or not found' });
       return;
     }
@@ -115,7 +116,7 @@ export const getEventSummaryAnalytics = async (req: AuthRequest, res: Response):
       }
     });
 
-    if (!event || event.hostId !== req.user?.userId) {
+    if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
       res.status(403).json({ message: 'Forbidden or not found' });
       return;
     }

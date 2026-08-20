@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
+import { logActivity } from '../utils/logger';
 
 export const createStaff = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -28,7 +29,9 @@ export const createStaff = async (req: AuthRequest, res: Response): Promise<void
       }
     });
 
-    res.status(201).json({ message: 'Staff created', user: { id: staff.id, email: staff.email } });
+    await logActivity(req.user!.userId, 'CREATE_STAFF', 'User', staff.id, { name, email });
+
+    res.status(201).json({ message: 'Staff created', user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role } });
   } catch (error) {
     console.error('Error creating staff', error);
     res.status(500).json({ message: 'Server error' });
@@ -47,7 +50,9 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
         name: true,
         email: true,
         createdAt: true,
-      }
+        _count: { select: { events: true } },
+      },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(staff);
   } catch (error) {
@@ -56,27 +61,26 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
   }
 };
 
-export const getTenantEvents = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getTenantStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const events = await prisma.event.findMany({
-      where: {
-        host: {
-          parentUserId: req.user!.userId,
-        }
-      },
-      include: {
-        host: {
-          select: { name: true }
-        },
-        _count: {
-          select: { participants: true, questions: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(events);
+    const userId = req.user!.userId;
+
+    const [staff, events, participants, liveEvents] = await Promise.all([
+      prisma.user.count({ where: { role: 'STAFF', parentUserId: userId } }),
+      prisma.event.count({
+        where: { OR: [{ hostId: userId }, { host: { parentUserId: userId } }] },
+      }),
+      prisma.participant.count({
+        where: { event: { OR: [{ hostId: userId }, { host: { parentUserId: userId } }] } },
+      }),
+      prisma.event.count({
+        where: { isLive: true, OR: [{ hostId: userId }, { host: { parentUserId: userId } }] },
+      }),
+    ]);
+
+    res.json({ staff, events, participants, liveEvents });
   } catch (error) {
-    console.error('Error fetching tenant events', error);
+    console.error('Error fetching tenant stats', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

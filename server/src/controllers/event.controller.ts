@@ -3,6 +3,7 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { generateRoomCode } from '../utils/roomCode';
 import { logActivity } from '../utils/logger';
+import { getAccessibleHostIds, canAccessEvent } from '../utils/access';
 
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -43,23 +44,25 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
       message: 'Event created successfully',
       event,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Create event error:', error);
-    res.status(500).json({ message: 'Internal server error', error: error?.message || String(error) });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 export const getHostEvents = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const hostId = req.user?.userId;
+    const { userId, role } = req.user!;
 
-    if (!hostId) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
+    // Scope events to the user's hierarchy (SUPERADMIN sees all)
+    const hostIds = await getAccessibleHostIds(userId, role);
 
     const events = await prisma.event.findMany({
+      where: hostIds === null ? undefined : { hostId: { in: hostIds } },
       include: {
+        host: {
+          select: { id: true, name: true, email: true, role: true },
+        },
         _count: {
           select: { questions: true, participants: true },
         },
@@ -70,7 +73,7 @@ export const getHostEvents = async (req: AuthRequest, res: Response): Promise<vo
     res.status(200).json({ events });
   } catch (error) {
     console.error('Get host events error:', error);
-    res.status(200).json({ events: [] });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -95,6 +98,12 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
+    const allowed = await canAccessEvent(req.user!.userId, req.user!.role, event.hostId);
+    if (!allowed) {
+      res.status(403).json({ message: 'Forbidden: You do not have access to this event.' });
+      return;
+    }
+
     res.status(200).json({ event });
   } catch (error) {
     console.error('Get event by ID error:', error);
@@ -105,7 +114,6 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
 export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const hostId = req.user?.userId;
 
     const event = await prisma.event.findUnique({ where: { id } });
 
@@ -114,14 +122,9 @@ export const deleteEvent = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { id: hostId } });
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    if (user.role !== 'SUPERADMIN' && event.hostId !== user.id) {
-      res.status(403).json({ message: 'Forbidden: You can only delete your own events.' });
+    const allowed = await canAccessEvent(req.user!.userId, req.user!.role, event.hostId);
+    if (!allowed) {
+      res.status(403).json({ message: 'Forbidden: You can only delete events in your organization.' });
       return;
     }
 
@@ -145,6 +148,12 @@ export const updateEventConfig = async (req: AuthRequest, res: Response): Promis
 
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    const allowed = await canAccessEvent(req.user!.userId, req.user!.role, event.hostId);
+    if (!allowed) {
+      res.status(403).json({ message: 'Forbidden: You do not have access to this event.' });
       return;
     }
 
@@ -172,14 +181,9 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user?.userId } });
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    if (user.role !== 'SUPERADMIN' && event.hostId !== user.id) {
-      res.status(403).json({ message: 'Forbidden: You can only clear data for your own events.' });
+    const allowed = await canAccessEvent(req.user!.userId, req.user!.role, event.hostId);
+    if (!allowed) {
+      res.status(403).json({ message: 'Forbidden: You can only clear data for events in your organization.' });
       return;
     }
 

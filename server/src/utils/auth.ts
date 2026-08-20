@@ -12,13 +12,19 @@ export const comparePassword = async (password: string, hash: string): Promise<b
   return bcrypt.compare(password, hash);
 };
 
-export const generateToken = (userId: string, email: string): string => {
-  return jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: '7d' });
+export interface TokenPayload {
+  userId: string;
+  email: string;
+  role: string;
+}
+
+export const generateToken = (userId: string, email: string, role: string): string => {
+  return jwt.sign({ userId, email, role }, JWT_SECRET, { expiresIn: '7d' });
 };
 
-export const verifyToken = (token: string): { userId: string; email: string } | null => {
+export const verifyToken = (token: string): TokenPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string; email: string };
+    return jwt.verify(token, JWT_SECRET) as TokenPayload;
   } catch (error) {
     return null;
   }

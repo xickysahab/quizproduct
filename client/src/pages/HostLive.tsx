@@ -5,7 +5,7 @@ import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award
 import { QRCodeSVG } from 'qrcode.react';
 import Logo from '../components/Logo';
 import { QUIZPULSE_PRESET } from '../constants/presets';
-import { socket } from '../socket/socket';
+import { socket, connectSocket } from '../socket/socket';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
@@ -35,8 +35,8 @@ const HostLive: React.FC = () => {
       setEvent(response.data.event);
       setParticipantCount(response.data.event._count?.participants || 0);
 
-      // Connect socket
-      socket.connect();
+      // Connect socket with auth token so the server can authorize host actions
+      connectSocket();
       socket.emit('host:join', id);
 
       // Setup socket listeners
@@ -46,6 +46,10 @@ const HostLive: React.FC = () => {
 
       socket.on('host:newResponseBatch', (data: { count: number }) => {
         setResponsesCount((prev) => prev + data.count);
+      });
+
+      socket.on('host:unauthorized', (data: { message: string }) => {
+        toast.error(data.message || 'Not authorized to host this event.');
       });
     } catch (error) {
       console.error('Failed to fetch event', error);
@@ -59,6 +63,7 @@ const HostLive: React.FC = () => {
     return () => {
       socket.off('host:participantJoined');
       socket.off('host:newResponseBatch');
+      socket.off('host:unauthorized');
       socket.disconnect();
     };
   }, []);

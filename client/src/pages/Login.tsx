@@ -31,15 +31,7 @@ const Login: React.FC = () => {
       const path = role ? `/${role.toLowerCase()}` : '/staff';
       navigate(path);
     } catch (err: any) {
-      // Fallback: If backend returns an error or is unreachable, allow hardcoded admin login
-      if (email === 'admin@admin.com' && password === 'admin@quizpulse') {
-        const fallbackUser = { id: 'admin-host-id', name: 'Admin Host', email: 'admin@admin.com', role: 'SUPERADMIN' };
-        const fallbackToken = 'admin_fallback_jwt_token';
-        login(fallbackUser, fallbackToken);
-        navigate('/superadmin');
-      } else {
-        setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
-      }
+      setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
     } finally {
       setLoading(false);
     }

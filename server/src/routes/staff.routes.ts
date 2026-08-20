@@ -1,16 +1,11 @@
 import { Router } from 'express';
 import { authenticateHost, authorizeRoles } from '../middleware/auth.middleware';
-import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfig, clearEventData } from '../controllers/event.controller';
+import { getStaffStats } from '../controllers/staff.controller';
 
 const router = Router();
 
-router.use(authenticateHost, authorizeRoles('STAFF', 'TENANT')); 
+router.use(authenticateHost, authorizeRoles('STAFF'));
 
-router.post('/events', createEvent);
-router.get('/events', getHostEvents);
-router.get('/events/:id', getEventById);
-router.delete('/events/:id', deleteEvent);
-router.put('/events/:id/config', updateEventConfig);
-router.delete('/events/:id/clear-data', clearEventData);
+router.get('/stats', getStaffStats);
 
 export default router;

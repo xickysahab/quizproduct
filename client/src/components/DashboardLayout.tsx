@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Menu, X, PlusCircle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import Navbar from './Navbar';
+import CreateQuizModal from './CreateQuizModal';
 
 interface SidebarItem {
   name: string;
@@ -18,9 +19,9 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItems, title, showCreateQuiz }) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [createQuizOpen, setCreateQuizOpen] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col">
@@ -62,10 +63,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
           {showCreateQuiz && (
             <div className="mt-auto mb-8 px-2">
               <button 
-                onClick={() => {
-                  /* Logic to open quiz creation modal or navigate */
-                  alert("Create Quiz Clicked");
-                }}
+                onClick={() => setCreateQuizOpen(true)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl gradient-btn text-white font-semibold hover:shadow-glow-md transition-all"
               >
                 <PlusCircle className="w-5 h-5" />
@@ -80,6 +78,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
           {children}
         </main>
       </div>
+
+      <CreateQuizModal isOpen={createQuizOpen} onClose={() => setCreateQuizOpen(false)} />
     </div>
   );
 };

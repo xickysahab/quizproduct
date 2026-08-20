@@ -5,7 +5,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
-    role?: string;
+    role: string;
   };
 }
 
@@ -23,19 +23,14 @@ export const authenticateHost = (req: AuthRequest, res: Response, next: NextFunc
     return;
   }
 
-  if (token === 'admin_fallback_jwt_token') {
-    req.user = { userId: 'admin-host-id', email: 'admin@admin.com', role: 'SUPERADMIN' };
-    return next();
-  }
+  const decoded = verifyToken(token);
 
-  const decoded = verifyToken(token) as any;
-
-  if (!decoded) {
-    res.status(401).json({ message: 'Invalid or expired token.' });
+  if (!decoded || !decoded.userId || !decoded.role) {
+    res.status(401).json({ message: 'Invalid or expired token. Please log in again.' });
     return;
   }
 
-  req.user = decoded;
+  req.user = { userId: decoded.userId, email: decoded.email, role: decoded.role };
   next();
 };
 

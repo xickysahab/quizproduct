@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -14,6 +15,7 @@ import subadminRoutes from './routes/subadmin.routes';
 import tenantRoutes from './routes/tenant.routes';
 import staffRoutes from './routes/staff.routes';
 import { initializeSocket } from './socket';
+import { ensureSuperAdmin } from './utils/bootstrap';
 
 dotenv.config();
 
@@ -34,7 +36,7 @@ const io = new Server(httpServer, {
 initializeSocket(io);
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 app.use(express.json());
@@ -57,4 +59,5 @@ app.get('/health', (req, res) => {
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  ensureSuperAdmin();
 });

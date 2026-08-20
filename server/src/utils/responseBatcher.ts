@@ -39,21 +39,32 @@ class ResponseBatcher {
     try {
       // For PostgreSQL, we use raw SQL to perform a bulk upsert.
       // This is much faster than running hundreds of individual upserts.
-      
-      const values = entries.map(e => {
-        const id = crypto.randomUUID();
-        return `('${id}', '${e.questionId}', '${e.participantId}', ${e.selectedOption}, ${e.isCorrect})`;
-      }).join(',');
+      // Values are passed as bind parameters to avoid SQL injection.
 
-      await prisma.$executeRawUnsafe(`
+      const placeholders = entries
+        .map((_, i) => `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`)
+        .join(',');
+
+      const params = entries.flatMap((e) => [
+        crypto.randomUUID(),
+        e.questionId,
+        e.participantId,
+        e.selectedOption,
+        e.isCorrect,
+      ]);
+
+      await prisma.$executeRawUnsafe(
+        `
         INSERT INTO "Response" ("id", "questionId", "participantId", "selectedOption", "isCorrect")
-        VALUES ${values}
+        VALUES ${placeholders}
         ON CONFLICT ("questionId", "participantId")
         DO UPDATE SET 
           "selectedOption" = EXCLUDED."selectedOption", 
           "isCorrect" = EXCLUDED."isCorrect",
           "respondedAt" = CURRENT_TIMESTAMP
-      `);
+      `,
+        ...params
+      );
       
       console.log(`🚀 Flushed ${entries.length} batched responses to database.`);
     } catch (error) {

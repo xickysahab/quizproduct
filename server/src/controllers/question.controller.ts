@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logActivity } from '../utils/logger';
+import { canAccessEvent } from '../utils/access';
 
 export const addQuestion = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -12,10 +13,10 @@ export const addQuestion = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    // Check if event exists and belongs to host
+    // Check if event exists and is within the user's hierarchy
     const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event || event.hostId !== req.user?.userId) {
-      res.status(403).json({ message: 'Forbidden. You do not own this event.' });
+    if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+      res.status(403).json({ message: 'Forbidden. You do not have access to this event.' });
       return;
     }
 
@@ -52,7 +53,7 @@ export const updateQuestion = async (req: AuthRequest, res: Response): Promise<v
       include: { event: true },
     });
 
-    if (!existingQuestion || existingQuestion.event.hostId !== req.user?.userId) {
+    if (!existingQuestion || !(await canAccessEvent(req.user!.userId, req.user!.role, existingQuestion.event.hostId))) {
       res.status(403).json({ message: 'Forbidden. Question not found or unauthorized.' });
       return;
     }
@@ -85,7 +86,7 @@ export const deleteQuestion = async (req: AuthRequest, res: Response): Promise<v
       include: { event: true },
     });
 
-    if (!existingQuestion || existingQuestion.event.hostId !== req.user?.userId) {
+    if (!existingQuestion || !(await canAccessEvent(req.user!.userId, req.user!.role, existingQuestion.event.hostId))) {
       res.status(403).json({ message: 'Forbidden. Question not found or unauthorized.' });
       return;
     }

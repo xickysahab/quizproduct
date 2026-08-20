@@ -1,48 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth';
-
-export const register = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      res.status(400).json({ message: 'Name, email, and password are required.' });
-      return;
-    }
-
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      res.status(400).json({ message: 'User with this email already exists.' });
-      return;
-    }
-
-    const hashedPassword = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
-    });
-
-    const token = generateToken(user.id, user.email);
-
-    res.status(201).json({
-      message: 'User registered successfully',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
+import { AuthRequest } from '../middleware/auth.middleware';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -51,21 +10,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     if (!email || !password) {
       res.status(400).json({ message: 'Email and password are required.' });
       return;
-    }
-
-    // Auto-create main admin if logging in with admin@admin.com and it doesn't exist
-    if (email === 'admin@admin.com' && password === 'admin') {
-      let user = await prisma.user.findUnique({ where: { email } });
-      if (!user) {
-        const hashedPassword = await hashPassword(password);
-        user = await prisma.user.create({
-          data: {
-            name: 'Main Admin',
-            email,
-            password: hashedPassword,
-          },
-        });
-      }
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
@@ -80,7 +24,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = generateToken(user.id, user.email);
+    const token = generateToken(user.id, user.email, user.role);
 
     res.status(200).json({
       message: 'Login successful',
@@ -89,11 +33,68 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.email === 'admin@admin.com' ? 'SUPERADMIN' : user.role,
+        role: user.role,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: error?.message || 'Internal server error', details: String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found.' });
+      return;
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ message: 'Current and new password are required.' });
+      return;
+    }
+
+    if (String(newPassword).length < 6) {
+      res.status(400).json({ message: 'New password must be at least 6 characters.' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) {
+      res.status(404).json({ message: 'User not found.' });
+      return;
+    }
+
+    const isPasswordValid = await comparePassword(currentPassword, user.password);
+    if (!isPasswordValid) {
+      res.status(401).json({ message: 'Current password is incorrect.' });
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: await hashPassword(newPassword) },
+    });
+
+    res.status(200).json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
