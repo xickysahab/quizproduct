@@ -9,8 +9,8 @@ import Logo from '../components/Logo';
 import { motion } from 'framer-motion';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('admin@admin.com');
-  const [password, setPassword] = useState('admin@quizpulse');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -62,11 +62,6 @@ const Login: React.FC = () => {
             </p>
           </div>
 
-          {/* Admin Credentials Info Pill */}
-          <div className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-3 rounded-2xl text-xs text-center font-medium mb-6 shadow-sm">
-            Default Host Credentials pre-filled for instant demo access
-          </div>
-
           {error && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -87,6 +82,7 @@ const Login: React.FC = () => {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="you@example.com"
                   value={email}
@@ -104,6 +100,7 @@ const Login: React.FC = () => {
                 <input
                   type="password"
                   required
+                  autoComplete="current-password"
                   className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="••••••••"
                   value={password}
