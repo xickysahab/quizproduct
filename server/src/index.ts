@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import authRoutes from './routes/auth.routes';
@@ -16,8 +15,7 @@ import tenantRoutes from './routes/tenant.routes';
 import staffRoutes from './routes/staff.routes';
 import { initializeSocket } from './socket';
 import { ensureSuperAdmin } from './utils/bootstrap';
-
-dotenv.config();
+import { allowedOrigins, corsOriginHandler } from './config/cors';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -28,7 +26,7 @@ const httpServer = createServer(app);
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: corsOriginHandler,
     methods: ['GET', 'POST']
   }
 });
@@ -36,7 +34,7 @@ const io = new Server(httpServer, {
 initializeSocket(io);
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: corsOriginHandler,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
 app.use(express.json());
@@ -59,5 +57,6 @@ app.get('/health', (req, res) => {
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🌐 Allowed CORS origins: ${allowedOrigins.join(', ')}`);
   ensureSuperAdmin();
 });
