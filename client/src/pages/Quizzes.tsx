@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight } from 'lucide-react';
+import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight, CopyPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -32,11 +32,15 @@ const Quizzes: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (nextPage = 1, append = false) => {
     try {
-      const response = await api.get('/events');
-      setEvents(response.data.events);
+      const response = await api.get('/events', { params: { page: nextPage, limit: 60 } });
+      setEvents((prev) => (append ? [...prev, ...response.data.events] : response.data.events));
+      setHasMore(Boolean(response.data.pagination?.hasMore));
+      setPage(nextPage);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load quizzes');
     } finally {
@@ -45,7 +49,7 @@ const Quizzes: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchEvents();
+    fetchEvents(1);
   }, []);
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -57,7 +61,7 @@ const Quizzes: React.FC = () => {
       await api.post('/events', { title: newEventTitle.trim() });
       toast.success('Quiz created!');
       setNewEventTitle('');
-      fetchEvents();
+      fetchEvents(1);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to create quiz');
     } finally {
@@ -71,10 +75,20 @@ const Quizzes: React.FC = () => {
       await api.delete(`/events/${deleteModal.eventId}`);
       toast.success('Quiz deleted');
       setDeleteModal({ isOpen: false, eventId: null });
-      fetchEvents();
+      fetchEvents(1);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete quiz');
       setDeleteModal({ isOpen: false, eventId: null });
+    }
+  };
+
+  const duplicateEvent = async (eventId: string) => {
+    try {
+      const res = await api.post(`/events/${eventId}/duplicate`);
+      toast.success('Quiz duplicated');
+      navigate(`/events/${res.data.event.id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not duplicate quiz');
     }
   };
 
@@ -221,6 +235,13 @@ const Quizzes: React.FC = () => {
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      onClick={() => duplicateEvent(event.id)}
+                      className="p-2.5 rounded-xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                      title="Duplicate quiz"
+                    >
+                      <CopyPlus className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => setDeleteModal({ isOpen: true, eventId: event.id })}
                       className="p-2.5 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all"
                       title="Delete Quiz"
@@ -231,6 +252,17 @@ const Quizzes: React.FC = () => {
                 </motion.div>
               ))}
             </AnimatePresence>
+          </div>
+        )}
+
+        {hasMore && !searchQuery && (
+          <div className="text-center">
+            <button
+              onClick={() => fetchEvents(page + 1, true)}
+              className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Load more
+            </button>
           </div>
         )}
       </div>

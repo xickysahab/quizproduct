@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, ShieldCheck, User as UserIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -7,7 +7,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
 
 const SettingsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,7 +23,10 @@ const SettingsPage: React.FC = () => {
 
     setSaving(true);
     try {
-      await api.put('/auth/password', { currentPassword, newPassword });
+      const res = await api.put('/auth/password', { currentPassword, newPassword });
+      if (res.data.token && user) {
+        login(user, res.data.token);
+      }
       toast.success('Password updated!');
       setCurrentPassword('');
       setNewPassword('');
@@ -97,7 +100,7 @@ const SettingsPage: React.FC = () => {
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
@@ -110,7 +113,7 @@ const SettingsPage: React.FC = () => {
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
@@ -126,8 +129,85 @@ const SettingsPage: React.FC = () => {
             </button>
           </form>
         </div>
+
+        {user?.role === 'TENANT' && <OrganizationSettings />}
       </div>
     </DashboardLayout>
+  );
+};
+
+const OrganizationSettings: React.FC = () => {
+  const [org, setOrg] = useState<any>(null);
+  const [usage, setUsage] = useState<any>(null);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/org/me').then((res) => {
+      setOrg(res.data.organization);
+      setUsage(res.data.usage);
+      setLogoUrl(res.data.organization.logoUrl || '');
+      setPrimaryColor(res.data.organization.primaryColor || '');
+    }).catch(() => undefined);
+  }, []);
+
+  if (!org) return null;
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.patch('/org/me', { logoUrl, primaryColor });
+      toast.success('Branding saved');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not save branding');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const checkout = async () => {
+    try {
+      const res = await api.post('/billing/checkout');
+      if (res.data.url) window.location.href = res.data.url;
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Billing is not configured');
+    }
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+      <h2 className="text-xl font-bold text-gray-900">Organization</h2>
+      <p className="text-sm text-gray-500">
+        Plan: <strong>{org.plan}</strong>
+        {usage && ` · ${usage.eventsCreated}/${usage.limits.eventsPerMonth} quizzes this month · ${usage.limits.participantsPerEvent} participants / quiz`}
+      </p>
+      <form onSubmit={save} className="space-y-3">
+        <input
+          value={logoUrl}
+          onChange={(e) => setLogoUrl(e.target.value)}
+          placeholder="Logo URL"
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
+        />
+        <input
+          value={primaryColor}
+          onChange={(e) => setPrimaryColor(e.target.value)}
+          placeholder="Primary color (#4F46E5)"
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
+        />
+        <div className="flex gap-3">
+          <button type="submit" disabled={saving} className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50">
+            Save branding
+          </button>
+          {org.plan === 'FREE' && (
+            <button type="button" onClick={checkout} className="px-6 py-3 rounded-xl border border-indigo-200 text-indigo-700 font-semibold text-sm">
+              Upgrade to Pro
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 };
 

@@ -36,6 +36,7 @@ export const sidebarForRole = (role?: Role): SidebarItem[] => {
         { name: 'SubAdmins', href: '/superadmin/subadmins', icon: Users },
         { name: 'All Tenants', href: '/superadmin/tenants', icon: Building2 },
         { name: 'All Quizzes', href: '/superadmin/quizzes', icon: ListPlus },
+        { name: 'Organizations', href: '/superadmin/organizations', icon: Building2 },
         { name: 'Activity Logs', href: '/superadmin/logs', icon: Activity },
         { name: 'Settings', href: '/superadmin/settings', icon: Settings },
       ];

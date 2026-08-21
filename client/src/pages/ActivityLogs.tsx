@@ -27,19 +27,23 @@ const ActivityLogs: React.FC = () => {
   const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(1);
   }, []);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (nextPage = 1, append = false) => {
     try {
-      const response = await api.get('/logs');
-      setLogs(response.data.logs);
+      const response = await api.get('/logs', { params: { page: nextPage, limit: 100 } });
+      setLogs((prev) => (append ? [...prev, ...(response.data.logs || [])] : response.data.logs || []));
+      setHasMore(Boolean(response.data.pagination?.hasMore));
+      setPage(nextPage);
     } catch (error: any) {
       console.error('Failed to fetch logs', error);
       if (error.response?.status === 403) {
-        navigate('/dashboard'); // Fallback if non-admin tries to access directly
+        navigate('/dashboard');
       }
     } finally {
       setLoading(false);
@@ -158,6 +162,13 @@ const ActivityLogs: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {hasMore && (
+            <div className="p-4 text-center border-t border-gray-100">
+              <button onClick={() => fetchLogs(page + 1, true)} className="text-sm font-semibold text-indigo-600">
+                Load more
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

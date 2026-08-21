@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, UserPlus, Mail, Lock, User as UserIcon, Users } from 'lucide-react';
+import { X, UserPlus, Mail, Lock, User as UserIcon, Users, Ban, Trash2, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -13,6 +13,7 @@ interface ManagedUser {
   name: string;
   email: string;
   createdAt: string;
+  isActive?: boolean;
   parentUser?: { name: string; email: string } | null;
   _count?: { subUsers?: number; events?: number };
 }
@@ -32,6 +33,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [creating, setCreating] = useState(false);
+  const [inviteMode, setInviteMode] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -54,8 +56,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
 
     setCreating(true);
     try {
-      await api.post(createUrl, form);
-      toast.success(`${entityLabel} created!`);
+      if (inviteMode) {
+        await api.post('/invites', { email: form.email });
+        toast.success(`Invite sent to ${form.email}`);
+      } else {
+        await api.post(createUrl, form);
+        toast.success(`${entityLabel} created!`);
+      }
       setForm({ name: '', email: '', password: '' });
       setModalOpen(false);
       fetchUsers();
@@ -63,6 +70,27 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
       toast.error(error.response?.data?.message || `Failed to create ${entityLabel}`);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const toggleActive = async (u: ManagedUser) => {
+    try {
+      await api.patch(`/users/${u.id}`, { isActive: !u.isActive });
+      toast.success(u.isActive ? 'Account deactivated' : 'Account reactivated');
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not update user');
+    }
+  };
+
+  const removeUser = async (u: ManagedUser) => {
+    if (!window.confirm(`Remove ${u.name}? This only works if they have no quizzes or sub-users.`)) return;
+    try {
+      await api.delete(`/users/${u.id}`);
+      toast.success('User removed');
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not remove user');
     }
   };
 
@@ -99,7 +127,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                   <th className="px-6 py-4">Email</th>
                   {showManagedBy && <th className="px-6 py-4">Managed By</th>}
                   {showCount && <th className="px-6 py-4">{countLabel}</th>}
+                  <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Created</th>
+                  <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,8 +161,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                           </span>
                         </td>
                       )}
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 text-xs font-bold rounded-md ${u.isActive === false ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {u.isActive === false ? 'Inactive' : 'Active'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 font-mono text-xs text-gray-500 whitespace-nowrap">
                         {format(new Date(u.createdAt), 'MMM dd, yyyy')}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => toggleActive(u)} className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50" title={u.isActive === false ? 'Reactivate' : 'Deactivate'}>
+                            <Ban className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => removeUser(u)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -182,7 +227,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                     <UserIcon className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      required
+                      required={!inviteMode}
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
@@ -212,22 +257,32 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                     <Lock className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
-                      required
-                      minLength={6}
+                      required={!inviteMode}
+                      disabled={inviteMode}
+                      minLength={8}
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
-                      placeholder="Min. 6 characters"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm disabled:opacity-50"
+                      placeholder="Min. 8 characters"
                     />
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setInviteMode((v) => !v)}
+                  className="w-full text-sm font-semibold text-indigo-600 flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  {inviteMode ? 'Switch to create with password' : 'Or send an email invite instead'}
+                </button>
 
                 <button
                   type="submit"
                   disabled={creating}
                   className="w-full mt-4 gradient-btn text-white font-semibold py-3 rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
                 >
-                  {creating ? 'Creating...' : `Create ${entityLabel}`}
+                  {creating ? 'Saving...' : inviteMode ? `Send ${entityLabel} invite` : `Create ${entityLabel}`}
                 </button>
               </form>
             </motion.div>

@@ -24,6 +24,7 @@ const HostLive: React.FC = () => {
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [showQR, setShowQR] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useEffect(() => {
     fetchEventDetails();
@@ -46,6 +47,9 @@ const HostLive: React.FC = () => {
 
       socket.on('host:newResponseBatch', (data: { count: number }) => {
         setResponsesCount((prev) => prev + data.count);
+        api.get(`/analytics/events/${id}/leaderboard`).then((res) => {
+          setLeaderboard((res.data.leaderboard || []).slice(0, 5));
+        }).catch(() => undefined);
       });
 
       socket.on('host:unauthorized', (data: { message: string }) => {
@@ -438,18 +442,31 @@ const HostLive: React.FC = () => {
 
               {/* Options Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                {activeQuestion.options.map((opt: string, idx: number) => (
+                {(activeQuestion.options || []).map((opt: string, idx: number) => (
                   <div
                     key={idx}
                     className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 transition-all hover:border-indigo-300 hover:bg-gray-50 shadow-sm hover-card"
                   >
                     <span className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 font-heading text-lg font-bold flex items-center justify-center border border-indigo-100">
-                      {['A', 'B', 'C', 'D'][idx]}
+                      {['A', 'B', 'C', 'D', 'E', 'F'][idx] || idx + 1}
                     </span>
                     <span className="text-lg font-medium text-gray-700">{opt}</span>
                   </div>
                 ))}
               </div>
+              {leaderboard.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">Live leaderboard</h3>
+                  <ol className="space-y-2">
+                    {leaderboard.map((row) => (
+                      <li key={row.participantId} className="flex justify-between text-sm">
+                        <span>{row.rank}. {row.name}</span>
+                        <span className="font-bold text-indigo-600">{row.score}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </motion.div>
           )}
         </div>

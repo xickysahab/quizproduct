@@ -3,14 +3,16 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
+import { validateNewUser } from '../utils/validation';
 
 export const createSubAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      res.status(400).json({ message: 'Name, email and password are required.' });
+    const parsed = validateNewUser(req.body);
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
       return;
     }
+    const { name, email, password } = parsed.value;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -49,6 +51,7 @@ export const getSubAdmins = async (_req: AuthRequest, res: Response): Promise<vo
         id: true,
         name: true,
         email: true,
+        isActive: true,
         createdAt: true,
         _count: { select: { subUsers: true } },
       },
@@ -69,6 +72,7 @@ export const getAllTenants = async (_req: AuthRequest, res: Response): Promise<v
         id: true,
         name: true,
         email: true,
+        isActive: true,
         createdAt: true,
         parentUser: { select: { name: true, email: true } },
         _count: { select: { subUsers: true } },

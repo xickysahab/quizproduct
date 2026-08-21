@@ -248,6 +248,9 @@ const EventDetails: React.FC = () => {
                           {q.text}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold uppercase tracking-wider">
+                            {(q.type || 'MCQ').replace('_', ' ')}
+                          </span>
                           <Clock className="w-3.5 h-3.5 text-indigo-600" />
                           <span>{q.timeLimit > 0 ? `${q.timeLimit} seconds timer` : 'Manual advance (No timer)'}</span>
                         </div>
@@ -256,7 +259,7 @@ const EventDetails: React.FC = () => {
 
                     {/* Options Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      {q.options.map((opt: string, optIdx: number) => {
+                      {(q.options || []).map((opt: string, optIdx: number) => {
                         const isCorrect = q.correctOption === optIdx;
                         return (
                           <div
@@ -304,6 +307,8 @@ const EventDetails: React.FC = () => {
             </AnimatePresence>
           </div>
         )}
+
+        <EventReports eventId={id!} />
       </main>
 
       <Footer />
@@ -347,3 +352,69 @@ const EventDetails: React.FC = () => {
 };
 
 export default EventDetails;
+
+const EventReports: React.FC<{ eventId: string }> = ({ eventId }) => {
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      api.get(`/analytics/events/${eventId}/leaderboard`).then((r) => setLeaderboard(r.data.leaderboard || [])).catch(() => undefined),
+      api.get(`/analytics/events/${eventId}/participants`).then((r) => setParticipants(r.data.participants || [])).catch(() => undefined),
+    ]);
+  }, [eventId]);
+
+  if (!leaderboard.length && !participants.length) return null;
+
+  return (
+    <div className="mt-12 space-y-6 print:block">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Results</h2>
+        <button onClick={() => window.print()} className="text-sm font-semibold text-indigo-600">
+          Print / Save PDF
+        </button>
+      </div>
+      {leaderboard.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-4 py-3 text-left">Rank</th>
+                <th className="px-4 py-3 text-left">Player</th>
+                <th className="px-4 py-3 text-right">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.slice(0, 20).map((row) => (
+                <tr key={row.participantId} className="border-t border-gray-100">
+                  <td className="px-4 py-2">{row.rank}</td>
+                  <td className="px-4 py-2 font-medium">{row.name}</td>
+                  <td className="px-4 py-2 text-right">{row.score}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {participants.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+          <h3 className="font-bold text-gray-900">Participant breakdown</h3>
+          {participants.map((p) => (
+            <details key={p.id} className="border border-gray-100 rounded-xl p-3">
+              <summary className="cursor-pointer font-medium text-sm">
+                {p.name} · {p.score} pts
+              </summary>
+              <ul className="mt-2 text-xs text-gray-600 space-y-1">
+                {p.answers.map((a: any) => (
+                  <li key={a.questionId}>
+                    {a.text}: {a.answer ?? '—'} {a.isCorrect ? '(correct)' : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

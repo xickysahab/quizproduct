@@ -1,35 +1,46 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import SubAdminDashboard from './pages/SubAdminDashboard';
-import TenantDashboard from './pages/TenantDashboard';
-import StaffDashboard from './pages/StaffDashboard';
-import UserManagement from './pages/UserManagement';
-import Quizzes from './pages/Quizzes';
-import SettingsPage from './pages/SettingsPage';
-import EventDetails from './pages/EventDetails';
-import HostLive from './pages/HostLive';
+import ErrorBoundary from './components/ErrorBoundary';
 import Join from './pages/Join';
 import LiveQuiz from './pages/LiveQuiz';
-import ActivityLogs from './pages/ActivityLogs';
 
-// Protected Route Wrapper for Host Pages
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+const Login = lazy(() => import('./pages/Login'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const SubAdminDashboard = lazy(() => import('./pages/SubAdminDashboard'));
+const TenantDashboard = lazy(() => import('./pages/TenantDashboard'));
+const StaffDashboard = lazy(() => import('./pages/StaffDashboard'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const Quizzes = lazy(() => import('./pages/Quizzes'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const EventDetails = lazy(() => import('./pages/EventDetails'));
+const HostLive = lazy(() => import('./pages/HostLive'));
+const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
+const Organizations = lazy(() => import('./pages/Organizations'));
+
+const PageFallback = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">
+    Loading...
+  </div>
+);
+
+const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode, allowedRoles?: string[] }) => {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />; // Or unauthorized page
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
-// Global redirect for legacy /dashboard paths
 const DashboardRedirect = () => {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -40,135 +51,133 @@ const DashboardRedirect = () => {
 
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Public Participant Routes */}
-      <Route path="/" element={<Join />} />
-      <Route path="/live/:roomCode" element={<LiveQuiz />} />
+    <Suspense fallback={<PageFallback />}>
+      <Routes>
+        <Route path="/" element={<Join />} />
+        <Route path="/live/:roomCode" element={<LiveQuiz />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+        <Route path="/dashboard" element={<DashboardRedirect />} />
 
-      {/* Host Auth Routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/dashboard" element={<DashboardRedirect />} />
+        <Route path="/superadmin" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><SuperAdminDashboard /></ProtectedRoute>
+        } />
+        <Route path="/superadmin/subadmins" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}>
+            <UserManagement
+              pageTitle="SubAdmins"
+              entityLabel="SubAdmin"
+              fetchUrl="/superadmin/subadmins"
+              createUrl="/superadmin/subadmins"
+              countLabel="Tenants"
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/superadmin/tenants" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}>
+            <UserManagement
+              pageTitle="All Tenants"
+              entityLabel="Tenant"
+              fetchUrl="/superadmin/tenants"
+              countLabel="Staff"
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/superadmin/quizzes" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><Quizzes /></ProtectedRoute>
+        } />
+        <Route path="/superadmin/organizations" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><Organizations /></ProtectedRoute>
+        } />
+        <Route path="/superadmin/logs" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><ActivityLogs /></ProtectedRoute>
+        } />
+        <Route path="/superadmin/settings" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><SettingsPage /></ProtectedRoute>
+        } />
 
-      {/* SuperAdmin */}
-      <Route path="/superadmin" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}><SuperAdminDashboard /></ProtectedRoute>
-      } />
-      <Route path="/superadmin/subadmins" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}>
-          <UserManagement
-            pageTitle="SubAdmins"
-            entityLabel="SubAdmin"
-            fetchUrl="/superadmin/subadmins"
-            createUrl="/superadmin/subadmins"
-            countLabel="Tenants"
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/superadmin/tenants" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}>
-          <UserManagement
-            pageTitle="All Tenants"
-            entityLabel="Tenant"
-            fetchUrl="/superadmin/tenants"
-            countLabel="Staff"
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/superadmin/quizzes" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}><Quizzes /></ProtectedRoute>
-      } />
-      <Route path="/superadmin/logs" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}><ActivityLogs /></ProtectedRoute>
-      } />
-      <Route path="/superadmin/settings" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN']}><SettingsPage /></ProtectedRoute>
-      } />
+        <Route path="/subadmin" element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}><SubAdminDashboard /></ProtectedRoute>
+        } />
+        <Route path="/subadmin/tenants" element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}>
+            <UserManagement
+              pageTitle="My Tenants"
+              entityLabel="Tenant"
+              fetchUrl="/subadmin/tenants"
+              createUrl="/subadmin/tenants"
+              countLabel="Staff"
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/subadmin/quizzes" element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}><Quizzes /></ProtectedRoute>
+        } />
+        <Route path="/subadmin/logs" element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}><ActivityLogs /></ProtectedRoute>
+        } />
+        <Route path="/subadmin/settings" element={
+          <ProtectedRoute allowedRoles={['SUBADMIN']}><SettingsPage /></ProtectedRoute>
+        } />
 
-      {/* SubAdmin */}
-      <Route path="/subadmin" element={
-        <ProtectedRoute allowedRoles={['SUBADMIN']}><SubAdminDashboard /></ProtectedRoute>
-      } />
-      <Route path="/subadmin/tenants" element={
-        <ProtectedRoute allowedRoles={['SUBADMIN']}>
-          <UserManagement
-            pageTitle="My Tenants"
-            entityLabel="Tenant"
-            fetchUrl="/subadmin/tenants"
-            createUrl="/subadmin/tenants"
-            countLabel="Staff"
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/subadmin/quizzes" element={
-        <ProtectedRoute allowedRoles={['SUBADMIN']}><Quizzes /></ProtectedRoute>
-      } />
-      <Route path="/subadmin/logs" element={
-        <ProtectedRoute allowedRoles={['SUBADMIN']}><ActivityLogs /></ProtectedRoute>
-      } />
-      <Route path="/subadmin/settings" element={
-        <ProtectedRoute allowedRoles={['SUBADMIN']}><SettingsPage /></ProtectedRoute>
-      } />
+        <Route path="/tenant" element={
+          <ProtectedRoute allowedRoles={['TENANT']}><TenantDashboard /></ProtectedRoute>
+        } />
+        <Route path="/tenant/staff" element={
+          <ProtectedRoute allowedRoles={['TENANT']}>
+            <UserManagement
+              pageTitle="My Staff"
+              entityLabel="Staff"
+              fetchUrl="/tenant/staff"
+              createUrl="/tenant/staff"
+              countLabel="Quizzes"
+            />
+          </ProtectedRoute>
+        } />
+        <Route path="/tenant/quizzes" element={
+          <ProtectedRoute allowedRoles={['TENANT']}><Quizzes /></ProtectedRoute>
+        } />
+        <Route path="/tenant/settings" element={
+          <ProtectedRoute allowedRoles={['TENANT']}><SettingsPage /></ProtectedRoute>
+        } />
 
-      {/* Tenant */}
-      <Route path="/tenant" element={
-        <ProtectedRoute allowedRoles={['TENANT']}><TenantDashboard /></ProtectedRoute>
-      } />
-      <Route path="/tenant/staff" element={
-        <ProtectedRoute allowedRoles={['TENANT']}>
-          <UserManagement
-            pageTitle="My Staff"
-            entityLabel="Staff"
-            fetchUrl="/tenant/staff"
-            createUrl="/tenant/staff"
-            countLabel="Quizzes"
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/tenant/quizzes" element={
-        <ProtectedRoute allowedRoles={['TENANT']}><Quizzes /></ProtectedRoute>
-      } />
-      <Route path="/tenant/settings" element={
-        <ProtectedRoute allowedRoles={['TENANT']}><SettingsPage /></ProtectedRoute>
-      } />
+        <Route path="/staff" element={
+          <ProtectedRoute allowedRoles={['STAFF']}><StaffDashboard /></ProtectedRoute>
+        } />
+        <Route path="/staff/quizzes" element={
+          <ProtectedRoute allowedRoles={['STAFF']}><Quizzes /></ProtectedRoute>
+        } />
+        <Route path="/staff/settings" element={
+          <ProtectedRoute allowedRoles={['STAFF']}><SettingsPage /></ProtectedRoute>
+        } />
 
-      {/* Staff */}
-      <Route path="/staff" element={
-        <ProtectedRoute allowedRoles={['STAFF']}><StaffDashboard /></ProtectedRoute>
-      } />
-      <Route path="/staff/quizzes" element={
-        <ProtectedRoute allowedRoles={['STAFF']}><Quizzes /></ProtectedRoute>
-      } />
-      <Route path="/staff/settings" element={
-        <ProtectedRoute allowedRoles={['STAFF']}><SettingsPage /></ProtectedRoute>
-      } />
-
-      {/* Shared Admin Routes (legacy path kept for compatibility) */}
-      <Route path="/admin/logs" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN']}><ActivityLogs /></ProtectedRoute>
-      } />
-
-      {/* Event Management Routes */}
-      <Route path="/events/:id" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><EventDetails /></ProtectedRoute>
-      } />
-      <Route path="/host/live/:id" element={
-        <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><HostLive /></ProtectedRoute>
-      } />
-
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="/admin/logs" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN']}><ActivityLogs /></ProtectedRoute>
+        } />
+        <Route path="/events/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><EventDetails /></ProtectedRoute>
+        } />
+        <Route path="/host/live/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><HostLive /></ProtectedRoute>
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <Toaster position="top-center" />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Toaster position="top-center" />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

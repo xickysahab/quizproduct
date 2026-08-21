@@ -3,42 +3,59 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logActivity } from '../utils/logger';
 import { canAccessEvent } from '../utils/access';
+import { normalizeQuestionInput } from '../utils/questionTypes';
+import { assertCanAddQuestion } from '../utils/usage';
+import { slog } from '../utils/slog';
 
 export const addQuestion = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { eventId, text, options, correctOption, timeLimit } = req.body;
-
-    if (!eventId || !text || !Array.isArray(options) || options.length < 2) {
-      res.status(400).json({ message: 'Event ID, question text, and at least 2 options are required.' });
+    const parsed = normalizeQuestionInput(req.body || {});
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
       return;
     }
 
-    // Check if event exists and is within the user's hierarchy
+    const eventId = req.body?.eventId;
+    if (typeof eventId !== 'string') {
+      res.status(400).json({ message: 'Event ID is required.' });
+      return;
+    }
+
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
       res.status(403).json({ message: 'Forbidden. You do not have access to this event.' });
       return;
     }
 
-    // Get current question count to set order
     const count = await prisma.question.count({ where: { eventId } });
+    const quota = await assertCanAddQuestion(event.organizationId, count);
+    if (!quota.ok) {
+      res.status(402).json({ message: quota.message });
+      return;
+    }
 
     const question = await prisma.question.create({
       data: {
         eventId,
-        text,
-        options,
-        correctOption: correctOption !== undefined && correctOption !== null ? Number(correctOption) : null,
+        type: parsed.value.type,
+        text: parsed.value.text,
+        options: parsed.value.options,
+        correctOption: parsed.value.correctOption,
+        correctOptions: parsed.value.correctOptions,
         order: count + 1,
-        timeLimit: timeLimit ? Number(timeLimit) : null,
+        timeLimit: parsed.value.timeLimit,
       },
     });
 
-    await logActivity(req.user?.userId, 'ADD_QUESTION', 'Question', question.id, { eventId, text: question.text });
+    await logActivity(req.user?.userId, 'ADD_QUESTION', 'Question', question.id, {
+      eventId,
+      text: question.text,
+      type: question.type,
+    });
 
     res.status(201).json({ message: 'Question created successfully', question });
   } catch (error) {
-    console.error('Add question error:', error);
+    slog('error', 'question.add_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -46,7 +63,6 @@ export const addQuestion = async (req: AuthRequest, res: Response): Promise<void
 export const updateQuestion = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { text, options, correctOption, timeLimit } = req.body;
 
     const existingQuestion = await prisma.question.findUnique({
       where: { id },
@@ -58,21 +74,33 @@ export const updateQuestion = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const question = await prisma.question.update({
-      where: { id },
-      data: {
-        text: text || existingQuestion.text,
-        options: options || existingQuestion.options,
-        correctOption: correctOption !== undefined ? (correctOption === null ? null : Number(correctOption)) : existingQuestion.correctOption,
-        timeLimit: timeLimit !== undefined ? (timeLimit === null || timeLimit === 0 ? null : Number(timeLimit)) : existingQuestion.timeLimit,
-      },
+    const parsed = normalizeQuestionInput({
+      type: req.body?.type ?? existingQuestion.type,
+      text: req.body?.text ?? existingQuestion.text,
+      options: req.body?.options ?? existingQuestion.options,
+      correctOption: req.body?.correctOption === undefined ? existingQuestion.correctOption : req.body.correctOption,
+      correctOptions: req.body?.correctOptions ?? existingQuestion.correctOptions,
+      timeLimit: req.body?.timeLimit === undefined ? existingQuestion.timeLimit : req.body.timeLimit,
     });
 
-    await logActivity(req.user?.userId, 'UPDATE_QUESTION', 'Question', question.id, { eventId: existingQuestion.eventId, text: question.text });
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
+      return;
+    }
+
+    const question = await prisma.question.update({
+      where: { id },
+      data: parsed.value,
+    });
+
+    await logActivity(req.user?.userId, 'UPDATE_QUESTION', 'Question', question.id, {
+      eventId: existingQuestion.eventId,
+      text: question.text,
+    });
 
     res.status(200).json({ message: 'Question updated successfully', question });
   } catch (error) {
-    console.error('Update question error:', error);
+    slog('error', 'question.update_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -93,11 +121,14 @@ export const deleteQuestion = async (req: AuthRequest, res: Response): Promise<v
 
     await prisma.question.delete({ where: { id } });
 
-    await logActivity(req.user?.userId, 'DELETE_QUESTION', 'Question', id, { eventId: existingQuestion.eventId, text: existingQuestion.text });
+    await logActivity(req.user?.userId, 'DELETE_QUESTION', 'Question', id, {
+      eventId: existingQuestion.eventId,
+      text: existingQuestion.text,
+    });
 
     res.status(200).json({ message: 'Question deleted successfully' });
   } catch (error) {
-    console.error('Delete question error:', error);
+    slog('error', 'question.delete_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

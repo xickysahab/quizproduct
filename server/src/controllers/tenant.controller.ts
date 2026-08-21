@@ -3,14 +3,16 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
+import { validateNewUser } from '../utils/validation';
 
 export const createStaff = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      res.status(400).json({ message: 'Missing fields' });
+    const parsed = validateNewUser(req.body);
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
       return;
     }
+    const { name, email, password } = parsed.value;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -19,6 +21,10 @@ export const createStaff = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const hashedPassword = await hashPassword(password);
+    const parent = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { organizationId: true },
+    });
     const staff = await prisma.user.create({
       data: {
         name,
@@ -26,6 +32,7 @@ export const createStaff = async (req: AuthRequest, res: Response): Promise<void
         password: hashedPassword,
         role: 'STAFF',
         parentUserId: req.user!.userId,
+        organizationId: parent?.organizationId,
       }
     });
 
@@ -49,6 +56,7 @@ export const getStaff = async (req: AuthRequest, res: Response): Promise<void> =
         id: true,
         name: true,
         email: true,
+        isActive: true,
         createdAt: true,
         _count: { select: { events: true } },
       },

@@ -4,14 +4,17 @@ import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
 import { getAccessibleHostIds } from '../utils/access';
+import { validateNewUser } from '../utils/validation';
+import { createOrganization } from '../utils/org';
 
 export const createTenant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      res.status(400).json({ message: 'Missing fields' });
+    const parsed = validateNewUser(req.body);
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
       return;
     }
+    const { name, email, password } = parsed.value;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -20,6 +23,7 @@ export const createTenant = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     const hashedPassword = await hashPassword(password);
+    const org = await createOrganization(name);
     const tenant = await prisma.user.create({
       data: {
         name,
@@ -27,6 +31,7 @@ export const createTenant = async (req: AuthRequest, res: Response): Promise<voi
         password: hashedPassword,
         role: 'TENANT',
         parentUserId: req.user!.userId,
+        organizationId: org.id,
       }
     });
 
@@ -50,6 +55,7 @@ export const getTenants = async (req: AuthRequest, res: Response): Promise<void>
         id: true,
         name: true,
         email: true,
+        isActive: true,
         createdAt: true,
         _count: { select: { subUsers: true } },
       },

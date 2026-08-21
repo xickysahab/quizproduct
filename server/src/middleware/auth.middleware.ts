@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/auth';
+import { getUserAuthState } from '../utils/userStatus';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -9,7 +10,11 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticateHost = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const authenticateHost = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -27,6 +32,19 @@ export const authenticateHost = (req: AuthRequest, res: Response, next: NextFunc
 
   if (!decoded || !decoded.userId || !decoded.role) {
     res.status(401).json({ message: 'Invalid or expired token. Please log in again.' });
+    return;
+  }
+
+  const state = await getUserAuthState(decoded.userId);
+  if (!state?.isActive) {
+    res.status(403).json({ message: 'This account has been deactivated.' });
+    return;
+  }
+
+  // Tokens minted before password-reset/tokenVersion still work (missing field
+  // is treated as 0). After a password change the version bumps and old JWTs die.
+  if ((decoded.tokenVersion ?? 0) !== state.tokenVersion) {
+    res.status(401).json({ message: 'Session expired. Please log in again.' });
     return;
   }
 

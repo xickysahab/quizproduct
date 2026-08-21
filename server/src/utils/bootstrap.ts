@@ -1,5 +1,7 @@
 import prisma from '../config/prisma';
 import { hashPassword } from './auth';
+import { backfillOrganizations } from './org';
+import { slog } from './slog';
 
 /**
  * Ensures a SUPERADMIN account exists so the platform is never locked out.
@@ -21,20 +23,17 @@ export const ensureSuperAdmin = async (): Promise<void> => {
           role: 'SUPERADMIN',
         },
       });
-      console.log(`✅ SuperAdmin account created: ${email}`);
+      slog('info', 'bootstrap.superadmin.created', { email });
     } else if (existing.role !== 'SUPERADMIN') {
-      // Repair accounts created by the old broken bootstrap flow (wrong role/password)
       await prisma.user.update({
         where: { email },
         data: { role: 'SUPERADMIN', password: await hashPassword(password) },
       });
-      console.log(`✅ SuperAdmin role repaired for: ${email}`);
+      slog('info', 'bootstrap.superadmin.repaired', { email });
     }
 
-    if (!process.env.SUPERADMIN_PASSWORD) {
-      console.warn('⚠️  Using default SuperAdmin password. Set SUPERADMIN_PASSWORD in .env for production.');
-    }
+    await backfillOrganizations();
   } catch (error) {
-    console.error('Failed to ensure SuperAdmin account:', error);
+    slog('error', 'bootstrap.failed', { error: error instanceof Error ? error.message : String(error) });
   }
 };

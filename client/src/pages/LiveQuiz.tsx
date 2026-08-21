@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2, CheckCircle2, Award, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Logo from '../components/Logo';
-import { socket } from '../socket/socket';
+import { socket, connectAsParticipant } from '../socket/socket';
 import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,65 +12,97 @@ const LiveQuiz: React.FC = () => {
   const navigate = useNavigate();
 
   const [participantName, setParticipantName] = useState<string | null>(null);
-  const [participantId, setParticipantId] = useState<string | null>(null);
-  const [eventId, setEventId] = useState<string | null>(null);
-
   const [activeQuestion, setActiveQuestion] = useState<any>(null);
   const [currentSelection, setCurrentSelection] = useState<number | null>(null);
+  const [multiSelection, setMultiSelection] = useState<number[]>([]);
+  const [textAnswer, setTextAnswer] = useState('');
+  const [submitted, setSubmitted] = useState(false);
   const [quizEnded, setQuizEnded] = useState(false);
+  const [myResult, setMyResult] = useState<{ score: number; rank: number; totalParticipants: number } | null>(null);
 
   useEffect(() => {
     const pName = localStorage.getItem('participantName');
     const pId = localStorage.getItem('participantId');
     const eId = localStorage.getItem('eventId');
+    const pToken = localStorage.getItem('participantToken');
 
-    if (!pName || !pId || !eId) {
+    // Sessions saved before room tokens existed cannot answer, so send them
+    // back to rejoin rather than letting every submission fail.
+    if (!pName || !pId || !eId || !pToken) {
       navigate('/');
       return;
     }
 
     setParticipantName(pName);
-    setParticipantId(pId);
-    setEventId(eId);
 
-    // Connect Socket
-    socket.connect();
-    socket.emit('participant:join', eId, pId);
+    connectAsParticipant();
+    socket.emit('participant:join');
 
-    // Socket Listeners
     socket.on('participant:questionActive', ({ question, selectedOption }) => {
       setCurrentSelection(selectedOption !== undefined ? selectedOption : null);
+      setMultiSelection([]);
+      setTextAnswer('');
+      setSubmitted(selectedOption !== undefined && selectedOption !== null);
       setActiveQuestion(question);
     });
 
-    socket.on('participant:quizEnded', () => {
+    socket.on('participant:quizEnded', async () => {
       setQuizEnded(true);
       setActiveQuestion(null);
+      try {
+        const res = await api.get('/participants/me');
+        setMyResult(res.data);
+      } catch {
+        /* score is optional */
+      }
+    });
+
+    socket.on('participant:unauthorized', ({ message }) => {
+      toast.error(message || 'Session expired. Please rejoin the room.');
+      localStorage.removeItem('participantToken');
+      navigate('/');
     });
 
     return () => {
       socket.off('participant:questionActive');
       socket.off('participant:quizEnded');
+      socket.off('participant:unauthorized');
       socket.disconnect();
     };
   }, [navigate]);
 
-  const submitAnswer = async (index: number) => {
-    if (!activeQuestion) return;
-
-    setCurrentSelection(index);
+  const submitAnswer = async (payload: Record<string, unknown>): Promise<boolean> => {
+    if (!activeQuestion) return false;
 
     try {
       await api.post('/participants/response', {
-        participantId,
         questionId: activeQuestion.id,
-        selectedOption: index,
+        ...payload,
       });
-      socket.emit('participant:submitAnswer', eventId);
-    } catch (error) {
-      console.error('Failed to submit response', error);
-      toast.error('Unable to save response. The question may have been closed by the host.');
+      socket.emit('participant:submitAnswer');
+      setSubmitted(true);
+      return true;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('participantToken');
+        toast.error('Session expired. Please rejoin the room.');
+        navigate('/');
+        return false;
+      }
+
+      toast.error(
+        error.response?.data?.message ||
+          'Unable to save response. The question may have been closed by the host.'
+      );
+      return false;
     }
+  };
+
+  const submitMcq = async (index: number) => {
+    const previousSelection = currentSelection;
+    setCurrentSelection(index);
+    const ok = await submitAnswer({ selectedOption: index });
+    if (!ok) setCurrentSelection(previousSelection);
   };
 
   if (quizEnded) {
@@ -97,7 +129,10 @@ const LiveQuiz: React.FC = () => {
               Quiz Completed!
             </h1>
             <p className="text-sm text-gray-500 mt-2">
-              Thank you for participating, <span className="font-semibold text-gray-900">{participantName}</span>. Your responses were recorded.
+              Thank you for participating, <span className="font-semibold text-gray-900">{participantName}</span>.
+              {myResult
+                ? ` You scored ${myResult.score} point${myResult.score === 1 ? '' : 's'} (rank ${myResult.rank} of ${myResult.totalParticipants}).`
+                : ' Your responses were recorded.'}
             </p>
           </div>
 
@@ -180,12 +215,68 @@ const LiveQuiz: React.FC = () => {
 
               {/* Options List */}
               <div className="space-y-3.5 pt-2">
-                {activeQuestion.options.map((opt: string, idx: number) => {
+                {(activeQuestion.type === 'OPEN_TEXT' || activeQuestion.type === 'WORD_CLOUD') && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submitAnswer({ answerText: textAnswer });
+                    }}
+                    className="space-y-3"
+                  >
+                    <textarea
+                      value={textAnswer}
+                      onChange={(e) => setTextAnswer(e.target.value)}
+                      rows={3}
+                      maxLength={280}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 outline-none focus:border-indigo-500"
+                      placeholder={activeQuestion.type === 'WORD_CLOUD' ? 'Type a word or short phrase' : 'Type your answer'}
+                    />
+                    <button type="submit" disabled={!textAnswer.trim()} className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50">
+                      {submitted ? 'Update answer' : 'Submit answer'}
+                    </button>
+                  </form>
+                )}
+
+                {activeQuestion.type === 'MULTI_SELECT' && (
+                  <>
+                    {(activeQuestion.options || []).map((opt: string, idx: number) => {
+                      const isSelected = multiSelection.includes(idx);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() =>
+                            setMultiSelection((prev) =>
+                              prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+                            )
+                          }
+                          className={`w-full p-4.5 rounded-2xl text-left font-medium text-base transition-all flex items-center justify-between border ${
+                            isSelected
+                              ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold'
+                              : 'bg-white border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          <span>{opt}</span>
+                          {isSelected && <CheckCircle2 className="w-5 h-5 text-indigo-600" />}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => submitAnswer({ selectedOptions: multiSelection })}
+                      disabled={multiSelection.length === 0}
+                      className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50"
+                    >
+                      {submitted ? 'Update selection' : 'Submit selection'}
+                    </button>
+                  </>
+                )}
+
+                {(!activeQuestion.type || activeQuestion.type === 'MCQ' || activeQuestion.type === 'RATING') &&
+                  (activeQuestion.options || []).map((opt: string, idx: number) => {
                   const isSelected = currentSelection === idx;
                   return (
                     <button
                       key={idx}
-                      onClick={() => submitAnswer(idx)}
+                      onClick={() => submitMcq(idx)}
                       className={`w-full p-4.5 rounded-2xl text-left font-medium text-base transition-all flex items-center justify-between border ${
                         isSelected
                           ? 'bg-indigo-50 border-indigo-200 text-indigo-900 shadow-sm font-semibold'
@@ -198,7 +289,7 @@ const LiveQuiz: React.FC = () => {
                             isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'
                           }`}
                         >
-                          {['A', 'B', 'C', 'D'][idx]}
+                          {['A', 'B', 'C', 'D', 'E', 'F'][idx] || idx + 1}
                         </span>
                         <span>{opt}</span>
                       </div>
@@ -211,7 +302,7 @@ const LiveQuiz: React.FC = () => {
                 })}
               </div>
 
-              {currentSelection !== null && (
+              {submitted && (
                 <div className="pt-2 text-center">
                   <span className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
                     <CheckCircle2 className="w-3.5 h-3.5" />

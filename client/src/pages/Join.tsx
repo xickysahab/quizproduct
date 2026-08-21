@@ -42,6 +42,7 @@ const Join: React.FC = () => {
       localStorage.setItem('participantId', response.data.participant.id);
       localStorage.setItem('participantName', response.data.participant.name);
       localStorage.setItem('eventId', response.data.event.id);
+      localStorage.setItem('participantToken', response.data.participantToken);
 
       // Navigate to live quiz waiting room
       navigate(`/live/${roomCode.trim().toUpperCase()}`);

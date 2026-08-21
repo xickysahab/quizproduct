@@ -13,46 +13,139 @@ enum Role {
   STAFF
 }
 
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum QuestionType {
+  MCQ
+  MULTI_SELECT
+  OPEN_TEXT
+  WORD_CLOUD
+  RATING
+}
+
+model Organization {
+  id                   String        @id @default(uuid())
+  name                 String
+  slug                 String        @unique
+  plan                 Plan          @default(FREE)
+  logoUrl              String?
+  primaryColor         String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  users                User[]
+  events               Event[]
+  invites              Invite[]
+  usageMeters          UsageMeter[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model UsageMeter {
+  id                 String       @id @default(uuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  period             String
+  eventsCreated      Int          @default(0)
+  participantsJoined Int          @default(0)
+
+  @@unique([organizationId, period])
+  @@index([period])
+}
+
+model Invite {
+  id             String        @id @default(uuid())
+  email          String
+  role           Role
+  tokenHash      String        @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  invitedById    String
+  parentUserId   String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  password     String
-  name         String
-  role         Role          @default(STAFF)
-  parentUserId String?
-  parentUser   User?         @relation("UserHierarchy", fields: [parentUserId], references: [id])
-  subUsers     User[]        @relation("UserHierarchy")
-  events       Event[]
-  activityLogs ActivityLog[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id               String               @id @default(uuid())
+  email            String               @unique
+  password         String
+  name             String
+  role             Role                 @default(STAFF)
+  isActive         Boolean              @default(true)
+  tokenVersion     Int                  @default(0)
+  parentUserId     String?
+  parentUser       User?                @relation("UserHierarchy", fields: [parentUserId], references: [id])
+  subUsers         User[]               @relation("UserHierarchy")
+  organizationId   String?
+  organization     Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  events           Event[]
+  activityLogs     ActivityLog[]
+  passwordResets   PasswordResetToken[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([parentUserId])
+  @@index([role])
+  @@index([organizationId])
 }
 
 model Event {
-  id                String        @id @default(uuid())
-  title             String
-  roomCode          String        @unique
-  hostId            String
-  host              User          @relation(fields: [hostId], references: [id])
-  isLive            Boolean       @default(false)
-  currentQuestionId String?
-  concludeConfig    Json?
-  questions         Question[]
-  participants      Participant[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                       String         @id @default(uuid())
+  title                    String
+  roomCode                 String         @unique
+  hostId                   String
+  host                     User           @relation(fields: [hostId], references: [id])
+  organizationId           String?
+  organization             Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  isLive                   Boolean        @default(false)
+  isTemplate               Boolean        @default(false)
+  currentQuestionId        String?
+  /// Set when the host opens a question. Used to reject answers submitted after the time limit.
+  currentQuestionStartedAt DateTime?
+  concludeConfig           Json?
+  questions                Question[]
+  participants             Participant[]
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([hostId, createdAt])
+  @@index([organizationId])
 }
 
 model Question {
-  id            String     @id @default(uuid())
-  eventId       String
-  event         Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  text          String
-  options       String[]
-  correctOption Int?
-  order         Int
-  timeLimit     Int?
-  responses     Response[]
+  id             String       @id @default(uuid())
+  eventId        String
+  event          Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  type           QuestionType @default(MCQ)
+  text           String
+  options        String[]
+  correctOption  Int?
+  correctOptions Int[]        @default([])
+  order          Int
+  timeLimit      Int?
+  responses      Response[]
+
+  @@index([eventId, order])
 }
 
 model Participant {
@@ -63,19 +156,25 @@ model Participant {
   socketId  String?
   responses Response[]
   joinedAt  DateTime   @default(now())
+
+  @@index([eventId])
 }
 
 model Response {
-  id             String      @id @default(uuid())
-  questionId     String
-  question       Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  participantId  String
-  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  selectedOption Int
-  isCorrect      Boolean     @default(false)
-  respondedAt    DateTime    @default(now())
+  id              String      @id @default(uuid())
+  questionId      String
+  question        Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  participantId   String
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  selectedOption  Int         @default(0)
+  selectedOptions Int[]       @default([])
+  answerText      String?
+  score           Int         @default(0)
+  isCorrect       Boolean     @default(false)
+  respondedAt     DateTime    @default(now())
 
   @@unique([questionId, participantId])
+  @@index([participantId])
 }
 
 model ActivityLog {
@@ -87,4 +186,7 @@ model ActivityLog {
   resourceId String?
   details    Json?
   createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

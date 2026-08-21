@@ -4,6 +4,20 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { generateRoomCode } from '../utils/roomCode';
 import { logActivity } from '../utils/logger';
 import { getAccessibleHostIds, canAccessEvent } from '../utils/access';
+import { parsePagination } from '../utils/validation';
+import { organizationIdForUser } from '../utils/org';
+import { assertCanCreateEvent, bumpUsage } from '../utils/usage';
+import { slog } from '../utils/slog';
+
+const uniqueRoomCode = async (): Promise<string> => {
+  let roomCode = generateRoomCode();
+  let existingRoom = await prisma.event.findUnique({ where: { roomCode } });
+  while (existingRoom) {
+    roomCode = generateRoomCode();
+    existingRoom = await prisma.event.findUnique({ where: { roomCode } });
+  }
+  return roomCode;
+};
 
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -20,24 +34,23 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-
-    // Generate unique room code
-    let roomCode = generateRoomCode();
-    let existingRoom = await prisma.event.findUnique({ where: { roomCode } });
-
-    while (existingRoom) {
-      roomCode = generateRoomCode();
-      existingRoom = await prisma.event.findUnique({ where: { roomCode } });
+    const organizationId = await organizationIdForUser(hostId);
+    const allowed = await assertCanCreateEvent(organizationId);
+    if (!allowed.ok) {
+      res.status(402).json({ message: allowed.message });
+      return;
     }
 
     const event = await prisma.event.create({
       data: {
         title,
-        roomCode,
+        roomCode: await uniqueRoomCode(),
         hostId,
+        organizationId,
       },
     });
 
+    await bumpUsage(organizationId, 'eventsCreated');
     await logActivity(req.user?.userId, 'CREATE_EVENT', 'Event', event.id, { title: event.title, roomCode: event.roomCode });
 
     res.status(201).json({
@@ -45,7 +58,7 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
       event,
     });
   } catch (error) {
-    console.error('Create event error:', error);
+    slog('error', 'event.create_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -56,21 +69,35 @@ export const getHostEvents = async (req: AuthRequest, res: Response): Promise<vo
 
     // Scope events to the user's hierarchy (SUPERADMIN sees all)
     const hostIds = await getAccessibleHostIds(userId, role);
+    const where = hostIds === null ? undefined : { hostId: { in: hostIds } };
 
-    const events = await prisma.event.findMany({
-      where: hostIds === null ? undefined : { hostId: { in: hostIds } },
-      include: {
-        host: {
-          select: { id: true, name: true, email: true, role: true },
-        },
-        _count: {
-          select: { questions: true, participants: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
+    const { skip, take, page, limit } = parsePagination(req.query, {
+      defaultLimit: 60,
+      maxLimit: 200,
     });
 
-    res.status(200).json({ events });
+    const [events, total] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        include: {
+          host: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+          _count: {
+            select: { questions: true, participants: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.event.count({ where }),
+    ]);
+
+    res.status(200).json({
+      events,
+      pagination: { page, limit, total, hasMore: skip + events.length < total },
+    });
   } catch (error) {
     console.error('Get host events error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -201,6 +228,69 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
     res.status(200).json({ message: 'Quiz data cleared successfully' });
   } catch (error) {
     console.error('Clear event data error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const hostId = req.user!.userId;
+
+    const source = await prisma.event.findUnique({
+      where: { id },
+      include: { questions: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!source) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    const allowed = await canAccessEvent(hostId, req.user!.role, source.hostId);
+    if (!allowed) {
+      res.status(403).json({ message: 'Forbidden: You do not have access to this event.' });
+      return;
+    }
+
+    const organizationId = await organizationIdForUser(hostId);
+    const quota = await assertCanCreateEvent(organizationId);
+    if (!quota.ok) {
+      res.status(402).json({ message: quota.message });
+      return;
+    }
+
+    const copy = await prisma.event.create({
+      data: {
+        title: `${source.title} (copy)`,
+        roomCode: await uniqueRoomCode(),
+        hostId,
+        organizationId,
+        concludeConfig: source.concludeConfig ?? undefined,
+        questions: {
+          create: source.questions.map((question) => ({
+            type: question.type,
+            text: question.text,
+            options: question.options,
+            correctOption: question.correctOption,
+            correctOptions: question.correctOptions,
+            order: question.order,
+            timeLimit: question.timeLimit,
+          })),
+        },
+      },
+      include: { questions: true },
+    });
+
+    await bumpUsage(organizationId, 'eventsCreated');
+    await logActivity(hostId, 'DUPLICATE_EVENT', 'Event', copy.id, {
+      sourceId: source.id,
+      title: copy.title,
+    });
+
+    res.status(201).json({ message: 'Quiz duplicated', event: copy });
+  } catch (error) {
+    slog('error', 'event.duplicate_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

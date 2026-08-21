@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -117,6 +117,11 @@ const Login: React.FC = () => {
               <span>{loading ? 'Authenticating...' : 'Sign In as Host'}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
+            <p className="text-center text-sm text-gray-500">
+              <Link to="/forgot-password" className="text-indigo-600 font-semibold">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
         </motion.div>

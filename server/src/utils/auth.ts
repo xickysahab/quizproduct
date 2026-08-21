@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_slido_key_for_development';
+import { env } from '../config/env';
 
 export const hashPassword = async (password: string): Promise<string> => {
   const salt = await bcrypt.genSalt(10);
@@ -16,16 +15,30 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  typ?: string;
+  tokenVersion?: number;
 }
 
-export const generateToken = (userId: string, email: string, role: string): string => {
-  return jwt.sign({ userId, email, role }, JWT_SECRET, { expiresIn: '7d' });
+export const generateToken = (
+  userId: string,
+  email: string,
+  role: string,
+  tokenVersion = 0
+): string => {
+  return jwt.sign({ userId, email, role, tokenVersion, typ: 'host' }, env.jwtSecret, {
+    expiresIn: env.hostTokenTtl as jwt.SignOptions['expiresIn'],
+  });
 };
 
 export const verifyToken = (token: string): TokenPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as TokenPayload;
-  } catch (error) {
+    const decoded = jwt.verify(token, env.jwtSecret) as TokenPayload;
+
+    if (decoded.typ === 'participant') return null;
+    if (!decoded.userId || !decoded.role) return null;
+
+    return decoded;
+  } catch {
     return null;
   }
 };
