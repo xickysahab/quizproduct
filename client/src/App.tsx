@@ -21,6 +21,8 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
 const Organizations = lazy(() => import('./pages/Organizations'));
+const Signup = lazy(() => import('./pages/Signup'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">
@@ -29,24 +31,38 @@ const PageFallback = () => (
 );
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: ReactNode, allowedRoles?: string[] }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  // Hold the route until the stored session has been confirmed, so a refresh
+  // never redirects a valid session to the login page.
+  if (isLoading) return <PageFallback />;
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 };
 
 const DashboardRedirect = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
+  if (isLoading) return <PageFallback />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   const role = user?.role;
   const path = role ? `/${role.toLowerCase()}` : '/staff';
   return <Navigate to={path} replace />;
+};
+
+/** Keeps a signed-in host off the login form instead of showing it again. */
+const PublicOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <PageFallback />;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
 };
 
 function AppRoutes() {
@@ -55,7 +71,9 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Join />} />
         <Route path="/live/:roomCode" element={<LiveQuiz />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+        <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />

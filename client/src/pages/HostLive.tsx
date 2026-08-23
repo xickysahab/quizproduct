@@ -1,20 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award, LogOut, QrCode, X } from 'lucide-react';
+import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award, LogOut, QrCode, X, Eye, MessageSquare } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Logo from '../components/Logo';
-import { QUIZPULSE_PRESET } from '../constants/presets';
 import { socket, connectSocket } from '../socket/socket';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
+import QuestionResults from '../components/QuestionResults';
+import QaModerationPanel from '../components/QaModerationPanel';
+import Countdown from '../components/Countdown';
+import type { EventDetail, EventSummary, LeaderboardRow, QuestionTally } from '../types/analytics';
 
 const HostLive: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, action: 'conclude' | 'exit' | null}>({ isOpen: false, action: null });
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
@@ -22,9 +25,26 @@ const HostLive: React.FC = () => {
   const [responsesCount, setResponsesCount] = useState(0);
 
   const [showFinalSummary, setShowFinalSummary] = useState(false);
-  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<EventSummary | null>(null);
   const [showQR, setShowQR] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [liveResults, setLiveResults] = useState<QuestionTally | null>(null);
+  const [questionStartedAt, setQuestionStartedAt] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [showQa, setShowQa] = useState(false);
+  const [qaPending, setQaPending] = useState(0);
+
+  // The conclude config's colours still theme the charts. Its option *labels*
+  // no longer label anything — results are labelled from each question's own
+  // options — so a mismatched palette is simply ignored rather than applied to
+  // the wrong number of bars.
+  const brandPalette = event?.concludeConfig?.options?.length
+    ? event.concludeConfig.options.map((option) => option.themeColor)
+    : undefined;
+
+  // Socket handlers are registered once, so they read the live question through
+  // a ref rather than closing over a stale render's state.
+  const activeQuestionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     fetchEventDetails();
@@ -33,23 +53,68 @@ const HostLive: React.FC = () => {
   const fetchEventDetails = async () => {
     try {
       const response = await api.get(`/events/${id}`);
-      setEvent(response.data.event);
-      setParticipantCount(response.data.event._count?.participants || 0);
+      const loaded = response.data.event;
+      setEvent(loaded);
+      setParticipantCount(loaded._count?.participants || 0);
+
+      // Pick the live session back up where the server says it is. Without
+      // this a refresh mid-quiz dropped the host back to the lobby while
+      // participants were still on question 7.
+      if (loaded.isLive && loaded.currentQuestionId) {
+        const resumeIndex = (loaded.questions || []).findIndex(
+          (q: { id: string }) => q.id === loaded.currentQuestionId
+        );
+        if (resumeIndex >= 0) setCurrentQuestionIndex(resumeIndex);
+      }
 
       // Connect socket with auth token so the server can authorize host actions
       connectSocket();
-      socket.emit('host:join', id);
 
-      // Setup socket listeners
-      socket.on('host:participantJoined', () => {
-        setParticipantCount((prev) => prev + 1);
+      // Rejoin the host room on every connection, not just the first — a
+      // reconnect otherwise leaves the host silently outside the room.
+      const handleConnect = () => socket.emit('host:join', id);
+      socket.on('connect', handleConnect);
+      if (socket.connected) handleConnect();
+
+      // Both counters are now absolute values computed by the server, not
+      // deltas accumulated here. A rejoin or a host reconnect no longer drifts
+      // the numbers, and they cannot be moved by a participant.
+      socket.on('host:participantCount', (data: { count: number }) => {
+        setParticipantCount(data.count);
       });
 
-      socket.on('host:newResponseBatch', (data: { count: number }) => {
-        setResponsesCount((prev) => prev + data.count);
-        api.get(`/analytics/events/${id}/leaderboard`).then((res) => {
-          setLeaderboard((res.data.leaderboard || []).slice(0, 5));
-        }).catch(() => undefined);
+      socket.on('host:responseCount', (data: { questionId: string; count: number }) => {
+        setResponsesCount((prev) =>
+          data.questionId === activeQuestionIdRef.current ? data.count : prev
+        );
+      });
+
+      // The distribution fills in as answers land — host-only, so the room is
+      // not biased by seeing the tally before they answer.
+      socket.on('host:liveResults', (tally: QuestionTally) => setLiveResults(tally));
+
+      // Pushed by the server once a second while answers are landing, instead
+      // of the client re-fetching the full leaderboard on every batch.
+      socket.on('host:leaderboard', (data: { leaderboard: LeaderboardRow[] }) => {
+        setLeaderboard(data.leaderboard || []);
+      });
+
+      socket.on('host:questionActive', (data: { startedAt: string }) => {
+        setQuestionStartedAt(data.startedAt);
+      });
+
+      // Badge the Questions button so a host running a poll still notices
+      // something is waiting for review.
+      socket.on('qa:updated', () => {
+        api
+          .get(`/questions-from-audience/event/${id}`)
+          .then((res) => {
+            const pending = (res.data.questions || []).filter(
+              (q: { status: string }) => q.status === 'PENDING'
+            );
+            setQaPending(pending.length);
+          })
+          .catch(() => undefined);
       });
 
       socket.on('host:unauthorized', (data: { message: string }) => {
@@ -65,12 +130,25 @@ const HostLive: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      socket.off('host:participantJoined');
-      socket.off('host:newResponseBatch');
+      socket.off('connect');
+      socket.off('host:participantCount');
+      socket.off('host:responseCount');
+      socket.off('host:liveResults');
+      socket.off('host:leaderboard');
+      socket.off('host:questionActive');
+      socket.off('qa:updated');
       socket.off('host:unauthorized');
       socket.disconnect();
     };
   }, []);
+
+  // Keep the ref aligned with the rendered question, and refresh the
+  // leaderboard once per question instead of on every incoming response batch.
+  useEffect(() => {
+    const question = event?.questions?.[currentQuestionIndex];
+    activeQuestionIdRef.current = question?.id ?? null;
+
+  }, [currentQuestionIndex, event]);
 
   const handleNextQuestion = () => {
     if (!event) return;
@@ -78,6 +156,9 @@ const HostLive: React.FC = () => {
     if (nextIndex < event.questions.length) {
       setCurrentQuestionIndex(nextIndex);
       setResponsesCount(0);
+      setLiveResults(null);
+      setRevealed(false);
+      setQuestionStartedAt(new Date().toISOString());
       socket.emit('host:nextQuestion', id, event.questions[nextIndex]);
     }
   };
@@ -87,7 +168,16 @@ const HostLive: React.FC = () => {
     const prevIndex = currentQuestionIndex - 1;
     setCurrentQuestionIndex(prevIndex);
     setResponsesCount(0);
+    setLiveResults(null);
+    setRevealed(false);
+    setQuestionStartedAt(new Date().toISOString());
     socket.emit('host:nextQuestion', id, event.questions[prevIndex]);
+  };
+
+  const handleRevealResults = () => {
+    if (!activeQuestionIdRef.current) return;
+    socket.emit('host:revealResults', id, activeQuestionIdRef.current);
+    setRevealed(true);
   };
 
   const handleFinishAndViewSummary = async () => {
@@ -190,159 +280,66 @@ const HostLive: React.FC = () => {
               className="text-left w-full"
             >
               <div className="w-full space-y-6">
-                <div className="flex flex-col md:flex-row items-center justify-between bg-white p-6 rounded-3xl border border-gray-200 shadow-sm hover-card">
-                  <h3 className="font-heading text-2xl md:text-3xl font-bold text-gray-900">
-                    Overall Audience Sentiment
-                  </h3>
-                  <div className="mt-4 md:mt-0 flex items-center gap-3">
-                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-500">Total Participants:</span>
-                    <span className="text-lg font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
+                <div className="flex flex-col md:flex-row items-center justify-between bg-white p-6 rounded-3xl border border-gray-200 shadow-sm hover-card gap-4">
+                  <div>
+                    <h3 className="font-heading text-2xl md:text-3xl font-bold text-gray-900">
+                      {summaryData.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-0.5">Final results</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+                      Participants
+                    </span>
+                    <span className="text-lg font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100 tabular-nums">
                       {summaryData.totalParticipants}
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-8">
-                  {(() => {
-                    const activeConfig = event?.concludeConfig || QUIZPULSE_PRESET;
-                    const activeChartType = activeConfig.chartType || 'CUSTOM_GRID';
-                    const activeOptions = activeConfig.options || [];
+                {/* Pooled view, shown only when every question shares one scale.
+                    The server returns null otherwise — averaging unlike questions
+                    produced a chart with borrowed labels and no meaning. */}
+                {summaryData.collective && (
+                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm">
+                    <h4 className="font-heading text-xl font-bold text-gray-900 mb-1">
+                      Across all questions
+                    </h4>
+                    <p className="text-xs text-gray-500 mb-5">
+                      Every question uses the same scale, so responses are pooled.
+                    </p>
+                    <QuestionResults
+                      compact
+                      tally={{
+                        id: 'collective',
+                        text: 'Across all questions',
+                        type: 'MCQ',
+                        options: summaryData.collective.optionsText,
+                        totalResponses: summaryData.collective.totalResponses,
+                        optionCounts: summaryData.collective.optionCounts,
+                        percentages: summaryData.collective.percentages,
+                        textAnswers: [],
+                        words: [],
+                      }}
+                      palette={brandPalette}
+                    />
+                  </div>
+                )}
 
-                    if (activeChartType === 'BAR_CHART') {
-                      return (
-                        <div className="flex flex-col gap-8 w-full max-w-4xl mx-auto p-8 rounded-3xl border border-gray-200 shadow-sm bg-white">
-                          {activeOptions.map((opt: any, idx: number) => {
-                            const pct = summaryData.collective?.percentages?.[idx] || 0;
-                            const count = summaryData.collective?.optionCounts?.[idx] || 0;
-                            return (
-                              <div key={idx} className="flex flex-col gap-3">
-                                <div className="flex justify-between items-end">
-                                  <div>
-                                    <div className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                                      <span className="w-6 h-6 rounded flex items-center justify-center text-xs text-white" style={{ backgroundColor: opt.themeColor }}>{opt.letter}</span>
-                                      {opt.text}
-                                    </div>
-                                    <div className="text-xs font-bold tracking-wider mt-1" style={{ color: opt.themeColor }}>{opt.alert}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-2xl font-black" style={{ color: opt.themeColor }}>{pct}%</div>
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{count} votes</div>
-                                  </div>
-                                </div>
-                                <div className="h-8 w-full rounded-xl overflow-hidden bg-gray-100 flex items-center shadow-inner">
-                                  <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, delay: idx * 0.1 }} className="h-full rounded-xl flex items-center justify-end px-4" style={{ backgroundColor: opt.themeColor }}>
-                                      <span className="text-xs font-bold text-white drop-shadow-sm">{pct > 5 ? `${pct}%` : ''}</span>
-                                  </motion.div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-
-                    if (activeChartType === 'PIE_CHART') {
-                      let cumulativePercent = 0;
-                      const gradientStops = activeOptions.map((opt: any, idx: number) => {
-                        const pct = summaryData.collective?.percentages?.[idx] || 0;
-                        const start = cumulativePercent;
-                        cumulativePercent += pct;
-                        return `${opt.themeColor} ${start}% ${cumulativePercent}%`;
-                      });
-                      
-                      const conicGradient = cumulativePercent > 0 ? `conic-gradient(${gradientStops.join(', ')})` : 'conic-gradient(#f3f4f6 0% 100%)';
-
-                      return (
-                        <div className="flex flex-col md:flex-row items-center justify-center gap-12 p-8 md:p-16 rounded-3xl border border-gray-200 shadow-sm bg-white">
-                          <motion.div 
-                            initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.8 }}
-                            className="w-64 h-64 md:w-80 md:h-80 rounded-full shadow-sm relative flex items-center justify-center" 
-                            style={{ background: conicGradient }}
-                          >
-                            <div className="w-1/2 h-1/2 bg-white rounded-full shadow-lg flex items-center justify-center flex-col z-10 border border-gray-100">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</span>
-                              <span className="text-4xl font-black text-gray-900">{summaryData.totalParticipants}</span>
-                            </div>
-                          </motion.div>
-                          
-                          <div className="flex flex-col gap-6 w-full max-w-sm">
-                            {activeOptions.map((opt: any, idx: number) => {
-                                const pct = summaryData.collective?.percentages?.[idx] || 0;
-                                const count = summaryData.collective?.optionCounts?.[idx] || 0;
-                                return (
-                                  <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: idx * 0.1 }} key={idx} className="flex items-start gap-4 p-4 rounded-2xl transition-colors hover:bg-gray-50 border border-transparent hover:border-gray-200">
-                                    <div className="w-6 h-6 rounded-full shadow-md flex-shrink-0 mt-1" style={{ backgroundColor: opt.themeColor }}></div>
-                                    <div className="flex-1">
-                                      <div className="flex justify-between items-center mb-1">
-                                        <div className="text-sm font-bold text-gray-900 flex items-center gap-2">Option {opt.letter} <span className="px-2 py-0.5 rounded text-[9px] uppercase tracking-wider text-white" style={{ backgroundColor: opt.themeColor }}>{opt.alert}</span></div>
-                                        <div className="text-sm font-black" style={{ color: opt.themeColor }}>{pct}%</div>
-                                      </div>
-                                      <div className="text-xs text-gray-500 font-medium">{opt.text}</div>
-                                      <div className="text-[10px] text-gray-400 mt-1">{count} votes</div>
-                                    </div>
-                                  </motion.div>
-                                );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Default to CUSTOM_GRID
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {activeOptions.map((opt: any, idx: number) => {
-                          const pct = summaryData.collective?.percentages?.[idx] || 0;
-                          const count = summaryData.collective?.optionCounts?.[idx] || 0;
-
-                          return (
-                            <motion.div
-                              key={idx}
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: idx * 0.1 }}
-                              className="relative overflow-hidden p-6 md:p-8 rounded-3xl border shadow-sm transition-transform hover:-translate-y-1 hover-card"
-                              style={{ backgroundColor: `${opt.themeColor}0A`, borderColor: `${opt.themeColor}33` }}
-                            >
-                              <div className="flex justify-between items-start mb-8">
-                                <div 
-                                  className="px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest bg-white"
-                                  style={{ color: opt.themeColor, borderColor: `${opt.themeColor}4D` }}
-                                >
-                                  Option {opt.letter}
-                                </div>
-                                <div className="text-right" style={{ color: opt.themeColor }}>
-                                  <span className="text-4xl md:text-5xl font-bold block">{pct}%</span>
-                                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{count} votes</span>
-                                </div>
-                              </div>
-                              
-                              <h4 className="text-xl md:text-2xl font-heading italic font-medium mb-4 leading-snug" style={{ color: opt.themeColor }}>
-                                {opt.text}
-                              </h4>
-
-                              <div 
-                                className="inline-block px-3 py-1 mb-8 rounded text-[10px] font-bold tracking-[0.15em] shadow-sm text-white"
-                                style={{ backgroundColor: opt.themeColor }}
-                              >
-                                {opt.alert}
-                              </div>
-
-                              <div className="h-3 w-full rounded-full overflow-hidden bg-white border border-gray-200">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${pct}%` }}
-                                  transition={{ duration: 1.2, ease: "easeOut", delay: 0.4 + (idx * 0.1) }}
-                                  className="h-full rounded-full"
-                                  style={{ backgroundColor: opt.themeColor }}
-                                />
-                              </div>
-                            </motion.div>
-                          );
-                        })}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {summaryData.questions.map((tally, index) => (
+                    <div
+                      key={tally.id}
+                      className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm"
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">
+                        Question {index + 1}
+                      </span>
+                      <div className="mt-2">
+                        <QuestionResults tally={tally} palette={brandPalette} revealCorrect />
                       </div>
-                    );
-                  })()}
+                    </div>
+                  ))}
                 </div>
               </div>
             </motion.div>
@@ -414,7 +411,7 @@ const HostLive: React.FC = () => {
                 </button>
               </div>
             </motion.div>
-          ) : (
+          ) : activeQuestion ? (
             <motion.div
               key={currentQuestionIndex}
               initial={{ opacity: 0, y: 15 }}
@@ -440,20 +437,42 @@ const HostLive: React.FC = () => {
                 {activeQuestion.text}
               </h2>
 
-              {/* Options Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                {(activeQuestion.options || []).map((opt: string, idx: number) => (
-                  <div
-                    key={idx}
-                    className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center gap-4 transition-all hover:border-indigo-300 hover:bg-gray-50 shadow-sm hover-card"
-                  >
-                    <span className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 font-heading text-lg font-bold flex items-center justify-center border border-indigo-100">
-                      {['A', 'B', 'C', 'D', 'E', 'F'][idx] || idx + 1}
-                    </span>
-                    <span className="text-lg font-medium text-gray-700">{opt}</span>
+              {activeQuestion.timeLimit ? (
+                <div className="max-w-sm">
+                  <Countdown startedAt={questionStartedAt} timeLimit={activeQuestion.timeLimit} />
+                </div>
+              ) : null}
+
+              {/* Live distribution, filling in as answers land. */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                {liveResults ? (
+                  <QuestionResults
+                    tally={liveResults}
+                    palette={brandPalette}
+                    revealCorrect={revealed}
+                    compact
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(activeQuestion.options || []).map((opt: string, idx: number) => (
+                      <div
+                        key={idx}
+                        className="border border-gray-200 rounded-2xl p-5 flex items-center gap-4"
+                      >
+                        <span className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 font-heading text-lg font-bold flex items-center justify-center border border-indigo-100">
+                          {['A', 'B', 'C', 'D', 'E', 'F'][idx] || idx + 1}
+                        </span>
+                        <span className="text-lg font-medium text-gray-700">{opt}</span>
+                      </div>
+                    ))}
+                    {(activeQuestion.options || []).length === 0 && (
+                      <p className="text-sm text-gray-500">Waiting for the first response…</p>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
+
+              {showQa && id && <QaModerationPanel eventId={id} />}
               {leaderboard.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">Live leaderboard</h3>
@@ -468,7 +487,7 @@ const HostLive: React.FC = () => {
                 </div>
               )}
             </motion.div>
-          )}
+          ) : null}
         </div>
       </main>
 
@@ -482,8 +501,37 @@ const HostLive: React.FC = () => {
           <span>{showFinalSummary ? 'Exit Cockpit' : 'End Live Quiz'}</span>
         </button>
 
+        {!showFinalSummary && (
+          <button
+            onClick={() => setShowQa((v) => !v)}
+            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+              showQa
+                ? 'bg-indigo-600 border-indigo-600 text-white'
+                : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-600'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Questions</span>
+            {qaPending > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 text-[10px] tabular-nums">
+                {qaPending}
+              </span>
+            )}
+          </button>
+        )}
+
         {!showFinalSummary && currentQuestionIndex !== -1 && (
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleRevealResults}
+              disabled={revealed}
+              title="Show the distribution to everyone in the room"
+              className="px-5 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{revealed ? 'Results shown' : 'Show results'}</span>
+            </button>
+
             <button
               onClick={handlePrevQuestion}
               disabled={currentQuestionIndex === 0}
