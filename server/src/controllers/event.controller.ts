@@ -9,6 +9,7 @@ import { organizationIdForUser } from '../utils/org';
 import { assertCanCreateEvent, releaseEventSlot } from '../utils/usage';
 import { slog } from '../utils/slog';
 import { hashSecret } from '../utils/mailer';
+import { STARTER_TEMPLATES, getStarterTemplate } from '../utils/starterTemplates';
 
 const uniqueRoomCode = async (): Promise<string> => {
   let roomCode = generateRoomCode();
@@ -18,6 +19,84 @@ const uniqueRoomCode = async (): Promise<string> => {
     existingRoom = await prisma.event.findUnique({ where: { roomCode } });
   }
   return roomCode;
+};
+
+export const listStarterTemplates = async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({
+    templates: STARTER_TEMPLATES.map(({ id, title, description, questions, sessionMode }) => ({
+      id,
+      title,
+      description,
+      questionCount: questions.length,
+      sessionMode,
+    })),
+  });
+};
+
+export const createEventFromTemplate = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const templateId = String(req.body?.templateId || '');
+    const hostId = req.user?.userId;
+    if (!hostId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const template = getStarterTemplate(templateId);
+    if (!template) {
+      res.status(404).json({ message: 'Template not found.' });
+      return;
+    }
+
+    const organizationId = await organizationIdForUser(hostId);
+    const allowed = await assertCanCreateEvent(organizationId);
+    if (!allowed.ok) {
+      res.status(402).json({ message: allowed.message });
+      return;
+    }
+
+    let event;
+    try {
+      event = await prisma.event.create({
+        data: {
+          title: template.title,
+          roomCode: await uniqueRoomCode(),
+          hostId,
+          organizationId,
+          sessionMode: template.sessionMode,
+          // Knowledge-check decks benefit from Kahoot-style speed scoring.
+          speedBonusEnabled: template.sessionMode === 'QUIZ' && templateId === 'knowledge-check',
+          questions: {
+            create: template.questions.map((question) => ({
+              type: question.type,
+              text: question.text,
+              options: question.options,
+              correctOption: question.correctOption,
+              correctOptions: question.correctOptions,
+              order: question.order,
+              timeLimit: question.timeLimit,
+            })),
+          },
+        },
+        include: { questions: { orderBy: { order: 'asc' } } },
+      });
+    } catch (creationError) {
+      await releaseEventSlot(organizationId);
+      throw creationError;
+    }
+
+    await logActivity(hostId, 'CREATE_EVENT_FROM_TEMPLATE', 'Event', event.id, {
+      templateId,
+      title: event.title,
+    });
+
+    res.status(201).json({ message: 'Quiz created from template', event });
+  } catch (error) {
+    slog('error', 'event.template_create_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -141,7 +220,15 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    res.status(200).json({ event });
+    // Never send the passcode hash to the browser — only whether one is set.
+    const { passcodeHash, ...safeEvent } = event;
+
+    res.status(200).json({
+      event: {
+        ...safeEvent,
+        passcodeSet: Boolean(passcodeHash),
+      },
+    });
   } catch (error) {
     console.error('Get event by ID error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -279,6 +366,8 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
         hostId,
         organizationId,
         concludeConfig: source.concludeConfig ?? undefined,
+        speedBonusEnabled: source.speedBonusEnabled,
+        sessionMode: source.sessionMode,
         questions: {
           create: source.questions.map((question) => ({
             type: question.type,
@@ -316,7 +405,7 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
 export const updateEventAccess = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { passcode, allowAnonymous, retireCode } = req.body || {};
+    const { passcode, allowAnonymous, retireCode, speedBonusEnabled, sessionMode } = req.body || {};
 
     const event = await prisma.event.findUnique({ where: { id } });
     if (!event) {
@@ -329,7 +418,13 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const data: { passcodeHash?: string | null; allowAnonymous?: boolean; roomCodeRetiredAt?: Date | null } = {};
+    const data: {
+      passcodeHash?: string | null;
+      allowAnonymous?: boolean;
+      roomCodeRetiredAt?: Date | null;
+      speedBonusEnabled?: boolean;
+      sessionMode?: 'QUIZ' | 'SURVEY';
+    } = {};
 
     if (passcode !== undefined) {
       const value = typeof passcode === 'string' ? passcode.trim() : '';
@@ -344,6 +439,12 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
 
     if (typeof allowAnonymous === 'boolean') data.allowAnonymous = allowAnonymous;
     if (typeof retireCode === 'boolean') data.roomCodeRetiredAt = retireCode ? new Date() : null;
+    if (typeof speedBonusEnabled === 'boolean') data.speedBonusEnabled = speedBonusEnabled;
+    if (sessionMode === 'QUIZ' || sessionMode === 'SURVEY') {
+      data.sessionMode = sessionMode;
+      // Surveys have nothing to race for — turn speed scoring off with the mode.
+      if (sessionMode === 'SURVEY') data.speedBonusEnabled = false;
+    }
 
     if (Object.keys(data).length === 0) {
       res.status(400).json({ message: 'Nothing to update.' });
@@ -356,6 +457,8 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
       title: event.title,
       passcodeSet: Boolean(updated.passcodeHash),
       retired: Boolean(updated.roomCodeRetiredAt),
+      speedBonusEnabled: updated.speedBonusEnabled,
+      sessionMode: updated.sessionMode,
     });
 
     res.json({
@@ -364,6 +467,8 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
       passcodeSet: Boolean(updated.passcodeHash),
       allowAnonymous: updated.allowAnonymous,
       roomCodeRetiredAt: updated.roomCodeRetiredAt,
+      speedBonusEnabled: updated.speedBonusEnabled,
+      sessionMode: updated.sessionMode,
     });
   } catch (error) {
     slog('error', 'event.access_failed', { error: error instanceof Error ? error.message : String(error) });
@@ -387,6 +492,7 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
         allowAnonymous: true,
         passcodeHash: true,
         roomCodeRetiredAt: true,
+        sessionMode: true,
         organization: { select: { name: true, logoUrl: true, primaryColor: true } },
       },
     });
@@ -400,6 +506,7 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
       title: event.title,
       allowAnonymous: event.allowAnonymous,
       passcodeRequired: Boolean(event.passcodeHash),
+      sessionMode: event.sessionMode,
       branding: event.organization
         ? {
             name: event.organization.name,

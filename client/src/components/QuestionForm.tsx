@@ -9,15 +9,18 @@ const TYPES = [
   { id: 'OPEN_TEXT', label: 'Open text' },
   { id: 'WORD_CLOUD', label: 'Word cloud' },
   { id: 'RATING', label: 'Rating' },
+  { id: 'RANKING', label: 'Ranking' },
 ] as const;
 
 interface QuestionFormProps {
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   initialData?: any;
+  /** When true, hide answer-key UI — this session is a survey. */
+  surveyMode?: boolean;
 }
 
-const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialData }) => {
+const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialData, surveyMode = false }) => {
   const [type, setType] = useState<string>('MCQ');
   const [text, setText] = useState('');
   const [options, setOptions] = useState(['', '', '', '']);
@@ -26,7 +29,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
   const [timeLimit, setTimeLimit] = useState<number>(30);
   const [loading, setLoading] = useState(false);
 
-  const needsOptions = type === 'MCQ' || type === 'MULTI_SELECT' || type === 'RATING';
+  const needsOptions = type === 'MCQ' || type === 'MULTI_SELECT' || type === 'RATING' || type === 'RANKING';
 
   useEffect(() => {
     if (initialData) {
@@ -63,9 +66,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
       await onSubmit({
         type,
         text,
-        options: needsOptions ? (type === 'RATING' && filled.length < 2 ? ['1', '2', '3', '4', '5'] : options.map((o) => o.trim()).filter(Boolean)) : [],
-        correctOption: type === 'MULTI_SELECT' ? null : correctOption,
-        correctOptions: type === 'MULTI_SELECT' ? correctOptions : correctOption !== null ? [correctOption] : [],
+        options: needsOptions
+          ? type === 'RATING' && filled.length < 2
+            ? ['1', '2', '3', '4', '5']
+            : options.map((o) => o.trim()).filter(Boolean)
+          : [],
+        // Surveys never store an answer key. Quizzes keep the host's marks.
+        correctOption:
+          surveyMode || type === 'MULTI_SELECT' || type === 'RANKING' ? null : correctOption,
+        correctOptions: surveyMode
+          ? []
+          : type === 'MULTI_SELECT'
+            ? correctOptions
+            : type === 'RANKING'
+              ? correctOptions.length
+                ? correctOptions
+                : []
+              : correctOption !== null
+                ? [correctOption]
+                : [],
         timeLimit,
       });
       onClose();
@@ -133,17 +152,35 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                  {type === 'RATING' ? 'Scale labels' : 'Answer Options'}
+                  {type === 'RATING' ? 'Scale labels' : type === 'RANKING' ? 'Items to rank' : 'Answer Options'}
                 </label>
-                {type !== 'RATING' && (
+                {!surveyMode && type !== 'RATING' && type !== 'RANKING' && (
                   <span className="text-xs text-indigo-600 italic font-medium">
                     {type === 'MULTI_SELECT' ? 'Tap to mark every correct answer' : 'Tap to mark the correct answer'}
+                  </span>
+                )}
+                {!surveyMode && type === 'RANKING' && (
+                  <span className="text-xs text-indigo-600 italic font-medium">
+                    Optional: tap items in the correct order to set an answer key
+                  </span>
+                )}
+                {surveyMode && (
+                  <span className="text-xs text-teal-700 italic font-medium">
+                    Survey mode — no correct answer
                   </span>
                 )}
               </div>
               <div className="space-y-3">
                 {options.map((opt, idx) => {
-                  const isSelected = type === 'MULTI_SELECT' ? correctOptions.includes(idx) : correctOption === idx;
+                  const isSelected =
+                    !surveyMode &&
+                    (type === 'MULTI_SELECT' || type === 'RANKING'
+                      ? correctOptions.includes(idx)
+                      : correctOption === idx);
+                  const rankPosition =
+                    !surveyMode && type === 'RANKING' && correctOptions.includes(idx)
+                      ? correctOptions.indexOf(idx) + 1
+                      : null;
                   return (
                     <div
                       key={idx}
@@ -151,7 +188,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                         isSelected ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white'
                       }`}
                     >
-                      {type !== 'RATING' && (
+                      {!surveyMode && type !== 'RATING' && (
                         <button
                           type="button"
                           onClick={() => {
@@ -159,20 +196,24 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                               setCorrectOptions((prev) =>
                                 prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
                               );
+                            } else if (type === 'RANKING') {
+                              setCorrectOptions((prev) =>
+                                prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+                              );
                             } else {
                               setCorrectOption(isSelected ? null : idx);
                             }
                           }}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                             isSelected ? 'bg-indigo-600 text-white' : 'border-2 border-gray-300'
                           }`}
                         >
-                          <Check className="w-4 h-4" />
+                          {rankPosition ?? <Check className="w-4 h-4" />}
                         </button>
                       )}
                       <input
                         type="text"
-                        placeholder={`Option ${idx + 1}`}
+                        placeholder={type === 'RANKING' ? `Item ${idx + 1}` : `Option ${idx + 1}`}
                         className="flex-1 bg-transparent px-2 py-1 outline-none text-gray-900 font-medium"
                         value={opt}
                         onChange={(e) => handleOptionChange(idx, e.target.value)}
@@ -197,6 +238,13 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
           {(type === 'OPEN_TEXT' || type === 'WORD_CLOUD') && (
             <p className="text-sm text-gray-500">
               Participants will type a short answer. {type === 'WORD_CLOUD' ? 'Words are grouped on the results screen.' : 'Answers show in the participant report.'}
+            </p>
+          )}
+
+          {type === 'RANKING' && (
+            <p className="text-sm text-gray-500">
+              Participants drag items into their preferred order.
+              {!surveyMode && ' If you set an answer key above, exact order match scores a point.'}
             </p>
           )}
 

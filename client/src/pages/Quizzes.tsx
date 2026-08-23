@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight, CopyPlus } from 'lucide-react';
+import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight, CopyPlus, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -22,14 +22,24 @@ interface Event {
   };
 }
 
+interface StarterTemplate {
+  id: string;
+  title: string;
+  description: string;
+  questionCount: number;
+  sessionMode?: 'QUIZ' | 'SURVEY';
+}
+
 const Quizzes: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
+  const [templates, setTemplates] = useState<StarterTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; eventId: string | null }>({ isOpen: false, eventId: null });
   const [newEventTitle, setNewEventTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -50,6 +60,10 @@ const Quizzes: React.FC = () => {
 
   useEffect(() => {
     fetchEvents(1);
+    api
+      .get('/events/templates/starters')
+      .then((res) => setTemplates(res.data.templates || []))
+      .catch(() => undefined);
   }, []);
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -66,6 +80,19 @@ const Quizzes: React.FC = () => {
       toast.error(error.response?.data?.message || 'Failed to create quiz');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const createFromTemplate = async (templateId: string) => {
+    setCreatingTemplateId(templateId);
+    try {
+      const res = await api.post('/events/templates/starters', { templateId });
+      toast.success('Quiz created from template');
+      navigate(`/events/${res.data.event.id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not use that template');
+    } finally {
+      setCreatingTemplateId(null);
     }
   };
 
@@ -139,6 +166,34 @@ const Quizzes: React.FC = () => {
             </button>
           </form>
         </div>
+
+        {templates.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Starter templates</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  disabled={creatingTemplateId === template.id}
+                  onClick={() => createFromTemplate(template.id)}
+                  className="text-left bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all disabled:opacity-50"
+                >
+                  <h3 className="font-heading text-lg font-bold text-gray-900">{template.title}</h3>
+                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{template.description}</p>
+                  <p className="text-[11px] font-semibold text-indigo-600 mt-3">
+                    {creatingTemplateId === template.id
+                      ? 'Creating…'
+                      : `${template.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'} · ${template.questionCount} questions · Use template`}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative w-full sm:w-80">

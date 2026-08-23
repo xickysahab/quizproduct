@@ -11,7 +11,8 @@ import { normalizeRoomCode } from '../utils/roomCode';
 import { hashSecret } from '../utils/mailer';
 import { safeEquals } from '../utils/webhookSignature';
 import { liveEvents } from '../utils/liveEvents';
-import { getParticipantStanding } from '../utils/leaderboard';
+import { getLeaderboard, getParticipantStanding } from '../utils/leaderboard';
+import { tallyQuestion } from '../utils/tally';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
@@ -43,6 +44,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         organizationId: true,
         allowAnonymous: true,
         qaEnabled: true,
+        sessionMode: true,
         roomCodeRetiredAt: true,
         passcodeHash: true,
         organization: { select: { name: true, logoUrl: true, primaryColor: true } },
@@ -102,6 +104,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
             isLive: event.isLive,
             currentQuestionId: event.currentQuestionId,
             qaEnabled: event.qaEnabled,
+            sessionMode: event.sessionMode,
           },
           branding: event.organization
             ? {
@@ -147,6 +150,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         isLive: event.isLive,
         currentQuestionId: event.currentQuestionId,
         qaEnabled: event.qaEnabled,
+        sessionMode: event.sessionMode,
       },
       branding: event.organization
         ? {
@@ -181,6 +185,8 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
             isLive: true,
             currentQuestionId: true,
             currentQuestionStartedAt: true,
+            speedBonusEnabled: true,
+            sessionMode: true,
           },
         },
       },
@@ -201,10 +207,13 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       return;
     }
 
-    if (question.timeLimit && question.event.currentQuestionStartedAt) {
-      const elapsedSeconds =
+    let elapsedSeconds = 0;
+    if (question.event.currentQuestionStartedAt) {
+      elapsedSeconds =
         (Date.now() - question.event.currentQuestionStartedAt.getTime()) / 1000;
+    }
 
+    if (question.timeLimit && question.event.currentQuestionStartedAt) {
       if (elapsedSeconds > question.timeLimit + env.answerGracePeriodSeconds) {
         res.status(400).json({ message: 'Time is up for this question.' });
         return;
@@ -255,7 +264,34 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       }
     }
 
-    const { isCorrect, score } = scoreAnswer(question, optionIndex, optionList);
+    let { isCorrect, score } = scoreAnswer(question, optionIndex, optionList);
+
+    const isSurvey = question.event.sessionMode === 'SURVEY';
+
+    // Surveys never grade — even if a leftover answer key exists on a question.
+    if (isSurvey) {
+      isCorrect = false;
+      score = 0;
+    } else if (
+      isCorrect &&
+      question.event.speedBonusEnabled &&
+      question.timeLimit &&
+      question.timeLimit > 0
+    ) {
+      // Optional Kahoot-style bonus: correct answers earn more when submitted
+      // earlier. Base stays 1 when the toggle is off so existing leaderboards
+      // keep the same scale.
+      const remainingRatio = Math.max(0, Math.min(1, 1 - elapsedSeconds / question.timeLimit));
+      score = Math.max(1, Math.round(500 + remainingRatio * 500));
+    }
+
+    // Instant feedback only for graded quiz questions that have a key.
+    const scored =
+      !isSurvey &&
+      (((type === 'MCQ' || type === 'RATING') && question.correctOption !== null) ||
+        ((type === 'MULTI_SELECT' || type === 'RANKING') &&
+          Array.isArray(question.correctOptions) &&
+          question.correctOptions.length > 0));
 
     await responseBatcher.addResponse({
       questionId,
@@ -272,7 +308,22 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
     // counter is derived from this rather than from a client-emitted event.
     liveEvents.publish('response:recorded', { eventId, questionId });
 
-    res.status(200).json({ message: 'Response queued successfully', batched: true });
+    let standing: { score: number; rank: number; totalParticipants: number } | null = null;
+    if (!isSurvey) {
+      // Quiz answers need a live rank. Flush this one write so /standing is
+      // not a second behind the tap they just made.
+      await responseBatcher.flushNow();
+      standing = await getParticipantStanding(eventId, participantId);
+    }
+
+    res.status(200).json({
+      message: 'Response queued successfully',
+      batched: true,
+      scored,
+      isCorrect: scored ? isCorrect : null,
+      score: scored ? score : 0,
+      standing,
+    });
   } catch (error) {
     slog('error', 'participant.submit_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
@@ -291,6 +342,64 @@ export const getMyResult = async (req: ParticipantRequest, res: Response): Promi
     res.json(standing);
   } catch (error) {
     slog('error', 'participant.result_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Full-session distribution for the end screen. Available once the host has
+ * ended the live room. Answer keys are never included — surveys especially
+ * must not look like a graded quiz.
+ */
+export const getSessionResults = async (req: ParticipantRequest, res: Response): Promise<void> => {
+  try {
+    const { eventId } = req.participant!;
+
+    await responseBatcher.flushNow();
+
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true,
+        title: true,
+        isLive: true,
+        sessionMode: true,
+        questions: {
+          orderBy: { order: 'asc' },
+          include: { responses: true },
+        },
+      },
+    });
+
+    if (!event) {
+      res.status(404).json({ message: 'Session not found.' });
+      return;
+    }
+
+    // Still live = host has not concluded — keep distributions private until then
+    // (mid-session reveal still goes through the socket path).
+    if (event.isLive) {
+      res.status(403).json({ message: 'Results are available after the host ends the session.' });
+      return;
+    }
+
+    const totalParticipants = await prisma.participant.count({ where: { eventId } });
+    const questions = event.questions.map((question) => tallyQuestion(question, question.responses));
+    const leaderboard =
+      event.sessionMode === 'SURVEY' ? [] : await getLeaderboard(eventId, 8, 0);
+
+    res.json({
+      eventId: event.id,
+      title: event.title,
+      sessionMode: event.sessionMode,
+      totalParticipants,
+      questions,
+      leaderboard,
+    });
+  } catch (error) {
+    slog('error', 'participant.session_results_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

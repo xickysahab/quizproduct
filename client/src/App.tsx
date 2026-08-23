@@ -16,6 +16,7 @@ const Quizzes = lazy(() => import('./pages/Quizzes'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const EventDetails = lazy(() => import('./pages/EventDetails'));
 const HostLive = lazy(() => import('./pages/HostLive'));
+const AudienceDisplay = lazy(() => import('./pages/AudienceDisplay'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -179,6 +180,9 @@ function AppRoutes() {
         } />
         <Route path="/host/live/:id" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><HostLive /></ProtectedRoute>
+        } />
+        <Route path="/host/display/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><AudienceDisplay /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

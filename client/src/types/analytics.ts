@@ -91,6 +91,7 @@ export interface EventDetail {
   currentQuestionId: string | null;
   currentQuestionStartedAt: string | null;
   concludeConfig: ConcludeConfig | null;
+  sessionMode?: 'QUIZ' | 'SURVEY';
   questions: HostQuestion[];
   _count?: { participants?: number; questions?: number };
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { QuestionTally } from '../types/analytics';
+import { optionFills } from '../utils/optionTheme';
 
 /**
  * Renders one question's real results.
@@ -11,8 +12,8 @@ import type { QuestionTally } from '../types/analytics';
  * here comes from the question's own options.
  */
 
-/** Fallback series colours, used when no branding palette is supplied. */
-const SERIES = ['#6366F1', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#8B5CF6', '#14B8A6', '#EC4899'];
+/** Same colours as the live answer tiles, so a bar matches the button people tapped. */
+const SERIES = optionFills;
 
 const colourFor = (index: number, palette?: string[]): string =>
   palette?.[index] || SERIES[index % SERIES.length] || '#6366F1';
@@ -196,11 +197,11 @@ const QuestionResults: React.FC<Props> = ({ tally, palette, revealCorrect = fals
                   </div>
                 </div>
 
-                <div className="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-3.5 w-full rounded-full bg-gray-100 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                     className="h-full rounded-full"
                     style={{ backgroundColor: colour }}
                   />

@@ -75,6 +75,11 @@ class ResponseBatcher {
     await this.flush();
   }
 
+  /** Force a write before reading tallies (session end / reveal). */
+  public async flushNow(): Promise<void> {
+    await this.flush();
+  }
+
   /**
    * Removes and returns everything held in the local queue. Draining rather
    * than copying matters: entries that landed here while Redis was unreachable

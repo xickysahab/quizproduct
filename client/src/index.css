@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-heading: "Inter", system-ui, -apple-system, sans-serif;
+  --font-heading: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
   /* Core Light Palette */
@@ -184,4 +184,31 @@ input:-webkit-autofill:focus {
 .hover-glow:hover {
   box-shadow: var(--shadow-sm), var(--shadow-glow-primary);
   border-color: rgba(79, 70, 229, 0.4);
+}
+
+/* Live stage — Slido projector + Kahoot energy, not a gray SaaS page. */
+.bg-live-stage {
+  background:
+    radial-gradient(ellipse 90% 50% at 10% -10%, rgba(225, 29, 72, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 45% at 95% 0%, rgba(37, 99, 235, 0.22) 0%, transparent 52%),
+    radial-gradient(ellipse 60% 40% at 50% 110%, rgba(5, 150, 105, 0.12) 0%, transparent 50%),
+    #070b16;
+}
+
+@keyframes timer-urgent {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.timer-urgent {
+  animation: timer-urgent 0.7s ease-in-out infinite;
+}
+
+@keyframes join-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35); }
+  70% { box-shadow: 0 0 0 18px rgba(99, 102, 241, 0); }
+}
+
+.join-pulse {
+  animation: join-pulse 2.2s ease-out infinite;
 }

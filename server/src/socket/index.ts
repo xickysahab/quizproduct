@@ -8,6 +8,7 @@ import { tallyQuestion } from '../utils/tally';
 import { getLeaderboard } from '../utils/leaderboard';
 import { liveEvents } from '../utils/liveEvents';
 import { slog } from '../utils/slog';
+import { responseBatcher } from '../utils/responseBatcher';
 
 interface SocketUser {
   userId: string;
@@ -136,10 +137,22 @@ export const initializeSocket = (io: Server) => {
             const tally = await tallyForQuestion(entry.questionId);
             if (tally) io.to(`host-${eventId}`).emit('host:liveResults', tally);
 
-            // Pushed rather than polled. The client used to re-fetch the whole
-            // leaderboard on every response batch, once a second.
-            const top = await getLeaderboard(eventId, 5, 0);
+            // Persist the write buffer first so the race board matches what
+            // people just tapped, not what landed two seconds ago.
+            await responseBatcher.flushNow();
+
+            const [top, event] = await Promise.all([
+              getLeaderboard(eventId, 8, 0),
+              prisma.event.findUnique({ where: { id: eventId }, select: { sessionMode: true } }),
+            ]);
+
             io.to(`host-${eventId}`).emit('host:leaderboard', { leaderboard: top });
+
+            // Surveys have no race. Quizzes push the same top-8 to phones so
+            // the room is looking at one board, not just the host laptop.
+            if (event?.sessionMode !== 'SURVEY') {
+              io.to(`event-${eventId}`).emit('participant:leaderboard', { leaderboard: top });
+            }
           }
 
           if (participants !== null) {
@@ -288,12 +301,44 @@ export const initializeSocket = (io: Server) => {
         return;
       }
 
+      // Persist any answers still sitting in the write buffer before we tally.
+      await responseBatcher.flushNow();
+
       await prisma.event.update({
         where: { id: eventId },
         data: { isLive: false, currentQuestionId: null, currentQuestionStartedAt: null },
       });
 
-      io.to(`event-${eventId}`).emit('participant:quizEnded');
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: {
+          title: true,
+          sessionMode: true,
+          questions: {
+            orderBy: { order: 'asc' },
+            include: { responses: true },
+          },
+        },
+      });
+
+      const totalParticipants = await prisma.participant.count({ where: { eventId } });
+      const questions = (event?.questions || []).map((question) =>
+        tallyQuestion(question, question.responses)
+      );
+      const leaderboard =
+        event?.sessionMode === 'SURVEY' ? [] : await getLeaderboard(eventId, 8, 0);
+
+      // Participants get the full distribution at the end — surveys especially
+      // need this, since there is no score screen to land on.
+      const ended = {
+        title: event?.title,
+        sessionMode: event?.sessionMode || 'QUIZ',
+        totalParticipants,
+        questions,
+        leaderboard,
+      };
+      io.to(`event-${eventId}`).emit('participant:quizEnded', ended);
+      io.to(`host-${eventId}`).emit('host:quizEnded', ended);
     });
 
     // Host pushes the current question's results out to the room. Explicit
@@ -310,7 +355,12 @@ export const initializeSocket = (io: Server) => {
 
       const stored = await prisma.question.findUnique({
         where: { id: questionId },
-        select: { eventId: true, correctOption: true, correctOptions: true },
+        select: {
+          eventId: true,
+          correctOption: true,
+          correctOptions: true,
+          event: { select: { sessionMode: true } },
+        },
       });
 
       if (!stored || stored.eventId !== eventId) {
@@ -321,13 +371,38 @@ export const initializeSocket = (io: Server) => {
       const tally = await tallyForQuestion(questionId);
       if (!tally) return;
 
-      // The answer key is attached only here, on an explicit reveal — never on
-      // the broadcast that opens the question.
-      io.to(`event-${eventId}`).emit('participant:results', {
+      // Surveys never publish an answer key — there is nothing "correct".
+      const isSurvey = stored.event.sessionMode === 'SURVEY';
+      const revealPayload = {
         ...tally,
-        correctOption: stored.correctOption,
-        correctOptions: stored.correctOptions,
+        correctOption: isSurvey ? null : stored.correctOption,
+        correctOptions: isSurvey ? [] : stored.correctOptions,
+      };
+      io.to(`event-${eventId}`).emit('participant:results', revealPayload);
+      // Secondary host screens (projector / audience display) stay in the host
+      // room, so they need their own copy of the reveal.
+      io.to(`host-${eventId}`).emit('host:resultsRevealed', revealPayload);
+    });
+
+    // Host puts the race on the projector / phones between questions.
+    socket.on('host:showPodium', async (eventId: string) => {
+      const host = await getAuthorizedHost(socket, eventId);
+      if (!host) {
+        socket.emit('host:unauthorized', { message: 'Not authorized to control this event.' });
+        return;
+      }
+
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { sessionMode: true },
       });
+      if (!event || event.sessionMode === 'SURVEY') return;
+
+      await responseBatcher.flushNow();
+      const leaderboard = await getLeaderboard(eventId, 8, 0);
+      const payload = { leaderboard, spotlight: true };
+      io.to(`host-${eventId}`).emit('host:podium', payload);
+      io.to(`event-${eventId}`).emit('participant:podium', payload);
     });
 
     // `participant:submitAnswer` used to live here. It took no payload and did

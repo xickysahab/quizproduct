@@ -38,6 +38,13 @@ enum AudienceQuestionStatus {
   DISMISSED
 }
 
+/// QUIZ grades answers and can show correct/incorrect.
+/// SURVEY collects opinions only — no scoring, no answer-key reveal.
+enum SessionMode {
+  QUIZ
+  SURVEY
+}
+
 model Organization {
   id                   String        @id @default(uuid())
   name                 String
@@ -234,6 +241,11 @@ model Event {
   organization             Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   isLive                   Boolean        @default(false)
   isTemplate               Boolean        @default(false)
+  /// When on, correct answers score more when submitted earlier in the timer.
+  /// Ignored when sessionMode is SURVEY.
+  speedBonusEnabled        Boolean        @default(false)
+  /// QUIZ = scored with optional answer keys. SURVEY = opinion / feedback only.
+  sessionMode              SessionMode    @default(QUIZ)
   currentQuestionId        String?
   /// Set when the host opens a question. Used to reject answers submitted after the time limit.
   currentQuestionStartedAt DateTime?

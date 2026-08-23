@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfig, clearEventData, duplicateEvent, updateEventAccess, getPublicEventInfo } from '../controllers/event.controller';
+import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfig, clearEventData, duplicateEvent, updateEventAccess, getPublicEventInfo, listStarterTemplates, createEventFromTemplate } from '../controllers/event.controller';
 import { authenticateHost } from '../middleware/auth.middleware';
 import { joinLimiter } from '../config/rateLimit';
 
@@ -15,6 +15,8 @@ router.use(authenticateHost);
 
 router.post('/', createEvent);
 router.get('/', getHostEvents);
+router.get('/templates/starters', listStarterTemplates);
+router.post('/templates/starters', createEventFromTemplate);
 router.get('/:id', getEventById);
 router.post('/:id/duplicate', duplicateEvent);
 router.delete('/:id', deleteEvent);

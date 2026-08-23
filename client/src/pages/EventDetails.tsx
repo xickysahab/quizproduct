@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import { ArrowLeft, Plus, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
 import QuestionForm from '../components/QuestionForm';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
+import RoomAccessPanel from '../components/RoomAccessPanel';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmModal from '../components/ConfirmModal';
@@ -136,6 +137,15 @@ const EventDetails: React.FC = () => {
               {event.title}
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
+              <span
+                className={`inline-flex mr-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border align-middle ${
+                  event.sessionMode === 'SURVEY'
+                    ? 'bg-teal-50 text-teal-700 border-teal-100'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                }`}
+              >
+                {event.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'}
+              </span>
               Share the PIN code <span className="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">{event.roomCode}</span> with your participants to join live.
             </p>
           </div>
@@ -147,7 +157,7 @@ const EventDetails: React.FC = () => {
               className="gradient-btn text-white px-6 py-4 rounded-2xl font-semibold text-sm transition-all shadow-glow-sm hover:shadow-glow-md flex items-center justify-center gap-2.5 group"
             >
               <Play className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
-              <span>Broadcast Live Quiz</span>
+              <span>{event.sessionMode === 'SURVEY' ? 'Broadcast Live Survey' : 'Broadcast Live Quiz'}</span>
             </button>
 
             <button
@@ -187,6 +197,16 @@ const EventDetails: React.FC = () => {
             </button>
           </div>
         </div>
+
+        <RoomAccessPanel
+          eventId={id!}
+          passcodeSet={Boolean(event.passcodeSet)}
+          allowAnonymous={event.allowAnonymous !== false}
+          roomCodeRetiredAt={event.roomCodeRetiredAt ?? null}
+          speedBonusEnabled={Boolean(event.speedBonusEnabled)}
+          sessionMode={event.sessionMode === 'SURVEY' ? 'SURVEY' : 'QUIZ'}
+          onUpdated={fetchEventDetails}
+        />
 
         {/* Questions Header & Add Button */}
         <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
@@ -316,6 +336,7 @@ const EventDetails: React.FC = () => {
       {isModalOpen && (
         <QuestionForm
           initialData={editingQuestion}
+          surveyMode={event.sessionMode === 'SURVEY'}
           onClose={() => setIsModalOpen(false)}
           onSubmit={editingQuestion ? handleEditQuestion : handleAddQuestion}
         />

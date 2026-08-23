@@ -5,6 +5,7 @@ import { getSessionKey } from '../utils/session';
 import LanguagePicker from '../components/LanguagePicker';
 import { useTranslation } from '../i18n/useTranslation';
 import { normalizeRoomCode } from '../utils/roomCode';
+import { writeRoomBranding, brandTint, type RoomBranding } from '../utils/branding';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Sparkles, ArrowRight, ShieldCheck, Zap, BarChart3, CheckCircle2 } from 'lucide-react';
@@ -17,15 +18,44 @@ const Join: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [passcodeRequired, setPasscodeRequired] = useState(false);
+  const [allowAnonymous, setAllowAnonymous] = useState(true);
+  const [roomTitle, setRoomTitle] = useState<string | null>(null);
+  const [branding, setBranding] = useState<RoomBranding | null>(null);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const location = useLocation();
+
+  const loadPublicInfo = async (rawCode: string) => {
+    const code = normalizeRoomCode(rawCode);
+    if (code.length < 4) {
+      setRoomTitle(null);
+      setBranding(null);
+      setPasscodeRequired(false);
+      setAllowAnonymous(true);
+      return;
+    }
+
+    try {
+      const res = await api.get(`/events/public/${code}`);
+      setRoomTitle(res.data.title || null);
+      setPasscodeRequired(Boolean(res.data.passcodeRequired));
+      setAllowAnonymous(res.data.allowAnonymous !== false);
+      setBranding(res.data.branding || null);
+      writeRoomBranding(res.data.branding);
+    } catch {
+      // Wrong code — keep the form usable; join will surface the real error.
+      setRoomTitle(null);
+      setBranding(null);
+    }
+  };
 
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
     const codeParam = params.get('code');
     if (codeParam) {
-      setRoomCode(codeParam.replace(/[^0-9A-Za-z]/g, '').toUpperCase());
+      const cleaned = codeParam.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+      setRoomCode(cleaned);
+      void loadPublicInfo(cleaned);
     }
   }, [location.search]);
 
@@ -40,15 +70,16 @@ const Join: React.FC = () => {
       return;
     }
 
+    if (!allowAnonymous && !name.trim()) {
+      setError(t('join.errorName') || 'The host asked everyone to join with a name.');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await api.post('/participants/join', {
         roomCode: code,
-        // A name is optional — Slido needs only the code, and anonymity is what
-        // makes candid feedback possible.
         name: name.trim(),
-        // Stable per-device key so a refresh reuses this row instead of
-        // creating a duplicate participant.
         sessionKey: getSessionKey(),
         passcode: passcode.trim() || undefined,
       });
@@ -58,22 +89,22 @@ const Join: React.FC = () => {
       localStorage.setItem('eventId', response.data.event.id);
       localStorage.setItem('participantToken', response.data.participantToken);
       localStorage.setItem('qaEnabled', String(response.data.event.qaEnabled !== false));
-      if (response.data.branding) {
-        localStorage.setItem('roomBranding', JSON.stringify(response.data.branding));
-      } else {
-        localStorage.removeItem('roomBranding');
-      }
+      localStorage.setItem(
+        'sessionMode',
+        response.data.event.sessionMode === 'SURVEY' ? 'SURVEY' : 'QUIZ'
+      );
+      writeRoomBranding(response.data.branding);
 
       navigate(`/live/${code}`);
     } catch (err: any) {
-      // A room that wants a passcode says so, and the field appears rather than
-      // the person guessing why they were refused.
       if (err.response?.data?.passcodeRequired) setPasscodeRequired(true);
       setError(err.response?.data?.message || t('join.errorGeneric'));
     } finally {
       setLoading(false);
     }
   };
+
+  const accent = branding?.primaryColor || undefined;
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
@@ -166,28 +197,68 @@ const Join: React.FC = () => {
                   <input
                     type="text"
                     required
-                    className="w-full px-5 py-4 text-center text-3xl font-mono font-bold tracking-[0.25em] uppercase rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:tracking-normal placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 placeholder:text-base shadow-sm"
+                    className="w-full px-5 py-5 text-center text-4xl font-heading font-bold tracking-[0.22em] uppercase rounded-2xl border-2 border-gray-200 bg-slate-50 text-slate-950 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:tracking-normal placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 placeholder:text-base shadow-sm"
                     placeholder="123 4567"
                     value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.replace(/[^0-9A-Za-z ]/g, '').toUpperCase())}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/[^0-9A-Za-z ]/g, '').toUpperCase();
+                      setRoomCode(next);
+                    }}
+                    onBlur={() => void loadPublicInfo(roomCode)}
                     maxLength={9}
                     inputMode="numeric"
                     autoComplete="one-time-code"
                   />
+                  {(roomTitle || branding?.name) && (
+                    <div className="mt-3 flex items-center gap-2.5 text-left">
+                      {branding?.logoUrl && (
+                        <img
+                          src={branding.logoUrl}
+                          alt=""
+                          className="w-8 h-8 rounded-lg object-contain border border-gray-100 bg-white"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        {branding?.name && (
+                          <p className="text-[11px] font-bold uppercase tracking-wider truncate" style={{ color: accent || '#4f46e5' }}>
+                            {branding.name}
+                          </p>
+                        )}
+                        {roomTitle && (
+                          <p className="text-sm font-semibold text-gray-900 truncate">{roomTitle}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    {t('join.name')} <span className="normal-case tracking-normal font-medium text-gray-400">— {t('join.nameOptional')}</span>
+                    {t('join.name')}
+                    {allowAnonymous && (
+                      <span className="normal-case tracking-normal font-medium text-gray-400">
+                        {' '}
+                        — {t('join.nameOptional')}
+                      </span>
+                    )}
                   </label>
                   <input
                     type="text"
-                    required
+                    required={!allowAnonymous}
                     className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
-                    placeholder={t("join.namePlaceholder")}
+                    placeholder={
+                      allowAnonymous
+                        ? t('join.namePlaceholder')
+                        : t('join.nameRequiredPlaceholder') || 'Your name (required)'
+                    }
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={25}
+                    style={
+                      accent
+                        ? ({ ['--tw-ring-color' as string]: brandTint(accent, 0.35) } as React.CSSProperties)
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -216,6 +287,7 @@ const Join: React.FC = () => {
                   type="submit"
                   disabled={loading || normalizeRoomCode(roomCode).length < 4}
                   className="w-full gradient-btn text-white text-base font-semibold py-4 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 group mt-2 shadow-md"
+                  style={accent ? { background: accent } : undefined}
                 >
                   <span>{loading ? t('join.connecting') : t('join.submit')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
