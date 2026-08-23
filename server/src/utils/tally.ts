@@ -17,6 +17,16 @@ export interface TallyResponse {
   selectedOption: number;
   selectedOptions: number[];
   answerText: string | null;
+  rankedOptions?: number[];
+}
+
+/** Mean placement of one option in a ranking question. Lower is better. */
+export interface RankAverage {
+  option: string;
+  index: number;
+  /** 1-based mean position across everyone who ranked it. */
+  averageRank: number;
+  votes: number;
 }
 
 export interface WordCount {
@@ -35,6 +45,8 @@ export interface QuestionTally {
   percentages: number[];
   textAnswers: string[];
   words: WordCount[];
+  /** Populated for RANKING only, ordered best-first. */
+  ranking: RankAverage[];
 }
 
 /** Question types that collect free text instead of an option index. */
@@ -58,7 +70,10 @@ export const tallyOptions = (
 ): { totalResponses: number; optionCounts: number[]; percentages: number[] } => {
   const optionCounts = new Array<number>(question.options.length).fill(0);
 
-  if (isTextType(question.type)) {
+  // Text and ranking questions carry no single-option choice. Counting one
+  // would read `selectedOption`, which defaults to 0 — the same defect that
+  // made every free-text answer look like a vote for option A.
+  if (isTextType(question.type) || question.type === 'RANKING') {
     return { totalResponses: responses.length, optionCounts, percentages: optionCounts.slice() };
   }
 
@@ -135,6 +150,60 @@ export const tallyWords = (answers: string[], limit = 60): WordCount[] => {
     .slice(0, limit);
 };
 
+/**
+ * Mean placement per option for a ranking question.
+ *
+ * Counting a ranking as if it were a single choice would throw away everything
+ * except each person's first pick, which is the same mistake multi-select used
+ * to make. Options nobody ranked are reported with zero votes rather than
+ * silently dropped.
+ */
+export const tallyRanking = (
+  question: TallyQuestion,
+  responses: TallyResponse[]
+): RankAverage[] => {
+  const totals = question.options.map(() => ({ sum: 0, votes: 0 }));
+
+  for (const response of responses) {
+    const order = response.rankedOptions ?? [];
+    const seen = new Set<number>();
+
+    order.forEach((optionIndex, position) => {
+      if (
+        !Number.isInteger(optionIndex) ||
+        optionIndex < 0 ||
+        optionIndex >= totals.length ||
+        seen.has(optionIndex)
+      ) {
+        return;
+      }
+      seen.add(optionIndex);
+      const entry = totals[optionIndex]!;
+      entry.sum += position + 1;
+      entry.votes += 1;
+    });
+  }
+
+  return question.options
+    .map((option, index) => {
+      const entry = totals[index]!;
+      return {
+        option,
+        index,
+        averageRank: entry.votes === 0 ? 0 : Number((entry.sum / entry.votes).toFixed(2)),
+        votes: entry.votes,
+      };
+    })
+    // Unranked options sort last rather than first, which a raw ascending
+    // sort on a zero average would do.
+    .sort((a, b) => {
+      if (a.votes === 0 && b.votes === 0) return a.index - b.index;
+      if (a.votes === 0) return 1;
+      if (b.votes === 0) return -1;
+      return a.averageRank - b.averageRank;
+    });
+};
+
 /** Full per-question tally, including text aggregation. */
 export const tallyQuestion = (
   question: TallyQuestion,
@@ -158,6 +227,7 @@ export const tallyQuestion = (
     percentages,
     textAnswers,
     words: question.type === 'WORD_CLOUD' ? tallyWords(textAnswers) : [],
+    ranking: question.type === 'RANKING' ? tallyRanking(question, responses) : [],
   };
 };
 
@@ -173,7 +243,9 @@ export const tallyQuestion = (
 export const collectiveTally = (
   tallies: QuestionTally[]
 ): { options: string[]; optionCounts: number[]; percentages: number[]; totalResponses: number } | null => {
-  const scored = tallies.filter((tally) => !isTextType(tally.type) && tally.options.length > 0);
+  const scored = tallies.filter(
+    (tally) => !isTextType(tally.type) && tally.type !== 'RANKING' && tally.options.length > 0
+  );
   if (scored.length === 0) return null;
 
   const shape = JSON.stringify(scored[0]!.options);

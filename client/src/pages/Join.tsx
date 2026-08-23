@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { getSessionKey } from '../utils/session';
+import LanguagePicker from '../components/LanguagePicker';
+import { useTranslation } from '../i18n/useTranslation';
+import { normalizeRoomCode } from '../utils/roomCode';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Sparkles, ArrowRight, ShieldCheck, Zap, BarChart3, CheckCircle2 } from 'lucide-react';
@@ -12,7 +15,10 @@ const Join: React.FC = () => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [passcodeRequired, setPasscodeRequired] = useState(false);
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const location = useLocation();
 
   React.useEffect(() => {
@@ -27,10 +33,10 @@ const Join: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    const code = roomCode.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const code = normalizeRoomCode(roomCode);
 
     if (!code) {
-      setError('Enter the code shown on screen');
+      setError(t('join.errorCode'));
       return;
     }
 
@@ -44,6 +50,7 @@ const Join: React.FC = () => {
         // Stable per-device key so a refresh reuses this row instead of
         // creating a duplicate participant.
         sessionKey: getSessionKey(),
+        passcode: passcode.trim() || undefined,
       });
 
       localStorage.setItem('participantId', response.data.participant.id);
@@ -51,10 +58,18 @@ const Join: React.FC = () => {
       localStorage.setItem('eventId', response.data.event.id);
       localStorage.setItem('participantToken', response.data.participantToken);
       localStorage.setItem('qaEnabled', String(response.data.event.qaEnabled !== false));
+      if (response.data.branding) {
+        localStorage.setItem('roomBranding', JSON.stringify(response.data.branding));
+      } else {
+        localStorage.removeItem('roomBranding');
+      }
 
       navigate(`/live/${code}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Unable to join. Check the code and try again.');
+      // A room that wants a passcode says so, and the field appears rather than
+      // the person guessing why they were refused.
+      if (err.response?.data?.passcodeRequired) setPasscodeRequired(true);
+      setError(err.response?.data?.message || t('join.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -123,13 +138,13 @@ const Join: React.FC = () => {
             <div className="bg-white rounded-3xl p-8 md:p-10 shadow-xl border border-gray-100 relative hover-card">
               <div className="text-center mb-8">
                 <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
-                  Participant Portal
+                  {t('join.eyebrow')}
                 </span>
                 <h2 className="font-heading text-3xl font-bold text-gray-900 mt-1">
-                  Join a Live Session
+                  {t('join.title')}
                 </h2>
                 <p className="text-sm text-gray-500 mt-2">
-                  Enter the code shown on the host&apos;s screen
+                  {t('join.subtitle')}
                 </p>
               </div>
 
@@ -146,7 +161,7 @@ const Join: React.FC = () => {
               <form onSubmit={handleJoin} className="space-y-5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    Room Code
+                    {t('join.code')}
                   </label>
                   <input
                     type="text"
@@ -163,25 +178,46 @@ const Join: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    Your Name <span className="normal-case tracking-normal font-medium text-gray-400">— optional</span>
+                    {t('join.name')} <span className="normal-case tracking-normal font-medium text-gray-400">— {t('join.nameOptional')}</span>
                   </label>
                   <input
                     type="text"
                     required
                     className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
-                    placeholder="Leave blank to stay anonymous"
+                    placeholder={t("join.namePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={25}
                   />
                 </div>
 
+                {passcodeRequired && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
+                      Passcode
+                    </label>
+                    <input
+                      type="text"
+                      value={passcode}
+                      onChange={(e) => setPasscode(e.target.value)}
+                      placeholder="Shown by your host"
+                      maxLength={40}
+                      autoComplete="off"
+                      className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                    />
+                  </div>
+                )}
+
+                <div className="flex justify-center pt-1">
+                  <LanguagePicker />
+                </div>
+
                 <button
                   type="submit"
-                  disabled={loading || roomCode.replace(/[^0-9A-Za-z]/g, '').length < 4}
+                  disabled={loading || normalizeRoomCode(roomCode).length < 4}
                   className="w-full gradient-btn text-white text-base font-semibold py-4 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 group mt-2 shadow-md"
                 >
-                  <span>{loading ? 'Connecting...' : 'Enter Live Quiz'}</span>
+                  <span>{loading ? t('join.connecting') : t('join.submit')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
               </form>

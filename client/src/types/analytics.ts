@@ -1,4 +1,18 @@
-export type QuestionType = 'MCQ' | 'MULTI_SELECT' | 'OPEN_TEXT' | 'WORD_CLOUD' | 'RATING';
+export type QuestionType =
+  | 'MCQ'
+  | 'MULTI_SELECT'
+  | 'OPEN_TEXT'
+  | 'WORD_CLOUD'
+  | 'RATING'
+  | 'RANKING';
+
+/** Mean placement of one option in a ranking question. Lower is better. */
+export interface RankAverage {
+  option: string;
+  index: number;
+  averageRank: number;
+  votes: number;
+}
 
 export interface WordCount {
   word: string;
@@ -16,6 +30,8 @@ export interface QuestionTally {
   percentages: number[];
   textAnswers: string[];
   words: WordCount[];
+  /** Populated for RANKING only, ordered best-first. */
+  ranking: RankAverage[];
   correctOption?: number | null;
   correctOptions?: number[];
 }

@@ -64,8 +64,14 @@ export const exportEventAnalytics = async (req: AuthRequest, res: Response): Pro
       ...event.questions.flatMap((q, index) => [`Q${index + 1} (${q.text})`, `Q${index + 1} Score`]),
     ];
 
-    res.header('Content-Type', 'text/csv');
+    res.header('Content-Type', 'text/csv; charset=utf-8');
     res.attachment(`${event.title.replace(/\s+/g, '_')}_Analytics.csv`);
+
+    // UTF-8 byte-order mark. Excel on Windows assumes the system codepage
+    // without it, which turns every Devanagari, Tamil or Bengali participant
+    // name into mojibake — the single most visible export bug for an Indian
+    // product. LibreOffice and Sheets are unaffected either way.
+    res.write('\uFEFF');
 
     // Streamed in pages rather than materialising every participant and every
     // response in memory first. A 5,000-person event used to build the entire

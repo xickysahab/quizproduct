@@ -8,6 +8,8 @@ import { scoreAnswer } from '../utils/questionTypes';
 import { bumpUsage, participantCapForOrg } from '../utils/usage';
 import { slog } from '../utils/slog';
 import { normalizeRoomCode } from '../utils/roomCode';
+import { hashSecret } from '../utils/mailer';
+import { safeEquals } from '../utils/webhookSignature';
 import { liveEvents } from '../utils/liveEvents';
 import { getParticipantStanding } from '../utils/leaderboard';
 
@@ -16,7 +18,7 @@ const MAX_ANSWER_TEXT = 280;
 
 export const joinEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { roomCode, name, sessionKey } = req.body;
+    const { roomCode, name, sessionKey, passcode } = req.body;
 
     if (typeof roomCode !== 'string') {
       res.status(400).json({ message: 'A room code is required.' });
@@ -42,6 +44,8 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         allowAnonymous: true,
         qaEnabled: true,
         roomCodeRetiredAt: true,
+        passcodeHash: true,
+        organization: { select: { name: true, logoUrl: true, primaryColor: true } },
       },
     });
 
@@ -54,6 +58,16 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     if (event.roomCodeRetiredAt) {
       res.status(410).json({ message: 'This session has closed.' });
       return;
+    }
+
+    // A passcode is a door code shared with a room, not a password. Compared in
+    // constant time anyway, since there is no reason not to.
+    if (event.passcodeHash) {
+      const supplied = typeof passcode === 'string' ? passcode.trim() : '';
+      if (!supplied || !safeEquals(hashSecret(supplied.toLowerCase()), event.passcodeHash)) {
+        res.status(401).json({ message: 'That passcode is not right.', passcodeRequired: true });
+        return;
+      }
     }
 
     if (!trimmedName && !event.allowAnonymous) {
@@ -89,6 +103,13 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
             currentQuestionId: event.currentQuestionId,
             qaEnabled: event.qaEnabled,
           },
+          branding: event.organization
+            ? {
+                name: event.organization.name,
+                logoUrl: event.organization.logoUrl,
+                primaryColor: event.organization.primaryColor,
+              }
+            : null,
         });
         return;
       }
@@ -127,6 +148,13 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         currentQuestionId: event.currentQuestionId,
         qaEnabled: event.qaEnabled,
       },
+      branding: event.organization
+        ? {
+            name: event.organization.name,
+            logoUrl: event.organization.logoUrl,
+            primaryColor: event.organization.primaryColor,
+          }
+        : null,
     });
   } catch (error) {
     slog('error', 'participant.join_failed', { error: error instanceof Error ? error.message : String(error) });
@@ -137,7 +165,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
 export const submitResponse = async (req: ParticipantRequest, res: Response): Promise<void> => {
   try {
     const { participantId, eventId } = req.participant!;
-    const { questionId, selectedOption, selectedOptions, answerText } = req.body;
+    const { questionId, selectedOption, selectedOptions, answerText, rankedOptions } = req.body;
 
     if (typeof questionId !== 'string') {
       res.status(400).json({ message: 'Question ID is required.' });
@@ -187,6 +215,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
     let optionIndex = 0;
     let optionList: number[] = [];
     let text: string | null = null;
+    let ranked: number[] = [];
 
     if (type === 'OPEN_TEXT' || type === 'WORD_CLOUD') {
       if (typeof answerText !== 'string' || !answerText.trim()) {
@@ -194,6 +223,22 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
         return;
       }
       text = answerText.trim().slice(0, MAX_ANSWER_TEXT);
+    } else if (type === 'RANKING') {
+      const raw = Array.isArray(rankedOptions) ? rankedOptions.map(Number) : [];
+      // Every option exactly once, in some order — a partial or duplicated
+      // ranking is not a ranking.
+      const valid =
+        raw.length === question.options.length &&
+        raw.every((n) => Number.isInteger(n) && n >= 0 && n < question.options.length) &&
+        new Set(raw).size === raw.length;
+
+      if (!valid) {
+        res.status(400).json({ message: 'Place every option exactly once.' });
+        return;
+      }
+      ranked = raw;
+      optionList = raw;
+      optionIndex = raw[0] ?? 0;
     } else if (type === 'MULTI_SELECT') {
       const raw = Array.isArray(selectedOptions) ? selectedOptions : [];
       optionList = raw.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < question.options.length);
@@ -217,6 +262,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       participantId,
       selectedOption: optionIndex,
       selectedOptions: optionList,
+      rankedOptions: ranked,
       answerText: text,
       isCorrect,
       score,

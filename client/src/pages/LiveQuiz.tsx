@@ -9,17 +9,22 @@ import type { LiveQuestion, QuestionTally } from '../types/analytics';
 import Countdown from '../components/Countdown';
 import QaPanel from '../components/QaPanel';
 import QuestionResults from '../components/QuestionResults';
+import LanguagePicker from '../components/LanguagePicker';
+import { useTranslation } from '../i18n/useTranslation';
+import { enqueue, flushQueue, onQueueChange, pendingCount, startAutoFlush } from '../utils/answerQueue';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const LiveQuiz: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [participantName, setParticipantName] = useState<string | null>(null);
   // Typed as the participant-safe shape: no correctOption, no correctOptions.
   const [activeQuestion, setActiveQuestion] = useState<LiveQuestion | null>(null);
   const [currentSelection, setCurrentSelection] = useState<number | null>(null);
   const [multiSelection, setMultiSelection] = useState<number[]>([]);
+  const [ranking, setRanking] = useState<number[]>([]);
   const [textAnswer, setTextAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [quizEnded, setQuizEnded] = useState(false);
@@ -29,6 +34,7 @@ const LiveQuiz: React.FC = () => {
   const [results, setResults] = useState<(QuestionTally & { correctOption: number | null; correctOptions: number[] }) | null>(null);
   const [tab, setTab] = useState<'poll' | 'qa'>('poll');
   const [qaEnabled, setQaEnabled] = useState(true);
+  const [queued, setQueued] = useState(0);
   const [myResult, setMyResult] = useState<{ score: number; rank: number; totalParticipants: number } | null>(null);
 
   useEffect(() => {
@@ -61,6 +67,11 @@ const LiveQuiz: React.FC = () => {
     socket.on('disconnect', () => setConnected(false));
     if (socket.connected) handleConnect();
 
+    // Answers buffered while offline go out as soon as the network returns.
+    setQueued(pendingCount());
+    const stopQueueWatch = onQueueChange(setQueued);
+    const stopAutoFlush = startAutoFlush();
+
     socket.on(
       'participant:questionActive',
       ({ question, selectedOption, selectedOptions, answerText, startedAt: openedAt }) => {
@@ -71,6 +82,9 @@ const LiveQuiz: React.FC = () => {
 
         setCurrentSelection(selectedOption ?? null);
         setMultiSelection(Array.isArray(selectedOptions) ? selectedOptions : []);
+        // A ranking starts in the question's own order, so the participant is
+        // reordering something rather than building a list from nothing.
+        setRanking(question.type === 'RANKING' ? question.options.map((_: string, i: number) => i) : []);
         setTextAnswer(answerText || '');
         setSubmitted(hasAnswer);
         setActiveQuestion(question);
@@ -102,6 +116,8 @@ const LiveQuiz: React.FC = () => {
     });
 
     return () => {
+      stopQueueWatch();
+      stopAutoFlush();
       socket.off('connect', handleConnect);
       socket.off('disconnect');
       socket.off('participant:questionActive');
@@ -127,15 +143,23 @@ const LiveQuiz: React.FC = () => {
     } catch (error: any) {
       if (error.response?.status === 401) {
         localStorage.removeItem('participantToken');
-        toast.error('Session expired. Please rejoin the room.');
+        toast.error(t('live.sessionExpired'));
         navigate('/');
         return false;
       }
 
-      toast.error(
-        error.response?.data?.message ||
-          'Unable to save response. The question may have been closed by the host.'
-      );
+      // No response at all means the network dropped, not that the server
+      // rejected the answer — hold it and send it when the connection returns
+      // rather than silently losing it.
+      if (!error.response) {
+        enqueue(activeQuestion.id, payload);
+        setSubmitted(true);
+        toast.success(t('live.offlineQueued'));
+        void flushQueue();
+        return true;
+      }
+
+      toast.error(error.response?.data?.message || t('live.timeUpMessage'));
       return false;
     }
   };
@@ -206,7 +230,7 @@ const LiveQuiz: React.FC = () => {
         <div className="flex items-center gap-3 text-xs">
           <span
             className="flex items-center gap-1.5 text-gray-500"
-            title={connected ? 'Connected' : 'Reconnecting'}
+            title={connected ? t('live.connected') : t('live.reconnecting')}
           >
             <span
               className={`w-2 h-2 rounded-full ${
@@ -214,10 +238,16 @@ const LiveQuiz: React.FC = () => {
               }`}
               aria-hidden="true"
             />
-            <span className="sr-only">{connected ? 'Connected' : 'Reconnecting'}</span>
+            <span className="sr-only">{connected ? t('live.connected') : t('live.reconnecting')}</span>
           </span>
-          <span className="text-gray-500">
-            Player: <strong className="text-gray-900">{participantName}</strong>
+          {queued > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tabular-nums">
+              {queued} queued
+            </span>
+          )}
+          <LanguagePicker compact />
+          <span className="text-gray-500 hidden sm:inline">
+            {t('live.player')}: <strong className="text-gray-900">{participantName}</strong>
           </span>
           <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-mono font-bold border border-indigo-100">
             {roomCode}
@@ -236,7 +266,7 @@ const LiveQuiz: React.FC = () => {
                   tab === key ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                {key === 'poll' ? 'Live poll' : 'Ask a question'}
+                {key === 'poll' ? t('live.tabPoll') : t('live.tabQa')}
               </button>
             ))}
           </div>
@@ -257,7 +287,7 @@ const LiveQuiz: React.FC = () => {
                 className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-gray-200 space-y-5"
               >
                 <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
-                  Results
+                  {t('live.results')}
                 </span>
                 <QuestionResults tally={results} revealCorrect />
               </motion.div>
@@ -274,13 +304,13 @@ const LiveQuiz: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
-                    Connected &amp; Ready
+                    {t('live.ready')}
                   </span>
                   <h1 className="font-heading text-3xl md:text-4xl font-bold text-gray-900">
-                    You&apos;re in, {participantName}!
+                    {t('live.waitingTitle')}, {participantName}!
                   </h1>
                   <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                    Waiting for the host to present the next question...
+                    {t('live.waitingBody')}
                   </p>
                 </div>
               </motion.div>
@@ -294,7 +324,7 @@ const LiveQuiz: React.FC = () => {
               >
                 <div>
                   <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
-                    Active Question
+                    {t('live.activeQuestion')}
                   </span>
                   <h2 className="font-heading text-3xl font-bold text-gray-900 mt-1 leading-snug">
                     {activeQuestion.text}
@@ -311,7 +341,7 @@ const LiveQuiz: React.FC = () => {
 
                 {expired && (
                   <p className="text-sm font-semibold text-rose-600 text-center">
-                    Time is up for this question.
+                    {t('live.timeUpMessage')}
                   </p>
                 )}
 
@@ -330,12 +360,75 @@ const LiveQuiz: React.FC = () => {
                         rows={3}
                         maxLength={280}
                         className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 outline-none focus:border-indigo-500"
-                        placeholder={activeQuestion.type === 'WORD_CLOUD' ? 'Type a word or short phrase' : 'Type your answer'}
+                        placeholder={activeQuestion.type === 'WORD_CLOUD' ? t('live.wordPlaceholder') : t('live.textPlaceholder')}
                       />
                       <button type="submit" disabled={!textAnswer.trim()} className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50">
-                        {submitted ? 'Update answer' : 'Submit answer'}
+                        {submitted ? t('live.updateAnswer') : t('live.submitAnswer')}
                       </button>
                     </form>
+                  )}
+
+                  {activeQuestion.type === 'RANKING' && (
+                    <>
+                      <p className="text-xs text-gray-500">
+                        Put these in your preferred order — most important first.
+                      </p>
+                      {ranking.map((optionIndex, position) => (
+                        <div
+                          key={optionIndex}
+                          className="w-full p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center gap-3"
+                        >
+                          <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
+                            {position + 1}
+                          </span>
+                          <span className="flex-1 text-left text-gray-800">
+                            {activeQuestion.options[optionIndex]}
+                          </span>
+                          <span className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              aria-label="Move up"
+                              disabled={position === 0}
+                              onClick={() =>
+                                setRanking((prev) => {
+                                  const next = [...prev];
+                                  const above = next[position - 1]!;
+                                  next[position - 1] = next[position]!;
+                                  next[position] = above;
+                                  return next;
+                                })
+                              }
+                              className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs disabled:opacity-30"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Move down"
+                              disabled={position === ranking.length - 1}
+                              onClick={() =>
+                                setRanking((prev) => {
+                                  const next = [...prev];
+                                  const below = next[position + 1]!;
+                                  next[position + 1] = next[position]!;
+                                  next[position] = below;
+                                  return next;
+                                })
+                              }
+                              className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs disabled:opacity-30"
+                            >
+                              ↓
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => submitAnswer({ rankedOptions: ranking })}
+                        className="w-full gradient-btn text-white py-3 rounded-xl font-semibold"
+                      >
+                        {submitted ? t('live.updateSelection') : t('live.submitSelection')}
+                      </button>
+                    </>
                   )}
 
                   {activeQuestion.type === 'MULTI_SELECT' && (
@@ -366,7 +459,7 @@ const LiveQuiz: React.FC = () => {
                         disabled={multiSelection.length === 0}
                         className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50"
                       >
-                        {submitted ? 'Update selection' : 'Submit selection'}
+                        {submitted ? t('live.updateSelection') : t('live.submitSelection')}
                       </button>
                     </>
                   )}
@@ -407,7 +500,7 @@ const LiveQuiz: React.FC = () => {
                   <div className="pt-2 text-center">
                     <span className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Response recorded — you may update until the host advances</span>
+                      <span>{t('live.recorded')}</span>
                     </span>
                   </div>
                 )}

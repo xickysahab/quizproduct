@@ -11,6 +11,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import QuestionResults from '../components/QuestionResults';
 import QaModerationPanel from '../components/QaModerationPanel';
 import Countdown from '../components/Countdown';
+import ShareRoom from '../components/ShareRoom';
 import type { EventDetail, EventSummary, LeaderboardRow, QuestionTally } from '../types/analytics';
 
 const HostLive: React.FC = () => {
@@ -320,6 +321,7 @@ const HostLive: React.FC = () => {
                         percentages: summaryData.collective.percentages,
                         textAnswers: [],
                         words: [],
+                        ranking: [],
                       }}
                       palette={brandPalette}
                     />
@@ -365,6 +367,9 @@ const HostLive: React.FC = () => {
                         {event.roomCode}
                       </span>
                     </p>
+                    <div className="pt-1">
+                      <ShareRoom roomCode={event.roomCode} title={event.title} />
+                    </div>
                     <button
                       onClick={() => setShowQR(true)}
                       className="text-sm font-semibold text-indigo-600 flex items-center gap-2 hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100"

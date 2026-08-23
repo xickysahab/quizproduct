@@ -8,6 +8,7 @@ import { parsePagination } from '../utils/validation';
 import { organizationIdForUser } from '../utils/org';
 import { assertCanCreateEvent, releaseEventSlot } from '../utils/usage';
 import { slog } from '../utils/slog';
+import { hashSecret } from '../utils/mailer';
 
 const uniqueRoomCode = async (): Promise<string> => {
   let roomCode = generateRoomCode();
@@ -301,6 +302,114 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
     res.status(201).json({ message: 'Quiz duplicated', event: copy });
   } catch (error) {
     slog('error', 'event.duplicate_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Sets or clears the room passcode, and the anonymity switch.
+ *
+ * A passcode is a door code shared with a room, not a credential — it is stored
+ * hashed so a database dump does not hand out access to every live session, but
+ * it is not pretending to resist offline cracking.
+ */
+export const updateEventAccess = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { passcode, allowAnonymous, retireCode } = req.body || {};
+
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    if (!(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+      res.status(403).json({ message: 'Forbidden: You do not have access to this event.' });
+      return;
+    }
+
+    const data: { passcodeHash?: string | null; allowAnonymous?: boolean; roomCodeRetiredAt?: Date | null } = {};
+
+    if (passcode !== undefined) {
+      const value = typeof passcode === 'string' ? passcode.trim() : '';
+      if (value && value.length < 4) {
+        res.status(400).json({ message: 'A passcode needs at least 4 characters.' });
+        return;
+      }
+      // Lowercased before hashing so the room does not fail on capitalisation
+      // when the code is read off a slide.
+      data.passcodeHash = value ? hashSecret(value.toLowerCase()) : null;
+    }
+
+    if (typeof allowAnonymous === 'boolean') data.allowAnonymous = allowAnonymous;
+    if (typeof retireCode === 'boolean') data.roomCodeRetiredAt = retireCode ? new Date() : null;
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ message: 'Nothing to update.' });
+      return;
+    }
+
+    const updated = await prisma.event.update({ where: { id }, data });
+
+    await logActivity(req.user?.userId, 'UPDATE_EVENT_ACCESS', 'Event', id, {
+      title: event.title,
+      passcodeSet: Boolean(updated.passcodeHash),
+      retired: Boolean(updated.roomCodeRetiredAt),
+    });
+
+    res.json({
+      message: 'Access settings updated.',
+      // Never echo the passcode back, only whether one is set.
+      passcodeSet: Boolean(updated.passcodeHash),
+      allowAnonymous: updated.allowAnonymous,
+      roomCodeRetiredAt: updated.roomCodeRetiredAt,
+    });
+  } catch (error) {
+    slog('error', 'event.access_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Public pre-join lookup, so the join screen can ask for a passcode and show
+ * the host's branding before anybody is admitted. Deliberately minimal — it
+ * must not leak the session's content to someone who has only guessed a code.
+ */
+export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const code = String(req.params.code || '').replace(/[\s-]+/g, '').toUpperCase();
+
+    const event = await prisma.event.findUnique({
+      where: { roomCode: code },
+      select: {
+        title: true,
+        allowAnonymous: true,
+        passcodeHash: true,
+        roomCodeRetiredAt: true,
+        organization: { select: { name: true, logoUrl: true, primaryColor: true } },
+      },
+    });
+
+    if (!event || event.roomCodeRetiredAt) {
+      res.status(404).json({ message: 'That code did not match a room.' });
+      return;
+    }
+
+    res.json({
+      title: event.title,
+      allowAnonymous: event.allowAnonymous,
+      passcodeRequired: Boolean(event.passcodeHash),
+      branding: event.organization
+        ? {
+            name: event.organization.name,
+            logoUrl: event.organization.logoUrl,
+            primaryColor: event.organization.primaryColor,
+          }
+        : null,
+    });
+  } catch (error) {
+    slog('error', 'event.public_info_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

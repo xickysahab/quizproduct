@@ -8,12 +8,13 @@ interface PendingResponse {
   participantId: string;
   selectedOption: number;
   selectedOptions?: number[];
+  rankedOptions?: number[];
   answerText?: string | null;
   isCorrect: boolean;
   score?: number;
 }
 
-const COLUMNS_PER_ROW = 8;
+const COLUMNS_PER_ROW = 9;
 const MAX_ROWS_PER_STATEMENT = Math.floor(60000 / COLUMNS_PER_ROW);
 const MAX_FLUSH_ATTEMPTS = 3;
 const REDIS_HASH_KEY = 'quiz:pending-responses';
@@ -167,7 +168,7 @@ class ResponseBatcher {
             i * COLUMNS_PER_ROW + 4
           }, $${i * COLUMNS_PER_ROW + 5}, $${i * COLUMNS_PER_ROW + 6}::int[], $${i * COLUMNS_PER_ROW + 7}, $${
             i * COLUMNS_PER_ROW + 8
-          })`
+          }, $${i * COLUMNS_PER_ROW + 9}::int[])`
       )
       .join(',');
 
@@ -180,11 +181,12 @@ class ResponseBatcher {
       `{${(e.selectedOptions ?? []).map((n) => Number(n) || 0).join(',')}}`,
       e.answerText ?? null,
       e.score ?? (e.isCorrect ? 1 : 0),
+      `{${(e.rankedOptions ?? []).map((n) => Number(n) || 0).join(',')}}`,
     ]);
 
     await prisma.$executeRawUnsafe(
       `
-      INSERT INTO "Response" ("id", "questionId", "participantId", "selectedOption", "isCorrect", "selectedOptions", "answerText", "score")
+      INSERT INTO "Response" ("id", "questionId", "participantId", "selectedOption", "isCorrect", "selectedOptions", "answerText", "score", "rankedOptions")
       VALUES ${placeholders}
       ON CONFLICT ("questionId", "participantId")
       DO UPDATE SET
@@ -193,6 +195,7 @@ class ResponseBatcher {
         "selectedOptions" = EXCLUDED."selectedOptions",
         "answerText" = EXCLUDED."answerText",
         "score" = EXCLUDED."score",
+        "rankedOptions" = EXCLUDED."rankedOptions",
         "respondedAt" = CURRENT_TIMESTAMP
     `,
       ...params

@@ -1,6 +1,6 @@
-export type QuestionType = 'MCQ' | 'MULTI_SELECT' | 'OPEN_TEXT' | 'WORD_CLOUD' | 'RATING';
+export type QuestionType = 'MCQ' | 'MULTI_SELECT' | 'OPEN_TEXT' | 'WORD_CLOUD' | 'RATING' | 'RANKING';
 
-const QUESTION_TYPES: QuestionType[] = ['MCQ', 'MULTI_SELECT', 'OPEN_TEXT', 'WORD_CLOUD', 'RATING'];
+const QUESTION_TYPES: QuestionType[] = ['MCQ', 'MULTI_SELECT', 'OPEN_TEXT', 'WORD_CLOUD', 'RATING', 'RANKING'];
 
 export interface NormalizedQuestion {
   type: QuestionType;
@@ -157,6 +157,14 @@ export const scoreAnswer = (
     const expected = [...(question.correctOptions || [])].sort((a, b) => a - b);
     const got = [...selectedOptions].sort((a, b) => a - b);
     const isCorrect = expected.length > 0 && expected.join(',') === got.join(',');
+    return { isCorrect, score: isCorrect ? 1 : 0 };
+  }
+
+  if (question.type === 'RANKING') {
+    // A ranking is a preference, not an answer — order matters, so only an
+    // exact sequence match counts, and only when a correct order was set.
+    const expected = question.correctOptions || [];
+    const isCorrect = expected.length > 0 && expected.join(',') === selectedOptions.join(',');
     return { isCorrect, score: isCorrect ? 1 : 0 };
   }
 

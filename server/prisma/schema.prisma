@@ -25,6 +25,8 @@ enum QuestionType {
   OPEN_TEXT
   WORD_CLOUD
   RATING
+  /// Participants order the options; results are a mean rank.
+  RANKING
 }
 
 /// Lifecycle of an audience-submitted question.
@@ -245,6 +247,10 @@ model Event {
   /// Set when the room is closed to new joins, so a code stops working instead
   /// of every code ever issued staying live forever.
   roomCodeRetiredAt        DateTime?
+  /// Argon-free: a short passcode hashed with SHA-256. Not a password — it is a
+  /// low-entropy door code shared with a room, so it is stored hashed to avoid
+  /// leaking it from a database dump, not to resist offline cracking.
+  passcodeHash             String?
   questions                Question[]
   participants             Participant[]
   audienceQuestions        AudienceQuestion[]
@@ -336,6 +342,8 @@ model Response {
   selectedOption  Int         @default(0)
   selectedOptions Int[]       @default([])
   answerText      String?
+  /// For RANKING: the option indices in the order the participant placed them.
+  rankedOptions   Int[]       @default([])
   score           Int         @default(0)
   isCorrect       Boolean     @default(false)
   respondedAt     DateTime    @default(now())
