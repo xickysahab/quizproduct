@@ -7,24 +7,27 @@ import { env } from '../config/env';
 import { scoreAnswer } from '../utils/questionTypes';
 import { bumpUsage, participantCapForOrg } from '../utils/usage';
 import { slog } from '../utils/slog';
+import { normalizeRoomCode } from '../utils/roomCode';
+import { liveEvents } from '../utils/liveEvents';
+import { getParticipantStanding } from '../utils/leaderboard';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
 
 export const joinEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { roomCode, name } = req.body;
+    const { roomCode, name, sessionKey } = req.body;
 
-    if (typeof roomCode !== 'string' || typeof name !== 'string') {
-      res.status(400).json({ message: 'Room code and participant name are required.' });
+    if (typeof roomCode !== 'string') {
+      res.status(400).json({ message: 'A room code is required.' });
       return;
     }
 
-    const formattedCode = roomCode.trim().toUpperCase();
-    const trimmedName = name.trim().slice(0, MAX_NAME_LENGTH);
+    const formattedCode = normalizeRoomCode(roomCode);
+    const trimmedName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : '';
 
-    if (!formattedCode || !trimmedName) {
-      res.status(400).json({ message: 'Room code and participant name are required.' });
+    if (!formattedCode) {
+      res.status(400).json({ message: 'A room code is required.' });
       return;
     }
 
@@ -36,12 +39,59 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         isLive: true,
         currentQuestionId: true,
         organizationId: true,
+        allowAnonymous: true,
+        qaEnabled: true,
+        roomCodeRetiredAt: true,
       },
     });
 
     if (!event) {
-      res.status(404).json({ message: 'Invalid room code. Event not found.' });
+      res.status(404).json({ message: 'That code did not match a room. Check the digits and try again.' });
       return;
+    }
+
+    // A retired code stops working rather than staying joinable forever.
+    if (event.roomCodeRetiredAt) {
+      res.status(410).json({ message: 'This session has closed.' });
+      return;
+    }
+
+    if (!trimmedName && !event.allowAnonymous) {
+      res.status(400).json({ message: 'The host asked everyone to join with a name.' });
+      return;
+    }
+
+    // Reuse this device's existing row rather than creating a second one. A
+    // duplicate splits the person's score across two leaderboard entries and
+    // burns another seat against the plan's participant cap.
+    const key = typeof sessionKey === 'string' && sessionKey.trim() ? sessionKey.trim().slice(0, 64) : null;
+
+    if (key) {
+      const existing = await prisma.participant.findUnique({
+        where: { eventId_sessionKey: { eventId: event.id, sessionKey: key } },
+      });
+
+      if (existing) {
+        // Let them correct their name on the way back in.
+        const participant = trimmedName && trimmedName !== existing.name
+          ? await prisma.participant.update({ where: { id: existing.id }, data: { name: trimmedName } })
+          : existing;
+
+        res.status(200).json({
+          message: 'Welcome back',
+          rejoined: true,
+          participant: { id: participant.id, name: participant.name },
+          participantToken: generateParticipantToken(participant.id, event.id),
+          event: {
+            id: event.id,
+            title: event.title,
+            isLive: event.isLive,
+            currentQuestionId: event.currentQuestionId,
+            qaEnabled: event.qaEnabled,
+          },
+        });
+        return;
+      }
     }
 
     const participantCount = await prisma.participant.count({ where: { eventId: event.id } });
@@ -55,24 +105,27 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     const participant = await prisma.participant.create({
       data: {
         eventId: event.id,
+        // Anonymous participants are stored with an empty name; the UI shows a
+        // generated label rather than inventing one here.
         name: trimmedName,
+        sessionKey: key,
       },
     });
 
     await bumpUsage(event.organizationId, 'participantsJoined');
+    liveEvents.publish('participant:joined', { eventId: event.id });
 
     res.status(201).json({
       message: 'Joined event successfully',
-      participant: {
-        id: participant.id,
-        name: participant.name,
-      },
+      rejoined: false,
+      participant: { id: participant.id, name: participant.name },
       participantToken: generateParticipantToken(participant.id, event.id),
       event: {
         id: event.id,
         title: event.title,
         isLive: event.isLive,
         currentQuestionId: event.currentQuestionId,
+        qaEnabled: event.qaEnabled,
       },
     });
   } catch (error) {
@@ -169,6 +222,10 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       score,
     });
 
+    // Tell the socket layer a real, validated answer landed. The host's live
+    // counter is derived from this rather than from a client-emitted event.
+    liveEvents.publish('response:recorded', { eventId, questionId });
+
     res.status(200).json({ message: 'Response queued successfully', batched: true });
   } catch (error) {
     slog('error', 'participant.submit_failed', { error: error instanceof Error ? error.message : String(error) });
@@ -180,28 +237,12 @@ export const getMyResult = async (req: ParticipantRequest, res: Response): Promi
   try {
     const { participantId, eventId } = req.participant!;
 
-    const [mine, others] = await Promise.all([
-      prisma.response.findMany({ where: { participantId } }),
-      prisma.participant.findMany({
-        where: { eventId },
-        include: { responses: { select: { score: true, isCorrect: true } } },
-      }),
-    ]);
+    // Ranked in Postgres. This used to load every participant in the event
+    // with all of their responses and sort them in JavaScript, on a request a
+    // participant makes at the end of every session.
+    const standing = await getParticipantStanding(eventId, participantId);
 
-    const scoreOf = (responses: { score: number; isCorrect: boolean }[]) =>
-      responses.reduce((sum, r) => sum + (r.score || (r.isCorrect ? 1 : 0)), 0);
-
-    const myScore = scoreOf(mine);
-    const ranked = others
-      .map((p) => ({ id: p.id, score: scoreOf(p.responses) }))
-      .sort((a, b) => b.score - a.score);
-    const rank = ranked.findIndex((p) => p.id === participantId) + 1;
-
-    res.json({
-      score: myScore,
-      rank: rank || others.length,
-      totalParticipants: others.length,
-    });
+    res.json(standing);
   } catch (error) {
     slog('error', 'participant.result_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });

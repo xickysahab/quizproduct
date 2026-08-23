@@ -74,20 +74,39 @@ class ResponseBatcher {
     await this.flush();
   }
 
+  /**
+   * Removes and returns everything held in the local queue. Draining rather
+   * than copying matters: entries that landed here while Redis was unreachable
+   * would otherwise be re-flushed on every tick for the life of the process.
+   */
+  private drainLocal(): PendingResponse[] {
+    const entries = Array.from(this.queue.values());
+    this.queue.clear();
+    return entries;
+  }
+
   private async takeEntries(): Promise<PendingResponse[]> {
     const redis = getQueueRedis();
 
     if (redis) {
       try {
         const keys = await redis.hkeys(REDIS_HASH_KEY);
-        if (keys.length === 0) return Array.from(this.queue.values());
+        // An empty hash does not mean there is nothing to write — the local
+        // queue still holds anything buffered during a Redis outage.
+        if (keys.length === 0) return this.drainLocal();
 
         const raw = await redis.hmget(REDIS_HASH_KEY, ...keys);
-        if (keys.length) await redis.hdel(REDIS_HASH_KEY, ...keys);
+        await redis.hdel(REDIS_HASH_KEY, ...keys);
 
-        return raw
+        const fromRedis = raw
           .filter((value): value is string => Boolean(value))
           .map((value) => JSON.parse(value) as PendingResponse);
+
+        // Redis is the source of truth for a key it holds, so it wins over a
+        // local entry for the same question/participant pair.
+        const merged = new Map(this.drainLocal().map((entry) => [keyFor(entry), entry]));
+        fromRedis.forEach((entry) => merged.set(keyFor(entry), entry));
+        return Array.from(merged.values());
       } catch (error) {
         slog('warn', 'queue.redis.read_failed', {
           error: error instanceof Error ? error.message : String(error),
@@ -95,9 +114,7 @@ class ResponseBatcher {
       }
     }
 
-    const entries = Array.from(this.queue.values());
-    this.queue.clear();
-    return entries;
+    return this.drainLocal();
   }
 
   private restore(entries: PendingResponse[]) {

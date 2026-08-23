@@ -29,6 +29,8 @@ export const env = {
   hostTokenTtl: process.env.HOST_TOKEN_TTL || '7d',
   participantTokenTtl: process.env.PARTICIPANT_TOKEN_TTL || '12h',
   maxParticipantsPerEvent: readInt(process.env.MAX_PARTICIPANTS_PER_EVENT, 1000),
+  /** Ceiling for accounts with no plan, so a deck cannot grow unrenderable. */
+  maxQuestionsHardCap: readInt(process.env.MAX_QUESTIONS_HARD_CAP, 500),
   answerGracePeriodSeconds: readInt(process.env.ANSWER_GRACE_PERIOD_SECONDS, 3),
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   resendApiKey: process.env.RESEND_API_KEY?.trim() || undefined,
@@ -36,6 +38,9 @@ export const env = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || undefined,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined,
   stripePricePro: process.env.STRIPE_PRICE_PRO?.trim() || undefined,
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID?.trim() || undefined,
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET?.trim() || undefined,
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || undefined,
   frontendOrigin: firstFrontendOrigin(),
 } as const;
 
@@ -58,8 +63,16 @@ export const configWarnings = (): string[] => {
     );
   }
 
-  if (isProduction && !process.env.SUPERADMIN_PASSWORD) {
-    warnings.push('SUPERADMIN_PASSWORD is not set — the default bootstrap password is in use.');
+  if (!process.env.SUPERADMIN_PASSWORD) {
+    warnings.push(
+      'SUPERADMIN_PASSWORD is not set — no administrator account will be created. Set it before first boot.'
+    );
+  }
+
+  if (!process.env.RAZORPAY_KEY_ID) {
+    warnings.push(
+      'RAZORPAY_KEY_ID is not set — Indian customers cannot pay. Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET to enable checkout.'
+    );
   }
 
   if (!env.resendApiKey) {

@@ -18,7 +18,9 @@ import userRoutes from './routes/user.routes';
 import inviteRoutes from './routes/invite.routes';
 import orgRoutes from './routes/org.routes';
 import billingRoutes from './routes/billing.routes';
-import { stripeWebhook } from './controllers/billing.controller';
+import audienceQuestionRoutes from './routes/audienceQuestion.routes';
+import privacyRoutes from './routes/privacy.routes';
+import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { initializeSocket } from './socket';
 import { ensureSuperAdmin } from './utils/bootstrap';
 import { allowedOrigins, corsOriginHandler } from './config/cors';
@@ -60,6 +62,7 @@ app.use(
 );
 // Stripe signs the raw bytes; parsing JSON first would break verification.
 app.post('/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
+app.post('/billing/razorpay-webhook', express.raw({ type: 'application/json' }), razorpayWebhook);
 app.use(express.json({ limit: '200kb' }));
 
 app.get('/health', (_req, res) => {
@@ -82,6 +85,8 @@ app.use('/users', userRoutes);
 app.use('/invites', inviteRoutes);
 app.use('/org', orgRoutes);
 app.use('/billing', billingRoutes);
+app.use('/questions-from-audience', audienceQuestionRoutes);
+app.use('/privacy', privacyRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Not found' });
@@ -101,7 +106,12 @@ const start = async () => {
   httpServer.listen(env.port, () => {
     slog('info', 'server.listening', { port: env.port, origins: allowedOrigins });
     configWarnings().forEach((warning) => slog('warn', 'config.warning', { warning }));
-    void ensureSuperAdmin();
+    void ensureSuperAdmin().catch((error) => {
+      // A refusal to create a default-password administrator is fatal in
+      // production — better to fail the deploy than to serve with one.
+      console.error('Bootstrap failed:', error);
+      process.exit(1);
+    });
   });
 };
 

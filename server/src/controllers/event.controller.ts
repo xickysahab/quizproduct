@@ -6,7 +6,7 @@ import { logActivity } from '../utils/logger';
 import { getAccessibleHostIds, canAccessEvent } from '../utils/access';
 import { parsePagination } from '../utils/validation';
 import { organizationIdForUser } from '../utils/org';
-import { assertCanCreateEvent, bumpUsage } from '../utils/usage';
+import { assertCanCreateEvent, releaseEventSlot } from '../utils/usage';
 import { slog } from '../utils/slog';
 
 const uniqueRoomCode = async (): Promise<string> => {
@@ -41,16 +41,25 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const event = await prisma.event.create({
-      data: {
-        title,
-        roomCode: await uniqueRoomCode(),
-        hostId,
-        organizationId,
-      },
-    });
+    let event;
+    try {
+      event = await prisma.event.create({
+        data: {
+          title,
+          roomCode: await uniqueRoomCode(),
+          hostId,
+          organizationId,
+        },
+      });
+    } catch (creationError) {
+      // The quota slot was reserved before the insert; hand it back rather
+      // than charging the org for an event that never existed.
+      await releaseEventSlot(organizationId);
+      throw creationError;
+    }
 
-    await bumpUsage(organizationId, 'eventsCreated');
+    // The slot was already reserved by assertCanCreateEvent — bumping again
+    // here would count every event twice against the monthly quota.
     await logActivity(req.user?.userId, 'CREATE_EVENT', 'Event', event.id, { title: event.title, roomCode: event.roomCode });
 
     res.status(201).json({
@@ -217,10 +226,12 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
     // Delete participants. Because of onDelete: Cascade in schema, this will automatically delete all Responses.
     await prisma.participant.deleteMany({ where: { eventId: id } });
 
-    // Optionally reset the current question pointer
+    // Reset the whole live-session pointer, not just the question. Leaving
+    // isLive true with a stale start time meant a re-run began mid-question
+    // with a deadline that had already expired.
     await prisma.event.update({
       where: { id },
-      data: { currentQuestionId: null }
+      data: { currentQuestionId: null, currentQuestionStartedAt: null, isLive: false },
     });
 
     await logActivity(req.user?.userId, 'CLEAR_EVENT_DATA', 'Event', id, { title: event.title });
@@ -282,7 +293,6 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
       include: { questions: true },
     });
 
-    await bumpUsage(organizationId, 'eventsCreated');
     await logActivity(hostId, 'DUPLICATE_EVENT', 'Event', copy.id, {
       sourceId: source.id,
       title: copy.title,

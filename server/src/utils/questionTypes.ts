@@ -19,6 +19,26 @@ const asType = (value: unknown): QuestionType =>
 const cleanOptions = (options: unknown): string[] =>
   Array.isArray(options) ? options.map((opt) => String(opt ?? '').trim()).filter(Boolean) : [];
 
+/** Seconds. Below the floor a question is unanswerable; above the ceiling the timer is meaningless. */
+const MIN_TIME_LIMIT = 5;
+const MAX_TIME_LIMIT = 3600;
+
+/**
+ * Normalizes a time limit to null (no timer) or a usable number of seconds.
+ *
+ * A negative value used to survive validation and then poison the answer check:
+ * `timeLimit && elapsed > timeLimit + grace` treats -5 as truthy, so every
+ * answer was rejected as late from the first millisecond.
+ */
+const cleanTimeLimit = (value: unknown): number | null => {
+  if (value === undefined || value === null || value === '') return null;
+
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+
+  return Math.min(Math.max(Math.floor(seconds), MIN_TIME_LIMIT), MAX_TIME_LIMIT);
+};
+
 /**
  * Existing MCQ clients omit `type`. Anything unknown falls back to MCQ so a
  * stale dashboard cannot create a question the live room cannot render.
@@ -30,10 +50,7 @@ export const normalizeQuestionInput = (
   if (!text) return { error: 'Question text is required.' };
 
   const type = asType(body.type);
-  const timeLimit =
-    body.timeLimit === undefined || body.timeLimit === null || body.timeLimit === 0
-      ? null
-      : Number(body.timeLimit);
+  const timeLimit = cleanTimeLimit(body.timeLimit);
 
   if (type === 'OPEN_TEXT' || type === 'WORD_CLOUD') {
     return {
@@ -43,7 +60,7 @@ export const normalizeQuestionInput = (
         options: [],
         correctOption: null,
         correctOptions: [],
-        timeLimit: Number.isFinite(timeLimit) ? timeLimit : null,
+        timeLimit,
       },
     };
   }
@@ -81,10 +98,46 @@ export const normalizeQuestionInput = (
       options,
       correctOption: Number.isInteger(correctOption) ? correctOption : null,
       correctOptions,
-      timeLimit: Number.isFinite(timeLimit) ? timeLimit : null,
+      timeLimit,
     },
   };
 };
+
+export interface ParticipantSafeQuestion {
+  id: string;
+  eventId: string;
+  type: QuestionType | string;
+  text: string;
+  options: string[];
+  order: number;
+  timeLimit: number | null;
+}
+
+/**
+ * Strips the answer key off a question before it is sent to participants.
+ *
+ * A stored Question carries `correctOption` and `correctOptions`. Broadcasting
+ * the row as-is puts the answer in the browser of everyone taking the quiz, so
+ * every participant-bound payload must go through this projection — never the
+ * Prisma row directly.
+ */
+export const toParticipantQuestion = (question: {
+  id: string;
+  eventId: string;
+  type: QuestionType | string;
+  text: string;
+  options: string[];
+  order: number;
+  timeLimit: number | null;
+}): ParticipantSafeQuestion => ({
+  id: question.id,
+  eventId: question.eventId,
+  type: question.type,
+  text: question.text,
+  options: question.options,
+  order: question.order,
+  timeLimit: question.timeLimit,
+});
 
 export const scoreAnswer = (
   question: {

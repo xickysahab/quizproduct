@@ -3,17 +3,17 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { Parser } from 'json2csv';
 import { canAccessEvent } from '../utils/access';
+import { collectiveTally, tallyQuestion } from '../utils/tally';
+import { getLeaderboard, countParticipants } from '../utils/leaderboard';
+import { parsePagination } from '../utils/validation';
 
 export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const questionId = req.params.id as string;
-    
+
     const question = await prisma.question.findUnique({
       where: { id: questionId },
-      include: {
-        event: true,
-        responses: true
-      }
+      include: { event: true, responses: true },
     });
 
     if (!question || !(await canAccessEvent(req.user!.userId, req.user!.role, question.event.hostId))) {
@@ -21,23 +21,14 @@ export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const totalResponses = question.responses.length;
-    const optionCounts = Array(question.options.length).fill(0);
-    
-    question.responses.forEach(response => {
-      if (response.selectedOption >= 0 && response.selectedOption < optionCounts.length) {
-        optionCounts[response.selectedOption] = (optionCounts[response.selectedOption] || 0) + 1;
-      }
-    });
-
-    const percentages = optionCounts.map(count => 
-      totalResponses === 0 ? 0 : Math.round((count / totalResponses) * 100)
-    );
+    const tally = tallyQuestion(question, question.responses);
 
     res.status(200).json({
-      totalResponses,
-      optionCounts,
-      percentages
+      totalResponses: tally.totalResponses,
+      optionCounts: tally.optionCounts,
+      percentages: tally.percentages,
+      textAnswers: tally.textAnswers,
+      words: tally.words,
     });
   } catch (error) {
     console.error('Analytics error:', error);
@@ -51,16 +42,7 @@ export const exportEventAnalytics = async (req: AuthRequest, res: Response): Pro
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: {
-        questions: {
-          orderBy: { order: 'asc' }
-        },
-        participants: {
-          include: {
-            responses: true
-          }
-        }
-      }
+      include: { questions: { orderBy: { order: 'asc' } } },
     });
 
     if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
@@ -68,58 +50,79 @@ export const exportEventAnalytics = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    // Format data for CSV
-    const csvData = event.participants.map(p => {
-      const row: any = {
-        ParticipantName: p.name,
-        JoinedAt: p.joinedAt.toISOString(),
-        TotalScore: p.responses.reduce((sum, r) => sum + (r.score || (r.isCorrect ? 1 : 0)), 0)
-      };
+    const total = await prisma.participant.count({ where: { eventId } });
 
-      event.questions.forEach((q, index) => {
-        const response = p.responses.find(r => r.questionId === q.id);
-        row[`Q${index + 1} (${q.text})`] = response
-          ? response.answerText ||
-            (response.selectedOptions?.length
-              ? response.selectedOptions.map((i) => q.options[i] ?? i).join('; ')
-              : q.options[response.selectedOption] ?? response.selectedOption)
-          : 'No Answer';
-        row[`Q${index + 1} Score`] = response?.score ?? 0;
-      });
-
-      return row;
-    });
-
-    if (csvData.length === 0) {
+    if (total === 0) {
       res.status(400).json({ message: 'No participants data to export' });
       return;
     }
 
-    const parser = new Parser();
-    const csv = parser.parse(csvData);
+    const fields = [
+      'ParticipantName',
+      'JoinedAt',
+      'TotalScore',
+      ...event.questions.flatMap((q, index) => [`Q${index + 1} (${q.text})`, `Q${index + 1} Score`]),
+    ];
 
     res.header('Content-Type', 'text/csv');
     res.attachment(`${event.title.replace(/\s+/g, '_')}_Analytics.csv`);
-    res.send(csv);
 
+    // Streamed in pages rather than materialising every participant and every
+    // response in memory first. A 5,000-person event used to build the entire
+    // object graph, then the entire CSV string, before sending a byte.
+    const PAGE = 200;
+
+    for (let offset = 0; offset < total; offset += PAGE) {
+      const participants = await prisma.participant.findMany({
+        where: { eventId },
+        include: { responses: true },
+        orderBy: { joinedAt: 'asc' },
+        skip: offset,
+        take: PAGE,
+      });
+
+      const rows = participants.map((p) => {
+        const row: Record<string, string | number> = {
+          ParticipantName: p.name || 'Anonymous',
+          JoinedAt: p.joinedAt.toISOString(),
+          TotalScore: p.responses.reduce((sum, r) => sum + (r.score || (r.isCorrect ? 1 : 0)), 0),
+        };
+
+        event.questions.forEach((q, index) => {
+          const response = p.responses.find((r) => r.questionId === q.id);
+          row[`Q${index + 1} (${q.text})`] = response
+            ? response.answerText ||
+              (response.selectedOptions?.length
+                ? response.selectedOptions.map((i) => q.options[i] ?? i).join('; ')
+                : q.options[response.selectedOption] ?? response.selectedOption)
+            : 'No Answer';
+          row[`Q${index + 1} Score`] = response?.score ?? 0;
+        });
+
+        return row;
+      });
+
+      // Header only on the first chunk.
+      const parser = new Parser({ fields, header: offset === 0 });
+      res.write(parser.parse(rows));
+      res.write('\n');
+    }
+
+    res.end();
   } catch (error) {
     console.error('Export error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (!res.headersSent) res.status(500).json({ message: 'Internal server error' });
+    else res.end();
   }
 };
 
 export const getEventSummaryAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const eventId = req.params.id as string;
-    
+
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: {
-        questions: {
-          orderBy: { order: 'asc' },
-          include: { responses: true }
-        }
-      }
+      include: { questions: { orderBy: { order: 'asc' }, include: { responses: true } } },
     });
 
     if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
@@ -127,85 +130,31 @@ export const getEventSummaryAnalytics = async (req: AuthRequest, res: Response):
       return;
     }
 
-    let collectiveTotalResponses = 0;
-    const collectiveOptionCounts = [0, 0, 0, 0]; // Assume max 4 options for aggregation
-    const sumOfPercentages = [0, 0, 0, 0];
-    let questionsWithResponses = 0;
+    const summary = event.questions.map((question) => ({
+      ...tallyQuestion(question, question.responses),
+      correctOption: question.correctOption,
+      correctOptions: question.correctOptions,
+    }));
 
-    const summary = event.questions.map(question => {
-      const totalResponses = question.responses.length;
-      const optionCounts = Array(question.options.length).fill(0);
-      
-      question.responses.forEach(response => {
-        if (response.selectedOption >= 0 && response.selectedOption < optionCounts.length) {
-          optionCounts[response.selectedOption] = (optionCounts[response.selectedOption] || 0) + 1;
-        }
-        if (response.selectedOption >= 0 && response.selectedOption < 4) {
-          collectiveOptionCounts[response.selectedOption] = (collectiveOptionCounts[response.selectedOption] || 0) + 1;
-          collectiveTotalResponses++;
-        }
-      });
-
-      const percentages = optionCounts.map(count => 
-        totalResponses === 0 ? 0 : Math.round((count / totalResponses) * 100)
-      );
-
-      if (totalResponses > 0) {
-        questionsWithResponses++;
-        for (let i = 0; i < percentages.length; i++) {
-          const prevSum = sumOfPercentages[i];
-          const currPct = percentages[i];
-          if (i < 4 && prevSum !== undefined && currPct !== undefined) {
-            sumOfPercentages[i] = prevSum + currPct;
-          }
-        }
-      }
-
-      return {
-        id: question.id,
-        text: question.text,
-        type: question.type,
-        options: question.options,
-        correctOption: question.correctOption,
-        totalResponses,
-        optionCounts,
-        percentages,
-        textAnswers: question.responses
-          .map((r) => r.answerText)
-          .filter((value): value is string => Boolean(value)),
-      };
-    });
-
-    // Calculate the mean percentage for each option across all questions
-    let collectivePercentages = sumOfPercentages.map(sum => 
-      questionsWithResponses === 0 ? 0 : Math.round(sum / questionsWithResponses)
-    );
-
-    // Normalize so they always sum exactly to 100% (or 0% if no responses)
-    const totalMeanPercentage = collectivePercentages.reduce((a, b) => a + b, 0);
-    if (totalMeanPercentage > 0 && totalMeanPercentage !== 100) {
-      // Find the max percentage and adjust it to make the sum 100%
-      const maxIdx = collectivePercentages.indexOf(Math.max(...collectivePercentages));
-      const diff = 100 - totalMeanPercentage;
-      if (maxIdx !== -1 && collectivePercentages[maxIdx] !== undefined) {
-        collectivePercentages[maxIdx] += diff;
-      }
-    }
+    // Null unless every scored question shares one scale — see collectiveTally.
+    // The old version assumed four options and averaged percentages across
+    // questions, then padded the largest to force a sum of 100.
+    const collective = collectiveTally(summary);
 
     res.status(200).json({
       eventId: event.id,
       title: event.title,
       totalParticipants: await prisma.participant.count({ where: { eventId } }),
       questions: summary,
-      collective: {
-        totalResponses: collectiveTotalResponses,
-        optionCounts: collectiveOptionCounts,
-        percentages: collectivePercentages,
-        // Take the options text from the first question assuming they are uniform for a survey
-        optionsText: event.questions.length > 0 ? event.questions[0]!.options : ['A', 'B', 'C', 'D']
-      }
+      collective: collective
+        ? {
+            totalResponses: collective.totalResponses,
+            optionCounts: collective.optionCounts,
+            percentages: collective.percentages,
+            optionsText: collective.options,
+          }
+        : null,
     });
-
   } catch (error) {
     console.error('Summary analytics error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -226,32 +175,23 @@ export const getEventLeaderboard = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    const participants = await prisma.participant.findMany({
-      where: { eventId },
-      include: { responses: { select: { score: true, isCorrect: true, respondedAt: true } } },
+    // Aggregated in Postgres and paginated. This used to load every
+    // participant with every response and reduce them in JavaScript.
+    const { skip, take, page, limit } = parsePagination(req.query, {
+      defaultLimit: 50,
+      maxLimit: 200,
     });
 
-    const ranked = participants
-      .map((p) => {
-        const score = p.responses.reduce((sum, r) => sum + (r.score || (r.isCorrect ? 1 : 0)), 0);
-        const lastAnswer = p.responses.reduce<Date | null>((latest, r) => {
-          if (!latest || r.respondedAt > latest) return r.respondedAt;
-          return latest;
-        }, null);
-        return {
-          participantId: p.id,
-          name: p.name,
-          score,
-          answers: p.responses.length,
-          lastAnsweredAt: lastAnswer,
-        };
-      })
-      .sort((a, b) => b.score - a.score || a.answers - b.answers);
+    const [leaderboard, total] = await Promise.all([
+      getLeaderboard(eventId, take, skip),
+      countParticipants(eventId),
+    ]);
 
     res.status(200).json({
       eventId,
       title: event.title,
-      leaderboard: ranked.map((row, index) => ({ ...row, rank: index + 1 })),
+      leaderboard,
+      pagination: { page, limit, total, hasMore: skip + leaderboard.length < total },
     });
   } catch (error) {
     console.error('Leaderboard error:', error);
@@ -275,14 +215,27 @@ export const getEventParticipants = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const participants = await prisma.participant.findMany({
-      where: { eventId },
-      include: { responses: true },
-      orderBy: { joinedAt: 'asc' },
+    // Paginated: a 5,000-participant Enterprise event would otherwise pull the
+    // entire object graph into memory in one go.
+    const { skip, take, page, limit } = parsePagination(req.query, {
+      defaultLimit: 100,
+      maxLimit: 500,
     });
+
+    const [participants, total] = await Promise.all([
+      prisma.participant.findMany({
+        where: { eventId },
+        include: { responses: true },
+        orderBy: { joinedAt: 'asc' },
+        skip,
+        take,
+      }),
+      prisma.participant.count({ where: { eventId } }),
+    ]);
 
     res.status(200).json({
       eventId,
+      pagination: { page, limit, total, hasMore: skip + participants.length < total },
       participants: participants.map((p) => ({
         id: p.id,
         name: p.name,
