@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
+import { getSessionKey } from '../utils/session';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Sparkles, ArrowRight, ShieldCheck, Zap, BarChart3, CheckCircle2 } from 'lucide-react';
@@ -18,7 +19,7 @@ const Join: React.FC = () => {
     const params = new URLSearchParams(location.search);
     const codeParam = params.get('code');
     if (codeParam) {
-      setRoomCode(codeParam.toUpperCase());
+      setRoomCode(codeParam.replace(/[^0-9A-Za-z]/g, '').toUpperCase());
     }
   }, [location.search]);
 
@@ -26,28 +27,34 @@ const Join: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!roomCode.trim() || !name.trim()) {
-      setError('Please provide both room code and your name');
+    const code = roomCode.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+
+    if (!code) {
+      setError('Enter the code shown on screen');
       return;
     }
 
     setLoading(true);
     try {
       const response = await api.post('/participants/join', {
-        roomCode: roomCode.trim().toUpperCase(),
+        roomCode: code,
+        // A name is optional — Slido needs only the code, and anonymity is what
+        // makes candid feedback possible.
         name: name.trim(),
+        // Stable per-device key so a refresh reuses this row instead of
+        // creating a duplicate participant.
+        sessionKey: getSessionKey(),
       });
 
-      // Save participant session in localStorage
       localStorage.setItem('participantId', response.data.participant.id);
-      localStorage.setItem('participantName', response.data.participant.name);
+      localStorage.setItem('participantName', response.data.participant.name || '');
       localStorage.setItem('eventId', response.data.event.id);
       localStorage.setItem('participantToken', response.data.participantToken);
+      localStorage.setItem('qaEnabled', String(response.data.event.qaEnabled !== false));
 
-      // Navigate to live quiz waiting room
-      navigate(`/live/${roomCode.trim().toUpperCase()}`);
+      navigate(`/live/${code}`);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Unable to join room. Please verify the 6-character room code.');
+      setError(err.response?.data?.message || 'Unable to join. Check the code and try again.');
     } finally {
       setLoading(false);
     }
@@ -122,7 +129,7 @@ const Join: React.FC = () => {
                   Join a Live Session
                 </h2>
                 <p className="text-sm text-gray-500 mt-2">
-                  Enter the 6-character room code provided by your host
+                  Enter the code shown on the host&apos;s screen
                 </p>
               </div>
 
@@ -145,22 +152,24 @@ const Join: React.FC = () => {
                     type="text"
                     required
                     className="w-full px-5 py-4 text-center text-3xl font-mono font-bold tracking-[0.25em] uppercase rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:tracking-normal placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 placeholder:text-base shadow-sm"
-                    placeholder="E.G. A1B2C3"
+                    placeholder="123 4567"
                     value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                    maxLength={6}
+                    onChange={(e) => setRoomCode(e.target.value.replace(/[^0-9A-Za-z ]/g, '').toUpperCase())}
+                    maxLength={9}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    Your Name
+                    Your Name <span className="normal-case tracking-normal font-medium text-gray-400">— optional</span>
                   </label>
                   <input
                     type="text"
                     required
                     className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
-                    placeholder="Enter your name or alias"
+                    placeholder="Leave blank to stay anonymous"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={25}
@@ -169,7 +178,7 @@ const Join: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={loading || roomCode.length < 6 || name.length < 2}
+                  disabled={loading || roomCode.replace(/[^0-9A-Za-z]/g, '').length < 4}
                   className="w-full gradient-btn text-white text-base font-semibold py-4 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 group mt-2 shadow-md"
                 >
                   <span>{loading ? 'Connecting...' : 'Enter Live Quiz'}</span>
@@ -273,7 +282,7 @@ const Join: React.FC = () => {
               </div>
               <h3 className="font-heading text-xl font-bold text-gray-900">Create & Schedule</h3>
               <p className="text-sm text-gray-600 leading-relaxed max-w-xs">
-                Build your quiz questions, set answer timers, and generate a unique 6-character room code in seconds.
+                Build your questions, set answer timers, and get a unique numeric join code in seconds.
               </p>
             </div>
 
