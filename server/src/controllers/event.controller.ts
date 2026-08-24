@@ -9,6 +9,17 @@ import { organizationIdForUser } from '../utils/org';
 import { assertCanCreateEvent, releaseEventSlot } from '../utils/usage';
 import { slog } from '../utils/slog';
 import { hashSecret } from '../utils/mailer';
+import {
+  SWITCH_KEYS,
+  presetSwitches,
+  isKnownPreset,
+  matchPreset,
+  resolveSwitches,
+  describeQuestionRisks,
+  deriveSessionMode,
+  PRESETS,
+} from '../utils/sessionSettings';
+import type { SessionSwitches, SessionPreset } from '../utils/sessionSettings';
 import { STARTER_TEMPLATES, getStarterTemplate } from '../utils/starterTemplates';
 
 const uniqueRoomCode = async (): Promise<string> => {
@@ -402,12 +413,30 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
  * hashed so a database dump does not hand out access to every live session, but
  * it is not pretending to resist offline cracking.
  */
+/**
+ * Reads the switches off an event row.
+ * `sessionMode` is deliberately absent — it is derived, never read.
+ */
+const switchesOf = (event: Record<string, unknown>): SessionSwitches =>
+  Object.fromEntries(SWITCH_KEYS.map((key) => [key, event[key]])) as unknown as SessionSwitches;
+
+/**
+ * The session's personality: apply a preset, or set individual switches.
+ *
+ * Presets and switches go through the same endpoint on purpose. A preset is
+ * only a bundle — applying one writes switches, and touching any switch
+ * afterwards moves the session to CUSTOM. There is no second source of truth.
+ */
 export const updateEventAccess = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { passcode, allowAnonymous, retireCode, speedBonusEnabled, sessionMode } = req.body || {};
+    const { passcode, retireCode, preset, ...rest } = req.body || {};
 
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findUnique({
+      where: { id },
+      include: { questions: { select: { timeLimit: true } } },
+    });
+
     if (!event) {
       res.status(404).json({ message: 'Event not found' });
       return;
@@ -418,13 +447,7 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const data: {
-      passcodeHash?: string | null;
-      allowAnonymous?: boolean;
-      roomCodeRetiredAt?: Date | null;
-      speedBonusEnabled?: boolean;
-      sessionMode?: 'QUIZ' | 'SURVEY';
-    } = {};
+    const data: Record<string, unknown> = {};
 
     if (passcode !== undefined) {
       const value = typeof passcode === 'string' ? passcode.trim() : '';
@@ -437,14 +460,52 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
       data.passcodeHash = value ? hashSecret(value.toLowerCase()) : null;
     }
 
-    if (typeof allowAnonymous === 'boolean') data.allowAnonymous = allowAnonymous;
-    if (typeof retireCode === 'boolean') data.roomCodeRetiredAt = retireCode ? new Date() : null;
-    if (typeof speedBonusEnabled === 'boolean') data.speedBonusEnabled = speedBonusEnabled;
-    if (sessionMode === 'QUIZ' || sessionMode === 'SURVEY') {
-      data.sessionMode = sessionMode;
-      // Surveys have nothing to race for — turn speed scoring off with the mode.
-      if (sessionMode === 'SURVEY') data.speedBonusEnabled = false;
+    if (typeof retireCode === 'boolean') {
+      data.roomCodeRetiredAt = retireCode ? new Date() : null;
     }
+
+    // Start from what the session already is, then layer the preset (if one was
+    // named) and then any explicit switches on top. Order matters: an explicit
+    // switch sent alongside a preset should win.
+    let next: SessionSwitches = switchesOf(event as unknown as Record<string, unknown>);
+    let requestedPreset: SessionPreset | null = null;
+
+    if (typeof preset === 'string') {
+      if (!isKnownPreset(preset)) {
+        res.status(400).json({ message: 'Unknown preset.' });
+        return;
+      }
+      requestedPreset = preset;
+      const bundle = presetSwitches(preset);
+      if (bundle) next = bundle;
+    }
+
+    let touchedASwitch = false;
+    for (const key of SWITCH_KEYS) {
+      const value = (rest as Record<string, unknown>)[key];
+      if (value === undefined) continue;
+      // Trust the type, not the caller: a bad value is ignored rather than
+      // written, so a stale client cannot corrupt the session's personality.
+      const expected = typeof next[key];
+      if (typeof value !== expected) continue;
+      (next as unknown as Record<string, unknown>)[key] = value;
+      touchedASwitch = true;
+    }
+
+    // Impossible combinations are corrected here, not in the UI — the UI can
+    // be stale or bypassed entirely.
+    const { switches, conflicts } = resolveSwitches(next);
+
+    // A preset that was applied and then modified is no longer that preset.
+    const effectivePreset =
+      requestedPreset && !touchedASwitch ? requestedPreset : matchPreset(switches);
+
+    SWITCH_KEYS.forEach((key) => {
+      data[key] = switches[key];
+    });
+    data.preset = effectivePreset;
+    // Legacy column, kept in step so the ~80 places that read it stay correct.
+    data.sessionMode = deriveSessionMode(switches.scoringEnabled);
 
     if (Object.keys(data).length === 0) {
       res.status(400).json({ message: 'Nothing to update.' });
@@ -455,25 +516,60 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
 
     await logActivity(req.user?.userId, 'UPDATE_EVENT_ACCESS', 'Event', id, {
       title: event.title,
+      preset: effectivePreset,
       passcodeSet: Boolean(updated.passcodeHash),
       retired: Boolean(updated.roomCodeRetiredAt),
-      speedBonusEnabled: updated.speedBonusEnabled,
-      sessionMode: updated.sessionMode,
     });
 
     res.json({
-      message: 'Access settings updated.',
+      message: 'Session settings updated.',
+      preset: updated.preset,
       // Never echo the passcode back, only whether one is set.
       passcodeSet: Boolean(updated.passcodeHash),
-      allowAnonymous: updated.allowAnonymous,
       roomCodeRetiredAt: updated.roomCodeRetiredAt,
-      speedBonusEnabled: updated.speedBonusEnabled,
       sessionMode: updated.sessionMode,
+      switches,
+      // What was corrected and what merely looks odd, so the host is told
+      // rather than left wondering why a toggle moved.
+      conflicts,
+      risks: describeQuestionRisks(switches, event.questions),
     });
   } catch (error) {
     slog('error', 'event.access_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
+};
+
+/** The preset catalogue, so the host UI does not hardcode the bundles. */
+export const listPresets = async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({
+    presets: [
+      {
+        id: 'DISCUSSION',
+        label: 'Discussion',
+        blurb: 'Audience Q&A leads. Nothing is scored and nobody loses — for town halls and meetings.',
+        switches: PRESETS.DISCUSSION,
+      },
+      {
+        id: 'GAME',
+        label: 'Game',
+        blurb: 'A scored race with speed, streaks, standings between questions and a podium.',
+        switches: PRESETS.GAME,
+      },
+      {
+        id: 'SURVEY',
+        label: 'Survey',
+        blurb: 'Collect opinions. Never graded, and the room does not see the split.',
+        switches: PRESETS.SURVEY,
+      },
+      {
+        id: 'CUSTOM',
+        label: 'Custom',
+        blurb: 'Mix them. Q&A during a scored quiz, a podium without a timer — whatever the room needs.',
+        switches: null,
+      },
+    ],
+  });
 };
 
 /**

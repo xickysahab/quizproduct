@@ -12,10 +12,44 @@ import { hashSecret } from '../utils/mailer';
 import { safeEquals } from '../utils/webhookSignature';
 import { liveEvents } from '../utils/liveEvents';
 import { getLeaderboard, getParticipantStanding } from '../utils/leaderboard';
+import { isQuestionScored } from '../utils/sessionSettings';
 import { tallyQuestion } from '../utils/tally';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
+/** Points added per consecutive correct answer beyond the first. */
+const STREAK_STEP = 100;
+
+/**
+ * How many correct answers this participant has running into the given
+ * question, counting backwards through the session's question order.
+ *
+ * Computed from stored responses rather than a counter on Participant, because
+ * an answer can be changed until the host advances — a running counter would
+ * drift the moment somebody corrected themselves.
+ */
+const previousStreak = async (
+  participantId: string,
+  eventId: string,
+  currentOrder: number
+): Promise<number> => {
+  const previous = await prisma.response.findMany({
+    where: {
+      participantId,
+      question: { eventId, order: { lt: currentOrder } },
+    },
+    select: { isCorrect: true, question: { select: { order: true } } },
+    orderBy: { question: { order: 'desc' } },
+    take: 20,
+  });
+
+  let run = 0;
+  for (const response of previous) {
+    if (!response.isCorrect) break;
+    run += 1;
+  }
+  return run;
+};
 
 export const joinEvent = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -187,6 +221,8 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
             currentQuestionStartedAt: true,
             speedBonusEnabled: true,
             sessionMode: true,
+            scoringEnabled: true,
+            streakBonusEnabled: true,
           },
         },
       },
@@ -266,28 +302,42 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
 
     let { isCorrect, score } = scoreAnswer(question, optionIndex, optionList);
 
-    const isSurvey = question.event.sessionMode === 'SURVEY';
+    // Whether THIS question is graded — the session switch, unless the question
+    // overrides it. This is what lets one session hold unscored opinion polls
+    // and scored quiz questions side by side.
+    const questionIsScored = isQuestionScored(
+      question.event.scoringEnabled,
+      question.scored
+    );
 
-    // Surveys never grade — even if a leftover answer key exists on a question.
-    if (isSurvey) {
+    let streak = 0;
+
+    if (!questionIsScored) {
+      // Never grade — even if a leftover answer key exists on the question.
       isCorrect = false;
       score = 0;
-    } else if (
-      isCorrect &&
-      question.event.speedBonusEnabled &&
-      question.timeLimit &&
-      question.timeLimit > 0
-    ) {
-      // Optional Kahoot-style bonus: correct answers earn more when submitted
-      // earlier. Base stays 1 when the toggle is off so existing leaderboards
-      // keep the same scale.
-      const remainingRatio = Math.max(0, Math.min(1, 1 - elapsedSeconds / question.timeLimit));
-      score = Math.max(1, Math.round(500 + remainingRatio * 500));
+    } else {
+      if (isCorrect) {
+        streak = (await previousStreak(participantId, question.eventId, question.order)) + 1;
+      }
+
+      if (isCorrect && question.event.speedBonusEnabled && question.timeLimit && question.timeLimit > 0) {
+        // Correct answers earn more when submitted earlier. Base stays 1 when
+        // the toggle is off so existing leaderboards keep the same scale.
+        const remainingRatio = Math.max(0, Math.min(1, 1 - elapsedSeconds / question.timeLimit));
+        score = Math.max(1, Math.round(500 + remainingRatio * 500));
+      }
+
+      if (isCorrect && question.event.streakBonusEnabled && streak > 1) {
+        // Capped so a long run cannot dwarf everything else, matching the shape
+        // of the bonus rather than letting it run away.
+        score += Math.min(streak - 1, 5) * STREAK_STEP;
+      }
     }
 
-    // Instant feedback only for graded quiz questions that have a key.
+    // Instant feedback only for graded questions that actually have a key.
     const scored =
-      !isSurvey &&
+      questionIsScored &&
       (((type === 'MCQ' || type === 'RATING') && question.correctOption !== null) ||
         ((type === 'MULTI_SELECT' || type === 'RANKING') &&
           Array.isArray(question.correctOptions) &&
@@ -302,6 +352,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       answerText: text,
       isCorrect,
       score,
+      streak,
     });
 
     // Tell the socket layer a real, validated answer landed. The host's live
@@ -309,7 +360,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
     liveEvents.publish('response:recorded', { eventId, questionId });
 
     let standing: { score: number; rank: number; totalParticipants: number } | null = null;
-    if (!isSurvey) {
+    if (questionIsScored) {
       // Quiz answers need a live rank. Flush this one write so /standing is
       // not a second behind the tap they just made.
       await responseBatcher.flushNow();
@@ -322,6 +373,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       scored,
       isCorrect: scored ? isCorrect : null,
       score: scored ? score : 0,
+      streak: scored && isCorrect ? streak : 0,
       standing,
     });
   } catch (error) {

@@ -5,7 +5,9 @@ import { verifyParticipantToken } from '../utils/participantToken';
 import { canAccessEvent } from '../utils/access';
 import { toParticipantQuestion } from '../utils/questionTypes';
 import { tallyQuestion } from '../utils/tally';
+import { isQuestionScored } from '../utils/sessionSettings';
 import { getLeaderboard } from '../utils/leaderboard';
+import type { LeaderboardRow } from '../utils/leaderboard';
 import { liveEvents } from '../utils/liveEvents';
 import { slog } from '../utils/slog';
 import { responseBatcher } from '../utils/responseBatcher';
@@ -34,6 +36,51 @@ const tallyForQuestion = async (questionId: string) => {
   return tallyQuestion(question, question.responses);
 };
 
+/**
+ * Publishes one question's results to the room.
+ *
+ * Shared by the host's explicit reveal and by AUTO_AFTER_QUESTION, so the two
+ * paths cannot drift on what gets sent — particularly on whether the answer key
+ * is attached, which is the one thing that must never leak early.
+ */
+const makeRevealer = (io: Server) =>
+  async (eventId: string, questionId: string): Promise<boolean> => {
+    const stored = await prisma.question.findUnique({
+      where: { id: questionId },
+      select: {
+        eventId: true,
+        scored: true,
+        correctOption: true,
+        correctOptions: true,
+        event: { select: { scoringEnabled: true, resultsReveal: true } },
+      },
+    });
+
+    if (!stored || stored.eventId !== eventId) return false;
+
+    // NEVER means the audience does not see the distribution at all.
+    if (stored.event.resultsReveal === 'NEVER') return true;
+
+    const tally = await tallyForQuestion(questionId);
+    if (!tally) return true;
+
+    // An ungraded question has no answer key to publish, whether that is
+    // because the session is unscored or because this question opted out.
+    const graded = isQuestionScored(stored.event.scoringEnabled, stored.scored);
+
+    const revealPayload = {
+      ...tally,
+      correctOption: graded ? stored.correctOption : null,
+      correctOptions: graded ? stored.correctOptions : [],
+    };
+
+    io.to(`event-${eventId}`).emit('participant:results', revealPayload);
+    // Secondary host screens (projector / audience display) stay in the host
+    // room, so they need their own copy of the reveal.
+    io.to(`host-${eventId}`).emit('host:resultsRevealed', revealPayload);
+    return true;
+  };
+
 /** Returns the authenticated user for host actions, or null if unauthorized. */
 const getAuthorizedHost = async (socket: Socket, eventId: string): Promise<SocketUser | null> => {
   const user = socket.data.user as SocketUser | undefined;
@@ -47,6 +94,8 @@ const getAuthorizedHost = async (socket: Socket, eventId: string): Promise<Socke
 };
 
 export const initializeSocket = (io: Server) => {
+  const revealResultsFor = makeRevealer(io);
+
   // Identify the connection up front. Hosts present a login token, participants
   // present the token they received when joining a room; either may be absent
   // on a connection that has not identified itself yet.
@@ -91,6 +140,13 @@ export const initializeSocket = (io: Server) => {
   liveEvents.subscribe('participant:joined', ({ eventId }) =>
     markDirty(eventId, { participants: true })
   );
+
+  // Standings as of the last scoreboard beat, so the next one can show movement
+  // rather than just position. Held in memory: it is presentation state for one
+  // live session, not something worth a table. With more than one server process
+  // a host on another instance would see no arrows — acceptable, and consistent
+  // with the note on the counters below.
+  const lastStandings = new Map<string, Map<string, number>>();
 
   // Q&A changes are coalesced the same way, so a burst of upvotes becomes one
   // "refresh your list" nudge rather than one frame per vote.
@@ -143,14 +199,20 @@ export const initializeSocket = (io: Server) => {
 
             const [top, event] = await Promise.all([
               getLeaderboard(eventId, 8, 0),
-              prisma.event.findUnique({ where: { id: eventId }, select: { sessionMode: true } }),
+              prisma.event.findUnique({
+                where: { id: eventId },
+                select: { scoringEnabled: true, leaderboardVisibility: true },
+              }),
             ]);
 
-            io.to(`host-${eventId}`).emit('host:leaderboard', { leaderboard: top });
+            // An unscored session has no board at all; otherwise the host sees
+            // it unless it was hidden outright.
+            if (event?.scoringEnabled && event.leaderboardVisibility !== 'HIDDEN') {
+              io.to(`host-${eventId}`).emit('host:leaderboard', { leaderboard: top });
+            }
 
-            // Surveys have no race. Quizzes push the same top-8 to phones so
-            // the room is looking at one board, not just the host laptop.
-            if (event?.sessionMode !== 'SURVEY') {
+            // The room only shares the board when the host chose EVERYONE.
+            if (event?.scoringEnabled && event.leaderboardVisibility === 'EVERYONE') {
               io.to(`event-${eventId}`).emit('participant:leaderboard', { leaderboard: top });
             }
           }
@@ -266,6 +328,17 @@ export const initializeSocket = (io: Server) => {
         return;
       }
 
+      // Captured before the pointer moves, so auto-reveal can push the results
+      // of the question the room has just finished.
+      const [previousState, eventSettings] = await Promise.all([
+        prisma.event.findUnique({ where: { id: eventId }, select: { currentQuestionId: true } }),
+        prisma.event.findUnique({ where: { id: eventId }, select: { resultsReveal: true } }),
+      ]);
+      const previousQuestionId =
+        previousState?.currentQuestionId && previousState.currentQuestionId !== stored.id
+          ? previousState.currentQuestionId
+          : null;
+
       // The start time is what makes the answer deadline enforceable server-side.
       const startedAt = new Date();
       await prisma.event.update({
@@ -285,6 +358,12 @@ export const initializeSocket = (io: Server) => {
         answerText: null,
         startedAt,
       });
+
+      // AUTO_AFTER_QUESTION: the previous question's results go out to the room
+      // as soon as the host moves on, without waiting for a second button.
+      if (previousQuestionId && eventSettings?.resultsReveal === 'AUTO_AFTER_QUESTION') {
+        void revealResultsFor(eventId, previousQuestionId);
+      }
 
       // The host keeps the full row, including the answer key.
       io.to(`host-${eventId}`).emit('host:questionActive', {
@@ -341,6 +420,60 @@ export const initializeSocket = (io: Server) => {
       io.to(`host-${eventId}`).emit('host:quizEnded', ended);
     });
 
+    /**
+     * The scoreboard beat between questions.
+     *
+     * Not a readout — a deliberate pause. The room looks up, sees who moved,
+     * reacts, and the host gets a natural moment to talk. Movement is the
+     * point, so each row carries its change in rank since the previous beat.
+     */
+    socket.on('host:showScoreboard', async (eventId: string) => {
+      const host = await getAuthorizedHost(socket, eventId);
+      if (!host) {
+        socket.emit('host:unauthorized', { message: 'Not authorized to control this event.' });
+        return;
+      }
+
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { scoringEnabled: true, leaderboardVisibility: true },
+      });
+
+      if (!event?.scoringEnabled) return;
+
+      const standings = await getLeaderboard(eventId, 10, 0);
+      const previous = lastStandings.get(eventId);
+
+      const rows = standings.map((row: LeaderboardRow) => {
+        const was = previous?.get(row.participantId);
+        return {
+          ...row,
+          // null on the first beat — nobody has moved from nowhere.
+          previousRank: was ?? null,
+          movement: was == null ? 0 : was - row.rank,
+        };
+      });
+
+      lastStandings.set(
+        eventId,
+        new Map(standings.map((row: LeaderboardRow) => [row.participantId, row.rank]))
+      );
+
+      io.to(`host-${eventId}`).emit('host:scoreboard', { standings: rows });
+
+      // The room only sees it if the host set the leaderboard to everyone.
+      if (event.leaderboardVisibility === 'EVERYONE') {
+        io.to(`event-${eventId}`).emit('participant:scoreboard', { standings: rows });
+      }
+    });
+
+    socket.on('host:hideScoreboard', async (eventId: string) => {
+      const host = await getAuthorizedHost(socket, eventId);
+      if (!host) return;
+      io.to(`host-${eventId}`).emit('host:scoreboardClosed');
+      io.to(`event-${eventId}`).emit('participant:scoreboardClosed');
+    });
+
     // Host pushes the current question's results out to the room. Explicit
     // rather than automatic: the host decides when the audience sees the
     // distribution, which is the whole point of a reveal.
@@ -353,35 +486,10 @@ export const initializeSocket = (io: Server) => {
 
       if (typeof questionId !== 'string') return;
 
-      const stored = await prisma.question.findUnique({
-        where: { id: questionId },
-        select: {
-          eventId: true,
-          correctOption: true,
-          correctOptions: true,
-          event: { select: { sessionMode: true } },
-        },
-      });
-
-      if (!stored || stored.eventId !== eventId) {
+      const ok = await revealResultsFor(eventId, questionId);
+      if (!ok) {
         socket.emit('host:unauthorized', { message: 'That question does not belong to this event.' });
-        return;
       }
-
-      const tally = await tallyForQuestion(questionId);
-      if (!tally) return;
-
-      // Surveys never publish an answer key — there is nothing "correct".
-      const isSurvey = stored.event.sessionMode === 'SURVEY';
-      const revealPayload = {
-        ...tally,
-        correctOption: isSurvey ? null : stored.correctOption,
-        correctOptions: isSurvey ? [] : stored.correctOptions,
-      };
-      io.to(`event-${eventId}`).emit('participant:results', revealPayload);
-      // Secondary host screens (projector / audience display) stay in the host
-      // room, so they need their own copy of the reveal.
-      io.to(`host-${eventId}`).emit('host:resultsRevealed', revealPayload);
     });
 
     // Host puts the race on the projector / phones between questions.
@@ -394,9 +502,10 @@ export const initializeSocket = (io: Server) => {
 
       const event = await prisma.event.findUnique({
         where: { id: eventId },
-        select: { sessionMode: true },
+        select: { scoringEnabled: true, podiumAtEnd: true },
       });
-      if (!event || event.sessionMode === 'SURVEY') return;
+      // Nothing to rank, or the host turned the podium off for this session.
+      if (!event?.scoringEnabled || !event.podiumAtEnd) return;
 
       await responseBatcher.flushNow();
       const leaderboard = await getLeaderboard(eventId, 8, 0);

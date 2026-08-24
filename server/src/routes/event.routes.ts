@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfig, clearEventData, duplicateEvent, updateEventAccess, getPublicEventInfo, listStarterTemplates, createEventFromTemplate } from '../controllers/event.controller';
+import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfig, clearEventData, duplicateEvent, updateEventAccess, getPublicEventInfo, listStarterTemplates, createEventFromTemplate , listPresets } from '../controllers/event.controller';
 import { authenticateHost } from '../middleware/auth.middleware';
 import { joinLimiter } from '../config/rateLimit';
 
@@ -17,6 +17,8 @@ router.post('/', createEvent);
 router.get('/', getHostEvents);
 router.get('/templates/starters', listStarterTemplates);
 router.post('/templates/starters', createEventFromTemplate);
+// Registered before /:id so "presets" is never read as an event ID.
+router.get('/presets', listPresets);
 router.get('/:id', getEventById);
 router.post('/:id/duplicate', duplicateEvent);
 router.delete('/:id', deleteEvent);

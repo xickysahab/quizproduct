@@ -40,9 +40,52 @@ enum AudienceQuestionStatus {
 
 /// QUIZ grades answers and can show correct/incorrect.
 /// SURVEY collects opinions only — no scoring, no answer-key reveal.
+/// Legacy grading signal, now DERIVED from `scoringEnabled` and kept in sync on
+/// every write. It is read in ~80 places across both apps; renaming it would be
+/// a large, risky refactor for no behavioural gain, and it already means exactly
+/// "is this session graded?". Treat `scoringEnabled` as authoritative and never
+/// set this by hand.
 enum SessionMode {
   QUIZ
   SURVEY
+}
+
+/// A named bundle of switches, not a behaviour of its own.
+/// Applying a preset writes the switches below; changing any switch afterwards
+/// moves the session to CUSTOM. This is what makes mixing possible — a mode
+/// enum alone could never express "Q&A on, scored on, podium off".
+enum SessionPreset {
+  /// Q&A led, unscored, anonymous. Meetings and town halls.
+  DISCUSSION
+  /// Scored race with speed, streak, scoreboard and podium.
+  GAME
+  /// Opinion collection. Never graded, results kept from the audience.
+  SURVEY
+  /// Any combination the host has assembled themselves.
+  CUSTOM
+}
+
+enum LeaderboardVisibility {
+  HIDDEN
+  HOST_ONLY
+  EVERYONE
+}
+
+enum ResultsReveal {
+  /// The host presses a button. Nothing is shown until they do.
+  HOST_TRIGGERED
+  /// Shown automatically once the question closes.
+  AUTO_AFTER_QUESTION
+  /// The audience never sees the distribution.
+  NEVER
+}
+
+/// Per-question override of the session's scoring switch — the mechanism that
+/// lets one session hold unscored opinion polls and scored quiz questions.
+enum ScoredOverride {
+  INHERIT
+  YES
+  NO
 }
 
 model Organization {
@@ -243,7 +286,24 @@ model Event {
   isTemplate               Boolean        @default(false)
   /// When on, correct answers score more when submitted earlier in the timer.
   /// Ignored when sessionMode is SURVEY.
+  /// ---- Session personality ----------------------------------------------
+  /// `preset` is a label recording which bundle was applied; the switches below
+  /// are what the server actually reads.
+  preset                   SessionPreset  @default(GAME)
+  /// Authoritative. `sessionMode` is derived from this.
+  scoringEnabled           Boolean        @default(true)
   speedBonusEnabled        Boolean        @default(false)
+  streakBonusEnabled       Boolean        @default(false)
+  leaderboardVisibility    LeaderboardVisibility @default(EVERYONE)
+  /// The full-screen standings moment between questions.
+  scoreboardBetweenQuestions Boolean      @default(false)
+  podiumAtEnd              Boolean        @default(true)
+  resultsReveal            ResultsReveal  @default(HOST_TRIGGERED)
+  /// Advance automatically when the timer runs out.
+  autoAdvance              Boolean        @default(false)
+  /// When false, phones show only the answer tiles so eyes go to the big screen.
+  phoneShowsQuestion       Boolean        @default(true)
+  soundEnabled             Boolean        @default(false)
   /// QUIZ = scored with optional answer keys. SURVEY = opinion / feedback only.
   sessionMode              SessionMode    @default(QUIZ)
   currentQuestionId        String?
@@ -284,6 +344,8 @@ model Question {
   correctOptions Int[]        @default([])
   order          Int
   timeLimit      Int?
+  /// Overrides the session's scoring switch for this question only.
+  scored         ScoredOverride @default(INHERIT)
   responses      Response[]
 
   @@index([eventId, order])
@@ -356,6 +418,10 @@ model Response {
   answerText      String?
   /// For RANKING: the option indices in the order the participant placed them.
   rankedOptions   Int[]       @default([])
+  /// Consecutive correct answers up to and including this one, at answer time.
+  /// Stored rather than derived so a later edit to an earlier answer cannot
+  /// retroactively rewrite a score that was already shown to somebody.
+  streak          Int         @default(0)
   score           Int         @default(0)
   isCorrect       Boolean     @default(false)
   respondedAt     DateTime    @default(now())

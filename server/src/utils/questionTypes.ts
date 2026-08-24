@@ -2,6 +2,8 @@ export type QuestionType = 'MCQ' | 'MULTI_SELECT' | 'OPEN_TEXT' | 'WORD_CLOUD' |
 
 const QUESTION_TYPES: QuestionType[] = ['MCQ', 'MULTI_SELECT', 'OPEN_TEXT', 'WORD_CLOUD', 'RATING', 'RANKING'];
 
+export type ScoredOverride = 'INHERIT' | 'YES' | 'NO';
+
 export interface NormalizedQuestion {
   type: QuestionType;
   text: string;
@@ -9,6 +11,8 @@ export interface NormalizedQuestion {
   correctOption: number | null;
   correctOptions: number[];
   timeLimit: number | null;
+  /** Overrides the session's scoring switch for this question only. */
+  scored: ScoredOverride;
 }
 
 const asType = (value: unknown): QuestionType =>
@@ -30,6 +34,9 @@ const MAX_TIME_LIMIT = 3600;
  * `timeLimit && elapsed > timeLimit + grace` treats -5 as truthy, so every
  * answer was rejected as late from the first millisecond.
  */
+const asScored = (value: unknown): ScoredOverride =>
+  value === 'YES' || value === 'NO' ? value : 'INHERIT';
+
 const cleanTimeLimit = (value: unknown): number | null => {
   if (value === undefined || value === null || value === '') return null;
 
@@ -51,6 +58,7 @@ export const normalizeQuestionInput = (
 
   const type = asType(body.type);
   const timeLimit = cleanTimeLimit(body.timeLimit);
+  const scored = asScored(body.scored);
 
   if (type === 'OPEN_TEXT' || type === 'WORD_CLOUD') {
     return {
@@ -61,6 +69,7 @@ export const normalizeQuestionInput = (
         correctOption: null,
         correctOptions: [],
         timeLimit,
+        scored,
       },
     };
   }
@@ -99,6 +108,7 @@ export const normalizeQuestionInput = (
       correctOption: Number.isInteger(correctOption) ? correctOption : null,
       correctOptions,
       timeLimit,
+      scored,
     },
   };
 };
