@@ -18,13 +18,26 @@ import { truncateAll, testDatabaseUrl } from './setup';
 const app = createApp();
 let db: Client;
 
+/**
+ * Signup is rate limited per client IP, and every request from supertest
+ * arrives from the same loopback address — so a suite that signs up more than
+ * a handful of times would throttle itself and fail with an unrelated-looking
+ * error. The app trusts one proxy hop, so each call presents its own
+ * X-Forwarded-For and is counted separately. The limiter itself is exercised
+ * deliberately further down, from a single fixed address.
+ */
+let ipCounter = 0;
+const nextIp = (): string => `203.0.113.${(ipCounter += 1) % 250}`;
+
 const signUp = async (email: string, organizationName: string) => {
   await request(app)
     .post('/auth/signup')
+    .set('X-Forwarded-For', nextIp())
     .send({ name: 'Test Host', email, password: 'IntegrationTest#2026', organizationName });
 
   const login = await request(app)
     .post('/auth/login')
+    .set('X-Forwarded-For', nextIp())
     .send({ email, password: 'IntegrationTest#2026' });
 
   return {
@@ -83,6 +96,7 @@ describe('who may reach the billing endpoints', () => {
 
     const login = await request(app)
       .post('/auth/login')
+      .set('X-Forwarded-For', nextIp())
       .send({ email: staff.email, password: 'IntegrationTest#2026' });
 
     const response = await request(app)
@@ -339,5 +353,48 @@ describe('the supplier identity the documents are issued under', () => {
     const pro = response.body.plans.find((plan: { id: string }) => plan.id === 'PRO');
     expect(pro.pricePaise).toBe(149_900);
     expect(pro.priceWithGstPaise).toBe(176_882);
+  });
+});
+
+describe('abuse limits on the endpoints that send mail', () => {
+  it('stops one address creating unlimited accounts', async () => {
+    // Signup used to share the login limiter, which skips successful requests
+    // so that a busy office is never locked out. On signup the successful
+    // requests are the abuse: each one makes an account and sends a
+    // verification email to whatever address was typed.
+    const attacker = '198.51.100.7';
+    const statuses: number[] = [];
+
+    for (let i = 0; i < 8; i += 1) {
+      const response = await request(app)
+        .post('/auth/signup')
+        .set('X-Forwarded-For', attacker)
+        .send({
+          name: 'Spam',
+          email: `spam${i}@example.com`,
+          password: 'IntegrationTest#2026',
+          organizationName: `Spam ${i}`,
+        });
+      statuses.push(response.status);
+    }
+
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThan(0);
+    expect(statuses.slice(-1)[0]).toBe(429);
+  });
+
+  it('stops unlimited password reset mail to a chosen address', async () => {
+    // The inbox being protected here is someone else's, not this server.
+    const attacker = '198.51.100.8';
+    const statuses: number[] = [];
+
+    for (let i = 0; i < 8; i += 1) {
+      const response = await request(app)
+        .post('/auth/forgot-password')
+        .set('X-Forwarded-For', attacker)
+        .send({ email: 'victim@example.com' });
+      statuses.push(response.status);
+    }
+
+    expect(statuses.slice(-1)[0]).toBe(429);
   });
 });

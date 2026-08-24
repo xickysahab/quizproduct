@@ -1,6 +1,16 @@
 import 'dotenv/config';
 import { sellerIdentityGaps, sellerStateMismatch, isGstRegistered } from './seller';
 
+/**
+ * A development-only signing key.
+ *
+ * It is committed, so it is public, so it is worthless as a secret — which is
+ * fine for a laptop and catastrophic anywhere else. Production refuses to boot
+ * rather than falling back to it: this key signs both host logins and
+ * participant tokens, so anyone who can read the repository could otherwise
+ * mint themselves a SUPERADMIN session on any deployment that forgot to set
+ * JWT_SECRET, and the only thing standing in the way was a warning in a log.
+ */
 const DEV_JWT_SECRET = 'super_secret_slido_key_for_development';
 const MIN_SECRET_LENGTH = 32;
 
@@ -45,12 +55,45 @@ export const env = {
   frontendOrigin: firstFrontendOrigin(),
 } as const;
 
+/**
+ * Secrets that production must not start without.
+ *
+ * Thrown at module load rather than checked at request time, so a
+ * misconfigured deployment fails immediately and visibly instead of serving
+ * traffic that anyone can forge their way into. This mirrors what
+ * `ensureSuperAdmin` already does for SUPERADMIN_PASSWORD — the same standard,
+ * applied to the secret that protects every session on the platform.
+ */
+const assertProductionSecrets = (): void => {
+  if (!isProduction) return;
+
+  if (!rawJwtSecret) {
+    throw new Error(
+      'JWT_SECRET is not set. Refusing to start in production with the public development key — it is committed to the repository, so anyone could forge an administrator session. Generate one with `openssl rand -base64 48`.'
+    );
+  }
+
+  if (rawJwtSecret === DEV_JWT_SECRET) {
+    throw new Error(
+      'JWT_SECRET is set to the public development key. Generate a real one with `openssl rand -base64 48`.'
+    );
+  }
+
+  if (rawJwtSecret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `JWT_SECRET is only ${rawJwtSecret.length} characters. Use at least ${MIN_SECRET_LENGTH} — a short signing key is a brute-forceable one.`
+    );
+  }
+};
+
+assertProductionSecrets();
+
 export const configWarnings = (): string[] => {
   const warnings: string[] = [];
 
   if (!rawJwtSecret) {
     warnings.push(
-      'JWT_SECRET is not set — falling back to a public development secret. Anyone can forge login tokens. Set it before serving real users.'
+      'JWT_SECRET is not set — using the public development key. Anyone can forge login and participant tokens. Production refuses to start without a real one; set it before serving anybody.'
     );
   } else if (rawJwtSecret.length < MIN_SECRET_LENGTH) {
     warnings.push(

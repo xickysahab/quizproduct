@@ -19,6 +19,41 @@ export const loginLimiter = rateLimit({
 });
 
 /**
+ * Account creation.
+ *
+ * Deliberately NOT the login limiter, which skips successful requests so a busy
+ * office signing in normally is never locked out. On signup the successful
+ * requests are precisely the abuse: every one creates an account and an
+ * organisation, and sends a verification email to whatever address was typed.
+ * Reusing the login limiter here made unlimited account creation free, and
+ * turned the service into an open relay for mail to arbitrary addresses —
+ * which burns the sending domain's reputation long before anyone notices.
+ *
+ * Colleagues are added by invitation, not by signing up repeatedly, so a low
+ * ceiling costs a real workspace nothing.
+ */
+export const signupLimiter = rateLimit({
+  ...shared,
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  message: { message: 'Too many accounts created from this network. Please try again later.' },
+});
+
+/**
+ * Password reset requests.
+ *
+ * Same reasoning: a successful request is one email sent to an address the
+ * requester named, so counting only failures counts nothing at all. Someone
+ * else's inbox is the thing being protected here, not this server.
+ */
+export const passwordResetLimiter = rateLimit({
+  ...shared,
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  message: { message: 'Too many reset requests. Please try again in an hour.' },
+});
+
+/**
  * Joins are limited generously: a lecture hall or office shares one public IP,
  * so the real flood protection is the per-event participant cap. This only
  * blunts scripted signup loops.
