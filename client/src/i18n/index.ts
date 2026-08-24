@@ -40,6 +40,8 @@ const en = {
   'join.connecting': 'Connecting…',
   'join.errorCode': 'Enter the code shown on screen',
   'join.errorGeneric': 'Unable to join. Check the code and try again.',
+  'join.errorName': 'The host asked everyone to join with a name.',
+  'join.nameRequiredPlaceholder': 'Enter your name',
 
   'live.connected': 'Connected',
   'live.reconnecting': 'Reconnecting',
@@ -109,6 +111,8 @@ const hi: Dictionary = {
   'join.connecting': 'जोड़ा जा रहा है…',
   'join.errorCode': 'स्क्रीन पर दिखाया गया कोड डालें',
   'join.errorGeneric': 'शामिल नहीं हो सके। कोड जाँचें और फिर कोशिश करें।',
+  'join.errorName': 'होस्ट ने सबसे नाम के साथ शामिल होने को कहा है।',
+  'join.nameRequiredPlaceholder': 'अपना नाम लिखें',
 
   'live.connected': 'जुड़ा हुआ',
   'live.reconnecting': 'फिर से जोड़ा जा रहा है',

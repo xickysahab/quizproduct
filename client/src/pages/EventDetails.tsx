@@ -6,7 +6,8 @@ import Footer from '../components/Footer';
 import { ArrowLeft, Plus, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
 import QuestionForm from '../components/QuestionForm';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
-import RoomAccessPanel from '../components/RoomAccessPanel';
+import SessionSettingsPanel from '../components/SessionSettingsPanel';
+import type { SessionSwitches } from '../components/SessionSettingsPanel';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmModal from '../components/ConfirmModal';
@@ -198,13 +199,26 @@ const EventDetails: React.FC = () => {
           </div>
         </div>
 
-        <RoomAccessPanel
+        <SessionSettingsPanel
           eventId={id!}
+          preset={event.preset || 'CUSTOM'}
+          switches={{
+            scoringEnabled: event.scoringEnabled !== false,
+            speedBonusEnabled: Boolean(event.speedBonusEnabled),
+            streakBonusEnabled: Boolean(event.streakBonusEnabled),
+            leaderboardVisibility: event.leaderboardVisibility || 'EVERYONE',
+            scoreboardBetweenQuestions: Boolean(event.scoreboardBetweenQuestions),
+            podiumAtEnd: event.podiumAtEnd !== false,
+            resultsReveal: event.resultsReveal || 'HOST_TRIGGERED',
+            autoAdvance: Boolean(event.autoAdvance),
+            phoneShowsQuestion: event.phoneShowsQuestion !== false,
+            soundEnabled: Boolean(event.soundEnabled),
+            qaEnabled: event.qaEnabled !== false,
+            qaModerated: Boolean(event.qaModerated),
+            allowAnonymous: event.allowAnonymous !== false,
+          } as SessionSwitches}
           passcodeSet={Boolean(event.passcodeSet)}
-          allowAnonymous={event.allowAnonymous !== false}
           roomCodeRetiredAt={event.roomCodeRetiredAt ?? null}
-          speedBonusEnabled={Boolean(event.speedBonusEnabled)}
-          sessionMode={event.sessionMode === 'SURVEY' ? 'SURVEY' : 'QUIZ'}
           onUpdated={fetchEventDetails}
         />
 

@@ -92,6 +92,16 @@ export interface EventDetail {
   currentQuestionStartedAt: string | null;
   concludeConfig: ConcludeConfig | null;
   sessionMode?: 'QUIZ' | 'SURVEY';
+  preset?: string;
+  scoringEnabled?: boolean;
+  streakBonusEnabled?: boolean;
+  leaderboardVisibility?: 'HIDDEN' | 'HOST_ONLY' | 'EVERYONE';
+  scoreboardBetweenQuestions?: boolean;
+  podiumAtEnd?: boolean;
+  resultsReveal?: 'HOST_TRIGGERED' | 'AUTO_AFTER_QUESTION' | 'NEVER';
+  autoAdvance?: boolean;
+  phoneShowsQuestion?: boolean;
+  soundEnabled?: boolean;
   questions: HostQuestion[];
   _count?: { participants?: number; questions?: number };
 }

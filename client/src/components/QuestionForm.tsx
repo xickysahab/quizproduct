@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Clock, Plus, Minus } from 'lucide-react';
+import { X, Check, Clock, Plus, Minus, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -27,6 +27,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
   const [correctOption, setCorrectOption] = useState<number | null>(null);
   const [correctOptions, setCorrectOptions] = useState<number[]>([]);
   const [timeLimit, setTimeLimit] = useState<number>(30);
+  const [scored, setScored] = useState<'INHERIT' | 'YES' | 'NO'>('INHERIT');
   const [loading, setLoading] = useState(false);
 
   const needsOptions = type === 'MCQ' || type === 'MULTI_SELECT' || type === 'RATING' || type === 'RANKING';
@@ -39,6 +40,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
       setCorrectOption(initialData.correctOption !== undefined ? initialData.correctOption : null);
       setCorrectOptions(initialData.correctOptions || []);
       setTimeLimit(initialData.timeLimit || 0);
+      setScored(initialData.scored === 'YES' || initialData.scored === 'NO' ? initialData.scored : 'INHERIT');
     }
   }, [initialData]);
 
@@ -86,6 +88,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                 ? [correctOption]
                 : [],
         timeLimit,
+        scored,
       });
       onClose();
     } catch (error) {
@@ -264,6 +267,28 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
               <option value={60}>60 seconds (1 minute)</option>
               <option value={120}>120 seconds (2 minutes)</option>
             </select>
+          </div>
+
+          {/* Per-question override — how one session holds unscored opinion
+              polls next to scored quiz questions. */}
+          <div>
+            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              <Trophy className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Scoring for this question</span>
+            </label>
+            <select
+              value={scored}
+              onChange={(e) => setScored(e.target.value as 'INHERIT' | 'YES' | 'NO')}
+              className="w-full px-5 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 font-medium outline-none"
+            >
+              <option value="INHERIT">Follow the session setting</option>
+              <option value="YES">Always score this one</option>
+              <option value="NO">Never score this one</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1.5">
+              Use this to drop an ungraded opinion poll into a quiz, or one graded
+              question into a discussion.
+            </p>
           </div>
 
           <div className="pt-4 flex gap-4 border-t border-gray-200">
