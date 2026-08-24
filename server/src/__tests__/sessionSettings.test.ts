@@ -20,7 +20,6 @@ describe('presets', () => {
     expect(PRESETS.DISCUSSION.scoringEnabled).toBe(false);
     expect(PRESETS.DISCUSSION.qaEnabled).toBe(true);
     expect(PRESETS.DISCUSSION.podiumAtEnd).toBe(false);
-    expect(PRESETS.DISCUSSION.allowAnonymous).toBe(true);
   });
 
   it('Game is a scored race with standings and a podium', () => {
@@ -104,26 +103,20 @@ describe('guard rules — combinations that cannot work', () => {
     expect(conflicts.some((c) => c.field === 'qaModerated' && c.severity === 'forced')).toBe(true);
   });
 
-  it('warns rather than forces when anonymity meets a public leaderboard', () => {
-    // Legal, and it will run — the host may simply not have thought about it.
-    const { switches, conflicts } = resolveSwitches({
-      ...game(),
-      allowAnonymous: true,
-      leaderboardVisibility: 'EVERYONE',
-    });
-
-    expect(switches.leaderboardVisibility).toBe('EVERYONE');
-    expect(switches.allowAnonymous).toBe(true);
-    expect(
-      conflicts.some((c) => c.field === 'leaderboardVisibility' && c.severity === 'warning')
-    ).toBe(true);
+  it('has no anonymity switch to conflict with — every participant is named', () => {
+    // Anonymous joining was removed as a product decision, so the leaderboard
+    // can never be a list of blanks and the old warning has nothing to fire on.
+    expect(SWITCH_KEYS).not.toContain('allowAnonymous');
+    const { conflicts } = resolveSwitches({ ...game(), leaderboardVisibility: 'EVERYONE' });
+    expect(conflicts.filter((c) => c.severity === 'warning' && c.field === 'leaderboardVisibility'))
+      .toEqual([]);
   });
 
   it('never silently overrides a warning-level choice', () => {
-    const input = { ...game(), allowAnonymous: true };
+    // phoneShowsQuestion carries a warning, never a correction.
+    const input = { ...game(), phoneShowsQuestion: false };
     const { switches } = resolveSwitches(input);
-    // Only forced rules may change values.
-    expect(switches.allowAnonymous).toBe(true);
+    expect(switches.phoneShowsQuestion).toBe(false);
   });
 
   it('is idempotent — resolving twice gives the same answer', () => {

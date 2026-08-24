@@ -35,7 +35,7 @@ const ResetPassword: React.FC = () => {
           {done ? (
             <p className="text-sm text-gray-600">
               Password updated.{' '}
-              <Link to="/login" className="text-indigo-600 font-semibold">
+              <Link to="/login" className="text-accent font-semibold">
                 Sign in
               </Link>
             </p>
@@ -48,7 +48,7 @@ const ResetPassword: React.FC = () => {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-indigo-500"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-accent"
                 placeholder="Min. 8 characters"
               />
               <button type="submit" disabled={loading || !token} className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50">

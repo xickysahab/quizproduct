@@ -73,7 +73,7 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
           <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200 bg-gray-50">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 font-heading">
-                <Palette className="w-6 h-6 text-indigo-600" />
+                <Palette className="w-6 h-6 text-accent" />
                 Customize Results Screen
               </h2>
               <p className="text-sm text-gray-500 mt-1">Configure the design, charts, and colors for the conclude screen.</p>
@@ -94,7 +94,7 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                 <h3 className="text-lg font-bold text-gray-900 font-heading">1. Select Chart Type</h3>
                 <button
                   onClick={loadPreset}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold hover:bg-indigo-100 transition-colors text-sm border border-indigo-100"
+                  className="flex items-center gap-2 px-4 py-2 bg-accent-wash text-accent rounded-xl font-bold hover:bg-accent-wash transition-colors text-sm border border-accent-soft"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Load QuizPulse Preset
@@ -103,23 +103,23 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button 
                   onClick={() => setChartType('CUSTOM_GRID')}
-                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'CUSTOM_GRID' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
+                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'CUSTOM_GRID' ? 'border-accent bg-accent-wash text-accent' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
                 >
-                  <LayoutGrid className={`w-8 h-8 ${chartType === 'CUSTOM_GRID' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <LayoutGrid className={`w-8 h-8 ${chartType === 'CUSTOM_GRID' ? 'text-accent' : 'text-gray-400'}`} />
                   <span className="font-bold text-sm">Cards Grid Layout</span>
                 </button>
                 <button 
                   onClick={() => setChartType('BAR_CHART')}
-                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'BAR_CHART' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
+                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'BAR_CHART' ? 'border-accent bg-accent-wash text-accent' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
                 >
-                  <BarChart className={`w-8 h-8 ${chartType === 'BAR_CHART' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <BarChart className={`w-8 h-8 ${chartType === 'BAR_CHART' ? 'text-accent' : 'text-gray-400'}`} />
                   <span className="font-bold text-sm">Bar Chart View</span>
                 </button>
                 <button 
                   onClick={() => setChartType('PIE_CHART')}
-                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'PIE_CHART' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
+                  className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all shadow-sm ${chartType === 'PIE_CHART' ? 'border-accent bg-accent-wash text-accent' : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white hover:bg-gray-50'}`}
                 >
-                  <PieChart className={`w-8 h-8 ${chartType === 'PIE_CHART' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <PieChart className={`w-8 h-8 ${chartType === 'PIE_CHART' ? 'text-accent' : 'text-gray-400'}`} />
                   <span className="font-bold text-sm">Donut / Pie Chart</span>
                 </button>
               </div>
@@ -157,7 +157,7 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                     <textarea
                       value={opt.text}
                       onChange={(e) => handleChange(idx, 'text', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-shadow placeholder:text-gray-400 shadow-sm"
+                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-accent focus:border-accent transition-shadow placeholder:text-gray-400 shadow-sm"
                       rows={2}
                     />
                   </div>
@@ -168,7 +168,7 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                       type="text"
                       value={opt.alert}
                       onChange={(e) => handleChange(idx, 'alert', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-shadow placeholder:text-gray-400 shadow-sm"
+                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-accent focus:border-accent transition-shadow placeholder:text-gray-400 shadow-sm"
                     />
                   </div>
                 </div>

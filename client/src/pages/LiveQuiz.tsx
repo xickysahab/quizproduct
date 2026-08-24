@@ -13,6 +13,7 @@ import QaPanel from '../components/QaPanel';
 import QuestionResults from '../components/QuestionResults';
 import LanguagePicker from '../components/LanguagePicker';
 import { useTranslation } from '../i18n/useTranslation';
+import { themeFor } from '../utils/sessionTheme';
 import { enqueue, flushQueue, onQueueChange, pendingCount, startAutoFlush } from '../utils/answerQueue';
 import { readRoomBranding, brandTint, type RoomBranding } from '../utils/branding';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,6 +60,9 @@ const LiveQuiz: React.FC = () => {
   } | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [showPodium, setShowPodium] = useState(false);
+
+  // The whole participant screen takes its colour from the session's mode.
+  const themeMode = themeFor({ sessionMode });
 
   useEffect(() => {
     const pName = localStorage.getItem('participantName');
@@ -257,7 +261,7 @@ const LiveQuiz: React.FC = () => {
 
   if (quizEnded) {
     return (
-      <div className="min-h-screen bg-live-stage text-white flex flex-col items-center justify-center p-6 font-sans relative">
+      <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex flex-col items-center justify-center p-6 font-sans relative">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -267,7 +271,7 @@ const LiveQuiz: React.FC = () => {
           }`}
         >
           <div
-            className="w-16 h-16 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm"
+            className="w-16 h-16 rounded-full bg-accent-wash text-accent flex items-center justify-center mx-auto shadow-sm"
             style={accent ? { backgroundColor: brandTint(accent, 0.15), color: accent } : undefined}
           >
             {branding?.logoUrl ? (
@@ -278,7 +282,7 @@ const LiveQuiz: React.FC = () => {
           </div>
           <div>
             <span
-              className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase"
+              className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase"
               style={accent ? { color: accent } : undefined}
             >
               {branding?.name || 'Session Concluded'}
@@ -300,7 +304,7 @@ const LiveQuiz: React.FC = () => {
 
           {sessionMode === 'QUIZ' && (leaderboard.length > 0 || standing) && (
             <div className="text-left">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600 mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent mb-3">
                 Leaderboard
               </p>
               <LivePodium rows={leaderboard} meId={meId} standing={standing || myResult} size="stage" />
@@ -314,7 +318,7 @@ const LiveQuiz: React.FC = () => {
                   key={tally.id}
                   className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 md:p-5"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
                     {sessionMode === 'SURVEY' ? 'Question' : 'Q'} {index + 1}
                   </span>
                   <div className="mt-2">
@@ -340,8 +344,9 @@ const LiveQuiz: React.FC = () => {
     );
   }
 
+
   return (
-    <div className="min-h-screen bg-live-stage text-white flex flex-col items-center justify-center p-4 md:p-6 font-sans relative">
+    <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex flex-col items-center justify-center p-4 md:p-6 font-sans relative">
       {/* Participant Top Header */}
       <div className="fixed top-4 left-4 right-4 max-w-xl mx-auto z-20">
         <BrandedHeader
@@ -439,7 +444,7 @@ const LiveQuiz: React.FC = () => {
                 exit={{ opacity: 0, y: -15 }}
                 className="bg-white text-gray-900 rounded-[2rem] p-8 md:p-10 shadow-2xl space-y-5"
               >
-                <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
+                <span className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">
                   {t('live.results')}
                 </span>
                 <QuestionResults tally={results} revealCorrect={sessionMode !== 'SURVEY'} />
@@ -456,7 +461,7 @@ const LiveQuiz: React.FC = () => {
                   <Loader2 className="w-8 h-8 animate-spin" />
                 </div>
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold tracking-[0.28em] text-indigo-300 uppercase">
+                  <span className="text-[11px] font-bold tracking-[0.28em] text-accent-lift uppercase">
                     {t('live.ready')}
                   </span>
                   <h1 className="font-heading text-3xl md:text-5xl font-bold text-white">
@@ -476,7 +481,7 @@ const LiveQuiz: React.FC = () => {
                 className="space-y-5"
               >
                 <div className="bg-white/8 border border-white/10 rounded-[1.6rem] p-6 md:p-7">
-                  <span className="text-[11px] font-bold tracking-[0.22em] text-indigo-300 uppercase">
+                  <span className="text-[11px] font-bold tracking-[0.22em] text-accent-lift uppercase">
                     {t('live.activeQuestion')}
                   </span>
                   <h2 className="font-heading text-2xl md:text-3xl font-bold text-white mt-1.5 leading-snug">
@@ -512,7 +517,7 @@ const LiveQuiz: React.FC = () => {
                         onChange={(e) => setTextAnswer(e.target.value)}
                         rows={3}
                         maxLength={280}
-                        className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 outline-none focus:border-indigo-500"
+                        className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 outline-none focus:border-accent"
                         placeholder={activeQuestion.type === 'WORD_CLOUD' ? t('live.wordPlaceholder') : t('live.textPlaceholder')}
                       />
                       <button type="submit" disabled={!textAnswer.trim()} className="w-full gradient-btn text-white py-3 rounded-xl font-semibold disabled:opacity-50">
@@ -531,7 +536,7 @@ const LiveQuiz: React.FC = () => {
                           key={optionIndex}
                           className="w-full p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center gap-3"
                         >
-                          <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
+                          <span className="w-7 h-7 rounded-full bg-accent text-white text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
                             {position + 1}
                           </span>
                           <span className="flex-1 text-left text-gray-800">
@@ -666,7 +671,7 @@ const LiveQuiz: React.FC = () => {
                           <span>{t('live.incorrect')}</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700 bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-accent bg-accent-wash px-4 py-2 rounded-full border border-accent-soft">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{t('live.recorded')}</span>
                         </span>
@@ -677,7 +682,7 @@ const LiveQuiz: React.FC = () => {
 
                 {sessionMode === 'QUIZ' && submitted && (leaderboard.length > 0 || standing) && (
                   <div className="bg-white/8 border border-white/10 rounded-[1.4rem] p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-300 mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-lift mb-3">
                       Live leaderboard
                     </p>
                     <LivePodium

@@ -109,7 +109,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
       >
         <div className="flex justify-between items-center pb-5 mb-6 border-b border-gray-200">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
               Question Builder
             </span>
             <h2 className="font-heading text-3xl font-bold text-gray-900">
@@ -129,7 +129,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                 type="button"
                 onClick={() => setType(item.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                  type === item.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'
+                  type === item.id ? 'bg-accent text-white border-accent' : 'bg-white text-gray-600 border-gray-200'
                 }`}
               >
                 {item.label}
@@ -145,7 +145,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
               type="text"
               required
               placeholder="E.g., What is the capital of France?"
-              className="w-full px-5 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 text-base outline-none focus:border-indigo-500"
+              className="w-full px-5 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 text-base outline-none focus:border-accent"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
@@ -158,12 +158,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                   {type === 'RATING' ? 'Scale labels' : type === 'RANKING' ? 'Items to rank' : 'Answer Options'}
                 </label>
                 {!surveyMode && type !== 'RATING' && type !== 'RANKING' && (
-                  <span className="text-xs text-indigo-600 italic font-medium">
+                  <span className="text-xs text-accent italic font-medium">
                     {type === 'MULTI_SELECT' ? 'Tap to mark every correct answer' : 'Tap to mark the correct answer'}
                   </span>
                 )}
                 {!surveyMode && type === 'RANKING' && (
-                  <span className="text-xs text-indigo-600 italic font-medium">
+                  <span className="text-xs text-accent italic font-medium">
                     Optional: tap items in the correct order to set an answer key
                   </span>
                 )}
@@ -188,7 +188,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                     <div
                       key={idx}
                       className={`flex items-center gap-3 p-3 rounded-2xl border ${
-                        isSelected ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white'
+                        isSelected ? 'border-accent-soft bg-accent-wash' : 'border-gray-200 bg-white'
                       }`}
                     >
                       {!surveyMode && type !== 'RATING' && (
@@ -208,7 +208,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                             }
                           }}
                           className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isSelected ? 'bg-indigo-600 text-white' : 'border-2 border-gray-300'
+                            isSelected ? 'bg-accent text-white' : 'border-2 border-gray-300'
                           }`}
                         >
                           {rankPosition ?? <Check className="w-4 h-4" />}
@@ -226,7 +226,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                 })}
               </div>
               <div className="flex gap-2 mt-3">
-                <button type="button" onClick={() => setOptions([...options, ''])} className="text-xs font-semibold text-indigo-600 flex items-center gap-1">
+                <button type="button" onClick={() => setOptions([...options, ''])} className="text-xs font-semibold text-accent flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5" /> Add option
                 </button>
                 {options.length > 2 && (
@@ -253,7 +253,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
 
           <div>
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <Clock className="w-3.5 h-3.5 text-accent" />
               <span>Time Limit</span>
             </label>
             <select
@@ -273,7 +273,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
               polls next to scored quiz questions. */}
           <div>
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              <Trophy className="w-3.5 h-3.5 text-indigo-600" />
+              <Trophy className="w-3.5 h-3.5 text-accent" />
               <span>Scoring for this question</span>
             </label>
             <select

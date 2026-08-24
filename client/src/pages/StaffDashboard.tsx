@@ -60,7 +60,7 @@ const StaffDashboard = () => {
             <h2 className="text-xl font-bold text-gray-900">My Quizzes</h2>
             <Link
               to="/staff/quizzes"
-              className="px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-sm font-medium hover:bg-indigo-100 transition-all"
+              className="px-4 py-2 bg-accent-wash text-accent border border-accent-soft rounded-xl text-sm font-medium hover:bg-accent-wash transition-all"
             >
               View All
             </Link>

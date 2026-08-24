@@ -61,10 +61,10 @@ const TenantDashboard = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-2">Quick Actions</h2>
           <p className="text-gray-500 text-sm mb-4">Manage your staff and quizzes.</p>
           <div className="flex flex-wrap gap-3">
-            <Link to="/tenant/staff" className="px-4 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-all">
+            <Link to="/tenant/staff" className="px-4 py-2.5 bg-accent-wash text-accent border border-accent-soft rounded-xl text-sm font-semibold hover:bg-accent-wash transition-all">
               Manage Staff
             </Link>
-            <Link to="/tenant/quizzes" className="px-4 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-all">
+            <Link to="/tenant/quizzes" className="px-4 py-2.5 bg-accent-wash text-accent border border-accent-soft rounded-xl text-sm font-semibold hover:bg-accent-wash transition-all">
               View Quizzes
             </Link>
           </div>

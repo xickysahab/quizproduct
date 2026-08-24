@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   KeyRound, Ban, MessagesSquare, Trophy, Zap, Flame, Eye, EyeOff,
-  Monitor, Volume2, UserX, ListOrdered, Info, AlertTriangle, Lock,
+  Monitor, Volume2, ListOrdered, Info, AlertTriangle, Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -34,7 +34,6 @@ export interface SessionSwitches {
   soundEnabled: boolean;
   qaEnabled: boolean;
   qaModerated: boolean;
-  allowAnonymous: boolean;
 }
 
 interface Conflict {
@@ -63,15 +62,14 @@ interface Props {
 type ToggleKey =
   | 'scoringEnabled' | 'speedBonusEnabled' | 'streakBonusEnabled'
   | 'scoreboardBetweenQuestions' | 'podiumAtEnd' | 'autoAdvance'
-  | 'phoneShowsQuestion' | 'soundEnabled' | 'qaEnabled' | 'qaModerated'
-  | 'allowAnonymous';
+  | 'phoneShowsQuestion' | 'soundEnabled' | 'qaEnabled' | 'qaModerated';
 
 const TOGGLES: {
   key: ToggleKey;
   label: string;
   hint: string;
   icon: React.ReactNode;
-  group: 'scoring' | 'qa' | 'room' | 'stage';
+  group: 'scoring' | 'qa' | 'stage';
 }[] = [
   { key: 'scoringEnabled', label: 'Score answers', hint: 'Off means nobody wins — the meeting shape.', icon: <Trophy className="w-4 h-4" />, group: 'scoring' },
   { key: 'speedBonusEnabled', label: 'Speed bonus', hint: 'Answer sooner, score higher. Needs a timer.', icon: <Zap className="w-4 h-4" />, group: 'scoring' },
@@ -82,17 +80,14 @@ const TOGGLES: {
   { key: 'qaEnabled', label: 'Audience questions', hint: 'People ask and upvote throughout the session.', icon: <MessagesSquare className="w-4 h-4" />, group: 'qa' },
   { key: 'qaModerated', label: 'Review before showing', hint: 'Questions wait for your approval.', icon: <Eye className="w-4 h-4" />, group: 'qa' },
 
-  { key: 'allowAnonymous', label: 'Allow joining without a name', hint: 'Candid feedback needs this. Leaderboards do not.', icon: <UserX className="w-4 h-4" />, group: 'room' },
-
   { key: 'phoneShowsQuestion', label: 'Show the question on phones', hint: 'Off keeps eyes on the shared screen.', icon: <Monitor className="w-4 h-4" />, group: 'stage' },
   { key: 'soundEnabled', label: 'Countdown sound', hint: 'Audio on the audience display.', icon: <Volume2 className="w-4 h-4" />, group: 'stage' },
   { key: 'autoAdvance', label: 'Advance automatically', hint: 'Move on when the timer runs out.', icon: <ListOrdered className="w-4 h-4" />, group: 'stage' },
 ];
 
-const GROUPS: { id: 'scoring' | 'qa' | 'room' | 'stage'; title: string }[] = [
+const GROUPS: { id: 'scoring' | 'qa' | 'stage'; title: string }[] = [
   { id: 'scoring', title: 'Scoring & competition' },
   { id: 'qa', title: 'Audience questions' },
-  { id: 'room', title: 'Who can join' },
   { id: 'stage', title: 'On screen' },
 ];
 
@@ -175,11 +170,11 @@ const SessionSettingsPanel: React.FC<Props> = ({
               onClick={() => save({ preset: p.id }, `${p.label} settings applied`)}
               className={`text-left p-4 rounded-2xl border transition-colors disabled:opacity-50 ${
                 active
-                  ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100'
-                  : 'border-gray-200 bg-white hover:border-indigo-300'
+                  ? 'border-accent bg-accent-wash ring-2 ring-accent'
+                  : 'border-gray-200 bg-white hover:border-accent-soft'
               }`}
             >
-              <span className={`block font-semibold text-sm ${active ? 'text-indigo-700' : 'text-gray-900'}`}>
+              <span className={`block font-semibold text-sm ${active ? 'text-accent' : 'text-gray-900'}`}>
                 {p.label}
                 {active && <span className="ml-2 text-[10px] uppercase tracking-wider">Active</span>}
               </span>
@@ -223,7 +218,7 @@ const SessionSettingsPanel: React.FC<Props> = ({
       <div>
         <button
           onClick={() => setAdvanced((v) => !v)}
-          className="text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+          className="text-sm font-semibold text-accent hover:text-accent"
         >
           {advanced ? 'Hide individual settings' : 'Change individual settings'}
         </button>
@@ -267,7 +262,7 @@ const SessionSettingsPanel: React.FC<Props> = ({
                         disabled={saving || Boolean(locked)}
                         onClick={() => save({ [toggle.key]: !on }, `${toggle.label} ${!on ? 'on' : 'off'}`)}
                         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:cursor-not-allowed ${
-                          on ? 'bg-indigo-600' : 'bg-gray-300'
+                          on ? 'bg-accent' : 'bg-gray-300'
                         } ${locked ? 'opacity-40' : ''}`}
                       >
                         <span
@@ -339,7 +334,7 @@ const SessionSettingsPanel: React.FC<Props> = ({
               onChange={(e) => setPasscode(e.target.value)}
               placeholder="At least 4 characters"
               autoComplete="off"
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-accent"
             />
           </label>
 

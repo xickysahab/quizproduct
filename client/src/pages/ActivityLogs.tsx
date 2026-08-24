@@ -51,7 +51,7 @@ const ActivityLogs: React.FC = () => {
   };
 
   const getActionIcon = (action: string) => {
-    if (action.includes('CREATE') || action.includes('ADD')) return <Play className="w-4 h-4 text-indigo-600" />;
+    if (action.includes('CREATE') || action.includes('ADD')) return <Play className="w-4 h-4 text-accent" />;
     if (action.includes('DELETE') || action.includes('CLEAR')) return <Trash2 className="w-4 h-4 text-red-500" />;
     if (action.includes('UPDATE') || action.includes('EDIT')) return <Edit2 className="w-4 h-4 text-amber-500" />;
     return <Server className="w-4 h-4 text-gray-500" />;
@@ -59,7 +59,7 @@ const ActivityLogs: React.FC = () => {
 
   const getActionBadge = (action: string) => {
     const baseClasses = "px-2.5 py-1 text-[11px] font-bold rounded-md tracking-wide";
-    if (action.includes('CREATE') || action.includes('ADD')) return `${baseClasses} bg-indigo-50 text-indigo-700`;
+    if (action.includes('CREATE') || action.includes('ADD')) return `${baseClasses} bg-accent-wash text-accent`;
     if (action.includes('DELETE') || action.includes('CLEAR')) return `${baseClasses} bg-red-50 text-red-600`;
     if (action.includes('UPDATE') || action.includes('EDIT')) return `${baseClasses} bg-amber-50 text-amber-700`;
     return `${baseClasses} bg-gray-100 text-gray-600`;
@@ -76,11 +76,11 @@ const ActivityLogs: React.FC = () => {
     <DashboardLayout title={dashboardTitleForRole(user?.role)} sidebarItems={sidebarForRole(user?.role)}>
       <div className="space-y-8">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
             System Records
           </span>
           <h1 className="text-4xl font-heading font-bold text-gray-900 flex items-center gap-3 mt-1">
-            <FileText className="w-8 h-8 text-indigo-600" />
+            <FileText className="w-8 h-8 text-accent" />
             Audit Logs
           </h1>
           <p className="text-sm text-gray-500 mt-1">Track platform activities and administrative actions</p>
@@ -96,7 +96,7 @@ const ActivityLogs: React.FC = () => {
                 placeholder="Search by action, user, or details..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all bg-white text-gray-900 placeholder:text-gray-400 shadow-sm"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-accent focus:border-accent transition-all bg-white text-gray-900 placeholder:text-gray-400 shadow-sm"
               />
             </div>
             <div className="text-sm text-gray-600 font-medium font-mono bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
@@ -164,7 +164,7 @@ const ActivityLogs: React.FC = () => {
           </div>
           {hasMore && (
             <div className="p-4 text-center border-t border-gray-100">
-              <button onClick={() => fetchLogs(page + 1, true)} className="text-sm font-semibold text-indigo-600">
+              <button onClick={() => fetchLogs(page + 1, true)} className="text-sm font-semibold text-accent">
                 Load more
               </button>
             </div>

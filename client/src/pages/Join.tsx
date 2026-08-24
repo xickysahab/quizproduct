@@ -5,10 +5,11 @@ import { getSessionKey } from '../utils/session';
 import LanguagePicker from '../components/LanguagePicker';
 import { useTranslation } from '../i18n/useTranslation';
 import { normalizeRoomCode } from '../utils/roomCode';
-import { writeRoomBranding, brandTint, type RoomBranding } from '../utils/branding';
+import { themeFor, type ThemeMode } from '../utils/sessionTheme';
+import { writeRoomBranding, type RoomBranding } from '../utils/branding';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { Sparkles, ArrowRight, ShieldCheck, Zap, BarChart3, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Join: React.FC = () => {
@@ -18,8 +19,8 @@ const Join: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [passcodeRequired, setPasscodeRequired] = useState(false);
-  const [allowAnonymous, setAllowAnonymous] = useState(true);
   const [roomTitle, setRoomTitle] = useState<string | null>(null);
+  const [roomTheme, setRoomTheme] = useState<ThemeMode>('discussion');
   const [branding, setBranding] = useState<RoomBranding | null>(null);
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -30,8 +31,8 @@ const Join: React.FC = () => {
     if (code.length < 4) {
       setRoomTitle(null);
       setBranding(null);
+      setRoomTheme('discussion');
       setPasscodeRequired(false);
-      setAllowAnonymous(true);
       return;
     }
 
@@ -39,8 +40,8 @@ const Join: React.FC = () => {
       const res = await api.get(`/events/public/${code}`);
       setRoomTitle(res.data.title || null);
       setPasscodeRequired(Boolean(res.data.passcodeRequired));
-      setAllowAnonymous(res.data.allowAnonymous !== false);
       setBranding(res.data.branding || null);
+      setRoomTheme(themeFor(res.data));
       writeRoomBranding(res.data.branding);
     } catch {
       // Wrong code — keep the form usable; join will surface the real error.
@@ -70,8 +71,8 @@ const Join: React.FC = () => {
       return;
     }
 
-    if (!allowAnonymous && !name.trim()) {
-      setError(t('join.errorName') || 'The host asked everyone to join with a name.');
+    if (!name.trim()) {
+      setError(t('join.errorName'));
       return;
     }
 
@@ -106,316 +107,195 @@ const Join: React.FC = () => {
 
   const accent = branding?.primaryColor || undefined;
 
+  // A participant who arrived with a code in the link is here to join, not to
+  // read a landing page. Kahoot's join screen is one input for exactly this
+  // reason, so the marketing collapses away the moment we know the room.
+  const focused = Boolean(roomTitle);
+  const codeReady = normalizeRoomCode(roomCode).length >= 4;
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
+    <div
+      data-mode={roomTheme}
+      className="min-h-screen text-ink flex flex-col font-sans relative"
+      style={accent ? ({ '--accent': accent } as React.CSSProperties) : undefined}
+    >
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative pt-32 md:pt-44 pb-24 md:pb-36 px-6 md:px-12 overflow-hidden bg-ambient-glow">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center relative z-10">
-          
-          {/* Hero Content Left */}
+      <main className="flex-1 flex flex-col">
+        <section className="relative flex-1 flex items-center justify-center px-5 pt-28 pb-16 bg-ambient-glow">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-7 space-y-8 text-left order-2 lg:order-1"
+            transition={{ duration: 0.45, ease: [0.22, 0.82, 0.24, 1] }}
+            className="w-full max-w-[460px]"
           >
-            {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="text-xs font-semibold tracking-wider text-indigo-700 uppercase">
-                Real-Time Audience Engagement
-              </span>
+            {/* The room announces itself the moment the code resolves — the
+                host's name and colour, before anyone is admitted. */}
+            <div className="text-center mb-7 min-h-[74px] flex flex-col justify-end">
+              {focused ? (
+                <div key="room" className="animate-cut-in">
+                  {branding?.logoUrl && (
+                    <img
+                      src={branding.logoUrl}
+                      alt=""
+                      className="h-9 mx-auto mb-3 object-contain"
+                    />
+                  )}
+                  <p className="eyebrow mb-1.5">
+                    {branding?.name || t('join.eyebrow')}
+                  </p>
+                  <h1 className="font-heading text-3xl md:text-[2.1rem] font-bold leading-tight text-ink">
+                    {roomTitle}
+                  </h1>
+                </div>
+              ) : (
+                <div key="idle">
+                  <p className="eyebrow mb-1.5">{t('join.eyebrow')}</p>
+                  <h1 className="font-heading text-3xl md:text-[2.1rem] font-bold leading-tight text-ink">
+                    {t('join.title')}
+                  </h1>
+                  <p className="text-[15px] text-muted mt-2">{t('join.subtitle')}</p>
+                </div>
+              )}
             </div>
 
-            {/* Main Headline */}
-            <h1 className="font-heading text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight text-gray-900">
-              Live quizzes that{' '}
-              <span className="gradient-text">electrify</span>{' '}
-              your audience.
-            </h1>
-
-            {/* Subtitle */}
-            <p className="text-lg md:text-xl text-gray-600 leading-relaxed max-w-xl font-normal">
-              Launch interactive polls, live quizzes, and real-time Q&A sessions. Zero downloads, instant sync, beautifully designed.
-            </p>
-
-            {/* Quick Metrics & Feature Highlights */}
-            <div className="pt-2 flex flex-wrap items-center gap-6 text-sm text-gray-500 font-medium">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>No app download required</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Instant WebSocket syncing</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Beautiful, fast interface</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Hero Form Right — Floating Room Join Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-5 order-1 lg:order-2 relative"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-3xl blur-xl opacity-20 transform -translate-y-2"></div>
-            <div className="bg-white rounded-3xl p-8 md:p-10 shadow-xl border border-gray-100 relative hover-card">
-              <div className="text-center mb-8">
-                <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
-                  {t('join.eyebrow')}
-                </span>
-                <h2 className="font-heading text-3xl font-bold text-gray-900 mt-1">
-                  {t('join.title')}
-                </h2>
-                <p className="text-sm text-gray-500 mt-2">
-                  {t('join.subtitle')}
-                </p>
-              </div>
-
+            <form onSubmit={handleJoin} className="card card-live p-6 md:p-7 space-y-5 shadow-lg">
               {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-sm font-medium text-center mb-6 shadow-sm"
+                <div
+                  role="alert"
+                  className="animate-wrong rounded-xl border border-[color:var(--color-wrong)]/25 bg-[color:var(--color-wrong-wash)] px-4 py-3 text-sm font-medium text-[color:var(--color-wrong)] text-center"
                 >
                   {error}
-                </motion.div>
+                </div>
               )}
 
-              <form onSubmit={handleJoin} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    {t('join.code')}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-5 py-5 text-center text-4xl font-heading font-bold tracking-[0.22em] uppercase rounded-2xl border-2 border-gray-200 bg-slate-50 text-slate-950 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:tracking-normal placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 placeholder:text-base shadow-sm"
-                    placeholder="123 4567"
-                    value={roomCode}
-                    onChange={(e) => {
-                      const next = e.target.value.replace(/[^0-9A-Za-z ]/g, '').toUpperCase();
-                      setRoomCode(next);
-                    }}
-                    onBlur={() => void loadPublicInfo(roomCode)}
-                    maxLength={9}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                  />
-                  {(roomTitle || branding?.name) && (
-                    <div className="mt-3 flex items-center gap-2.5 text-left">
-                      {branding?.logoUrl && (
-                        <img
-                          src={branding.logoUrl}
-                          alt=""
-                          className="w-8 h-8 rounded-lg object-contain border border-gray-100 bg-white"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        {branding?.name && (
-                          <p className="text-[11px] font-bold uppercase tracking-wider truncate" style={{ color: accent || '#4f46e5' }}>
-                            {branding.name}
-                          </p>
-                        )}
-                        {roomTitle && (
-                          <p className="text-sm font-semibold text-gray-900 truncate">{roomTitle}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                    {t('join.name')}
-                    {allowAnonymous && (
-                      <span className="normal-case tracking-normal font-medium text-gray-400">
-                        {' '}
-                        — {t('join.nameOptional')}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    required={!allowAnonymous}
-                    className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
-                    placeholder={
-                      allowAnonymous
-                        ? t('join.namePlaceholder')
-                        : t('join.nameRequiredPlaceholder') || 'Your name (required)'
-                    }
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={25}
-                    style={
-                      accent
-                        ? ({ ['--tw-ring-color' as string]: brandTint(accent, 0.35) } as React.CSSProperties)
-                        : undefined
-                    }
-                  />
-                </div>
-
-                {passcodeRequired && (
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 text-left">
-                      Passcode
-                    </label>
-                    <input
-                      type="text"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Shown by your host"
-                      maxLength={40}
-                      autoComplete="off"
-                      className="w-full px-5 py-4 text-base rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
-                    />
-                  </div>
-                )}
-
-                <div className="flex justify-center pt-1">
-                  <LanguagePicker />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || normalizeRoomCode(roomCode).length < 4}
-                  className="w-full gradient-btn text-white text-base font-semibold py-4 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 group mt-2 shadow-md"
-                  style={accent ? { background: accent } : undefined}
+              {/* The one thing this screen is for. Everything else is smaller. */}
+              <div>
+                <label
+                  htmlFor="room-code"
+                  className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
                 >
-                  <span>{loading ? t('join.connecting') : t('join.submit')}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </form>
-            </div>
+                  {t('join.code')}
+                </label>
+                <input
+                  id="room-code"
+                  type="text"
+                  required
+                  value={roomCode}
+                  onChange={(e) => {
+                    const next = e.target.value.replace(/[^0-9A-Za-z ]/g, '').toUpperCase();
+                    setRoomCode(next);
+                    void loadPublicInfo(next);
+                  }}
+                  maxLength={9}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="123 4567"
+                  className="field code-display w-full px-5 py-5 text-center text-[2rem] md:text-[2.4rem] leading-none bg-sunken"
+                />
+              </div>
+
+              {/* Only asked for once the room says it wants one. */}
+              {passcodeRequired && (
+                <div className="animate-rise">
+                  <label
+                    htmlFor="room-passcode"
+                    className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
+                  >
+                    Passcode
+                  </label>
+                  <input
+                    id="room-passcode"
+                    type="text"
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    placeholder="Shown by your host"
+                    maxLength={40}
+                    autoComplete="off"
+                    className="field w-full px-4 py-3.5 text-base"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="participant-name"
+                  className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
+                >
+                  {t('join.name')}
+                </label>
+                <input
+                  id="participant-name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={40}
+                  placeholder={t('join.nameRequiredPlaceholder')}
+                  className="field w-full px-4 py-3.5 text-base"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !codeReady || !name.trim()}
+                className="btn-primary w-full py-4 rounded-xl text-[15px] flex items-center justify-center gap-2 group disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <span>{loading ? t('join.connecting') : t('join.submit')}</span>
+                <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+              </button>
+
+              <div className="flex items-center justify-center pt-0.5">
+                <LanguagePicker />
+              </div>
+            </form>
           </motion.div>
-        </div>
-      </section>
+        </section>
 
-      {/* Feature Showcase Grid */}
-      <section id="features" className="py-24 px-6 md:px-12 bg-white border-y border-gray-100 relative">
-        <div className="max-w-7xl mx-auto">
-          {/* Section Header */}
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
-              Designed for High Engagement
-            </span>
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-gray-900">
-              Every element crafted with{' '}
-              <span className="gradient-text">intention</span>.
-            </h2>
-            <p className="text-gray-600 text-base leading-relaxed">
-              Remove friction between speakers and participants with stunning visuals and instant real-time synchronization.
-            </p>
-          </div>
+        {/* Marketing lives below the join, and disappears entirely once a real
+            room is on screen — nobody arriving mid-meeting needs the pitch. */}
+        {!focused && (
+          <section className="border-t border-line bg-surface px-5 py-16">
+            <div className="max-w-4xl mx-auto">
+              <p className="eyebrow text-center mb-3">Built for live rooms</p>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-center text-ink mb-10 max-w-xl mx-auto">
+                Polls, quizzes and audience questions — in the language the room speaks.
+              </h2>
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <motion.div
-              whileHover={{ y: -6 }}
-              transition={{ duration: 0.3 }}
-              className="bg-gray-50 rounded-3xl p-8 border border-gray-100 shadow-sm space-y-5 hover:shadow-md hover:border-gray-200 transition-all"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <Zap className="w-6 h-6" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 stagger">
+                {[
+                  {
+                    icon: <Zap className="w-4 h-4" />,
+                    title: 'Answers that survive bad wifi',
+                    body: 'Tap on a dropped connection and the answer waits, then sends itself when the signal comes back.',
+                  },
+                  {
+                    icon: <BarChart3 className="w-4 h-4" />,
+                    title: 'Discussion or game',
+                    body: 'Run it calm with Q&A and no scores, or as a timed race with a podium. Or mix the two.',
+                  },
+                  {
+                    icon: <ShieldCheck className="w-4 h-4" />,
+                    title: 'Join without an account',
+                    body: 'A code is enough. Names are optional, so people say what they actually think.',
+                  },
+                ].map((feature) => (
+                  <div key={feature.title} className="card p-5 hover-card">
+                    <span className="inline-flex w-9 h-9 rounded-lg bg-accent-wash text-accent items-center justify-center mb-3">
+                      {feature.icon}
+                    </span>
+                    <h3 className="font-heading text-[15px] font-semibold text-ink mb-1.5">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm text-muted leading-relaxed">{feature.body}</p>
+                  </div>
+                ))}
               </div>
-              <h3 className="font-heading text-2xl font-bold text-gray-900">
-                Instant Syncing
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Powered by WebSockets for zero latency. Answers, timers, and leaderboard positions update live across hundreds of connected devices.
-              </p>
-            </motion.div>
-
-            {/* Feature 2 */}
-            <motion.div
-              whileHover={{ y: -6 }}
-              transition={{ duration: 0.3 }}
-              className="bg-gray-50 rounded-3xl p-8 border border-gray-100 shadow-sm space-y-5 hover:shadow-md hover:border-gray-200 transition-all"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600">
-                <BarChart3 className="w-6 h-6" />
-              </div>
-              <h3 className="font-heading text-2xl font-bold text-gray-900">
-                Real-Time Analytics
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Observe live participant response breakdowns as they submit. Host control options allow you to reveal solutions or pause timer instantly.
-              </p>
-            </motion.div>
-
-            {/* Feature 3 */}
-            <motion.div
-              whileHover={{ y: -6 }}
-              transition={{ duration: 0.3 }}
-              className="bg-gray-50 rounded-3xl p-8 border border-gray-100 shadow-sm space-y-5 hover:shadow-md hover:border-gray-200 transition-all"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-600">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="font-heading text-2xl font-bold text-gray-900">
-                Premium Design
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                A clean, modern interface with smooth micro-animations, fast interactions, and vibrant accents eliminates distraction.
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Workflow Section */}
-      <section id="how-it-works" className="py-24 px-6 md:px-12 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-16">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
-              Simple Three-Step Process
-            </span>
-            <h2 className="font-heading text-4xl font-bold text-gray-900 mt-2">
-              How QuizPulse Works
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full gradient-btn text-white font-heading text-2xl font-bold flex items-center justify-center shadow-md">
-                1
-              </div>
-              <h3 className="font-heading text-xl font-bold text-gray-900">Create & Schedule</h3>
-              <p className="text-sm text-gray-600 leading-relaxed max-w-xs">
-                Build your questions, set answer timers, and get a unique numeric join code in seconds.
-              </p>
             </div>
-
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full gradient-btn text-white font-heading text-2xl font-bold flex items-center justify-center shadow-md">
-                2
-              </div>
-              <h3 className="font-heading text-xl font-bold text-gray-900">Share Room Code</h3>
-              <p className="text-sm text-gray-600 leading-relaxed max-w-xs">
-                Display the room PIN on screen. Audience members join instantly on mobile or desktop without downloads.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full gradient-btn text-white font-heading text-2xl font-bold flex items-center justify-center shadow-md">
-                3
-              </div>
-              <h3 className="font-heading text-xl font-bold text-gray-900">Host & Engage</h3>
-              <p className="text-sm text-gray-600 leading-relaxed max-w-xs">
-                Advance questions live, display option distributions, and celebrate top participants with instant leaderboards.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        )}
+      </main>
 
       <Footer />
     </div>

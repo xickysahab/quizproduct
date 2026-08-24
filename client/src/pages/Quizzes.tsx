@@ -154,7 +154,7 @@ const Quizzes: React.FC = () => {
               value={newEventTitle}
               onChange={(e) => setNewEventTitle(e.target.value)}
               placeholder="E.g., Design Systems Workshop Q&A"
-              className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+              className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400"
             />
             <button
               type="submit"
@@ -180,11 +180,11 @@ const Quizzes: React.FC = () => {
                   type="button"
                   disabled={creatingTemplateId === template.id}
                   onClick={() => createFromTemplate(template.id)}
-                  className="text-left bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all disabled:opacity-50"
+                  className="text-left bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:border-accent-soft hover:shadow-md transition-all disabled:opacity-50"
                 >
                   <h3 className="font-heading text-lg font-bold text-gray-900">{template.title}</h3>
                   <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{template.description}</p>
-                  <p className="text-[11px] font-semibold text-indigo-600 mt-3">
+                  <p className="text-[11px] font-semibold text-accent mt-3">
                     {creatingTemplateId === template.id
                       ? 'Creating…'
                       : `${template.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'} · ${template.questionCount} questions · Use template`}
@@ -203,7 +203,7 @@ const Quizzes: React.FC = () => {
             placeholder="Search by title, code or host..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-xs text-gray-900 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-xs text-gray-900 focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm"
           />
         </div>
 
@@ -212,7 +212,7 @@ const Quizzes: React.FC = () => {
           <div className="text-center py-16 text-gray-400">Loading quizzes...</div>
         ) : filteredEvents.length === 0 ? (
           <div className="text-center bg-white rounded-2xl border border-gray-200 p-16 space-y-4 shadow-sm">
-            <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mx-auto">
+            <div className="w-14 h-14 rounded-full bg-accent-wash flex items-center justify-center text-accent mx-auto">
               <Presentation className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-gray-900">No quizzes found</h3>
@@ -246,7 +246,7 @@ const Quizzes: React.FC = () => {
 
                       <button
                         onClick={() => copyRoomCode(event.roomCode)}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-900 hover:border-indigo-300 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-900 hover:border-accent-soft transition-colors"
                         title="Click to copy room code"
                       >
                         <span>{event.roomCode}</span>
@@ -258,7 +258,7 @@ const Quizzes: React.FC = () => {
                       </button>
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-accent transition-colors">
                       {event.title}
                     </h3>
 
@@ -271,7 +271,7 @@ const Quizzes: React.FC = () => {
 
                     <div className="flex items-center gap-5 text-xs text-gray-500 mb-5 pt-3 border-t border-gray-100">
                       <div className="flex items-center gap-1.5">
-                        <Presentation className="w-3.5 h-3.5 text-indigo-500" />
+                        <Presentation className="w-3.5 h-3.5 text-accent" />
                         <span>{event._count?.questions || 0} Questions</span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -284,14 +284,14 @@ const Quizzes: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => navigate(`/events/${event.id}`)}
-                      className="flex-1 bg-gray-100 hover:bg-indigo-600 text-gray-700 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 bg-gray-100 hover:bg-accent text-gray-700 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                     >
                       <span>Manage & Host</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => duplicateEvent(event.id)}
-                      className="p-2.5 rounded-xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                      className="p-2.5 rounded-xl text-gray-400 hover:text-accent hover:bg-accent-wash"
                       title="Duplicate quiz"
                     >
                       <CopyPlus className="w-4 h-4" />

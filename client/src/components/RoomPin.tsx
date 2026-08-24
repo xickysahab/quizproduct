@@ -24,7 +24,7 @@ const RoomPin: React.FC<RoomPinProps> = ({ code, size = 'chip', tone = 'light' }
       >
         <span
           className={`text-[11px] font-bold uppercase tracking-[0.35em] ${
-            dark ? 'text-slate-500' : 'text-indigo-300'
+            dark ? 'text-slate-500' : 'text-accent-lift'
           }`}
         >
           Join with PIN
@@ -44,7 +44,7 @@ const RoomPin: React.FC<RoomPinProps> = ({ code, size = 'chip', tone = 'light' }
     >
       <span
         className={`text-[9px] tracking-[0.22em] uppercase font-bold block ${
-          dark ? 'text-indigo-300' : 'text-indigo-300'
+          dark ? 'text-accent-lift' : 'text-accent-lift'
         }`}
       >
         PIN

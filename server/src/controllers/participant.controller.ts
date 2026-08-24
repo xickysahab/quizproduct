@@ -106,8 +106,11 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    if (!trimmedName && !event.allowAnonymous) {
-      res.status(400).json({ message: 'The host asked everyone to join with a name.' });
+    // Every participant gives a name. There is no anonymous path — a name is
+    // what makes a leaderboard, a Q&A attribution and a host's report mean
+    // anything, and it is required regardless of any legacy column value.
+    if (!trimmedName) {
+      res.status(400).json({ message: 'Please enter your name to join.' });
       return;
     }
 
@@ -163,8 +166,6 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     const participant = await prisma.participant.create({
       data: {
         eventId: event.id,
-        // Anonymous participants are stored with an empty name; the UI shows a
-        // generated label rather than inventing one here.
         name: trimmedName,
         sessionKey: key,
       },

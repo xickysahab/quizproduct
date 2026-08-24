@@ -16,6 +16,7 @@ import OptionTile from '../components/OptionTile';
 import RoomPin from '../components/RoomPin';
 import LivePodium from '../components/LivePodium';
 import type { EventDetail, EventSummary, LeaderboardRow, QuestionTally } from '../types/analytics';
+import { themeFor } from '../utils/sessionTheme';
 
 const HostLive: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,6 +51,9 @@ const HostLive: React.FC = () => {
   // Socket handlers are registered once, so they read the live question through
   // a ref rather than closing over a stale render's state.
   const activeQuestionIdRef = useRef<string | null>(null);
+
+  // Colour temperature follows the session's personality.
+  const themeMode = themeFor(event);
 
   useEffect(() => {
     fetchEventDetails();
@@ -231,7 +235,7 @@ const HostLive: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-live-stage text-white flex items-center justify-center font-heading text-lg">
+      <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex items-center justify-center font-heading text-lg">
         Opening the live stage…
       </div>
     );
@@ -239,7 +243,7 @@ const HostLive: React.FC = () => {
 
   if (!event || !event.questions || event.questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div data-mode={themeMode} className="min-h-screen bg-gray-50 text-gray-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
         <p className="font-heading text-2xl">No questions configured for this event.</p>
         <button
           onClick={() => navigate(`/events/${id}`)}
@@ -254,8 +258,9 @@ const HostLive: React.FC = () => {
   const activeQuestion = currentQuestionIndex >= 0 ? event.questions[currentQuestionIndex] : null;
   const isFinished = currentQuestionIndex >= event.questions.length - 1;
 
+
   return (
-    <div className="min-h-screen flex flex-col bg-live-stage text-white font-sans relative">
+    <div data-mode={themeMode} className="min-h-screen flex flex-col bg-live-stage text-white font-sans relative">
       {/* Header Bar */}
       <header className="bg-black/25 px-6 md:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-white/10 backdrop-blur-md">
         <div className="flex items-center gap-4">
@@ -277,7 +282,7 @@ const HostLive: React.FC = () => {
                 className={`px-2 py-0.5 rounded-full font-semibold ${
                   event.sessionMode === 'SURVEY'
                     ? 'bg-teal-400/15 text-teal-200 border border-teal-400/30'
-                    : 'bg-indigo-400/15 text-indigo-200 border border-indigo-400/30'
+                    : 'bg-indigo-400/15 text-accent-lift border border-indigo-400/30'
                 }`}
               >
                 {event.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'}
@@ -322,7 +327,7 @@ const HostLive: React.FC = () => {
                     <span className="text-sm font-semibold uppercase tracking-wider text-gray-500">
                       Participants
                     </span>
-                    <span className="text-lg font-bold text-indigo-600 bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100 tabular-nums">
+                    <span className="text-lg font-bold text-accent bg-accent-wash px-4 py-1.5 rounded-full border border-accent-soft tabular-nums">
                       {summaryData.totalParticipants}
                     </span>
                   </div>
@@ -364,7 +369,7 @@ const HostLive: React.FC = () => {
                       key={tally.id}
                       className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm"
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
                         Question {index + 1}
                       </span>
                       <div className="mt-2">
@@ -386,7 +391,7 @@ const HostLive: React.FC = () => {
               className="space-y-8 text-center"
             >
               <div className="space-y-6">
-                <span className="text-xs font-bold uppercase tracking-[0.3em] text-indigo-300">
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-accent-lift">
                   Lobby
                 </span>
                 <h2 className="font-heading text-4xl md:text-6xl font-bold text-white">
@@ -423,7 +428,7 @@ const HostLive: React.FC = () => {
                     >
                       <X className="w-5 h-5" />
                     </button>
-                    <span className="text-xs font-bold uppercase tracking-widest text-indigo-600">Scan to Join</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-accent">Scan to Join</span>
                     <div className="p-4 bg-gray-50 rounded-xl">
                       <QRCodeSVG 
                         value={`${window.location.origin}/?code=${event.roomCode}`} 
@@ -455,7 +460,7 @@ const HostLive: React.FC = () => {
             >
               {/* Question Index & Live Response Count */}
               <div className="flex items-center justify-between pb-2">
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-accent-lift">
                   Question {currentQuestionIndex + 1} of {event.questions.length}
                 </span>
 

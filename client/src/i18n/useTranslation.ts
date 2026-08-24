@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LANGUAGES, detectLanguage, setLanguage, translate } from './index';
+import { loadScriptFont } from './scriptFonts';
 import type { LanguageCode, TranslationKey } from './index';
 
 /**
@@ -15,7 +16,12 @@ const listeners = new Set<Listener>();
 let current: LanguageCode | null = null;
 
 const get = (): LanguageCode => {
-  if (!current) current = detectLanguage();
+  if (!current) {
+    current = detectLanguage();
+    // Pull the script's face in for whatever we detected, not only for a
+    // language the participant picks by hand.
+    loadScriptFont(current);
+  }
   return current;
 };
 
@@ -38,6 +44,7 @@ export const useTranslation = () => {
   const change = useCallback((next: LanguageCode) => {
     current = next;
     setLanguage(next);
+    loadScriptFont(next);
     listeners.forEach((listener) => listener(next));
   }, []);
 

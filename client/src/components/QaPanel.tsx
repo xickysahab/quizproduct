@@ -112,7 +112,7 @@ const QaPanel: React.FC = () => {
             maxLength={MAX_LENGTH}
             rows={2}
             placeholder={t("qa.placeholder")}
-            className="w-full px-4 py-3 pr-16 rounded-2xl border border-gray-200 bg-white text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 resize-none"
+            className="w-full px-4 py-3 pr-16 rounded-2xl border border-gray-200 bg-white text-sm outline-none focus:border-accent focus:ring-4 focus:ring-accent resize-none"
             aria-label="Your question"
           />
           <span className="absolute bottom-3 right-4 text-[10px] font-mono text-gray-400 tabular-nums">
@@ -126,7 +126,7 @@ const QaPanel: React.FC = () => {
               type="checkbox"
               checked={anonymous}
               onChange={(e) => setAnonymous(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
             />
             <span>{t('qa.anonymous')}</span>
           </label>
@@ -170,8 +170,8 @@ const QaPanel: React.FC = () => {
                 aria-label={`${t('qa.upvote')}: ${question.text}`}
                 className={`flex flex-col items-center justify-center w-12 py-1.5 rounded-xl border flex-shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   question.hasVoted
-                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'
+                    ? 'bg-accent border-accent text-white'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-accent-soft'
                 }`}
               >
                 <ChevronUp className="w-4 h-4" />

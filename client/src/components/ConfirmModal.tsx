@@ -52,7 +52,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <div className="flex flex-col items-center text-center mt-2">
               <div
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 shadow-sm ${
-                  isDestructive ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                  isDestructive ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-accent-wash text-accent border border-accent-soft'
                 }`}
               >
                 {icon ? icon : <AlertTriangle className="w-7 h-7" />}

@@ -588,6 +588,9 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
         allowAnonymous: true,
         passcodeHash: true,
         roomCodeRetiredAt: true,
+        preset: true,
+        scoringEnabled: true,
+        qaEnabled: true,
         sessionMode: true,
         organization: { select: { name: true, logoUrl: true, primaryColor: true } },
       },
@@ -600,8 +603,15 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
 
     res.json({
       title: event.title,
-      allowAnonymous: event.allowAnonymous,
+      // Kept in the response for older clients; always false in practice now.
+      allowAnonymous: false,
       passcodeRequired: Boolean(event.passcodeHash),
+      // Enough for the join screen to take on the room's colour before anyone
+      // is admitted — you can see whether you are walking into a game or a
+      // discussion before you type your name.
+      preset: event.preset,
+      scoringEnabled: event.scoringEnabled,
+      qaEnabled: event.qaEnabled,
       sessionMode: event.sessionMode,
       branding: event.organization
         ? {

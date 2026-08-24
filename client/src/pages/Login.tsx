@@ -38,7 +38,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-accent-wash">
       <Navbar />
 
       <main className="flex-1 pt-32 pb-24 px-6 md:px-12 flex items-center justify-center relative bg-ambient-glow">
@@ -51,7 +51,7 @@ const Login: React.FC = () => {
           {/* Header */}
           <div className="text-center mb-8">
             <Logo size={48} className="mx-auto mb-4" />
-            <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
+            <span className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">
               Host Portal
             </span>
             <h2 className="font-heading text-3xl font-bold text-gray-900 mt-1">
@@ -83,7 +83,7 @@ const Login: React.FC = () => {
                   type="email"
                   required
                   autoComplete="email"
-                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -101,7 +101,7 @@ const Login: React.FC = () => {
                   type="password"
                   required
                   autoComplete="current-password"
-                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -118,7 +118,7 @@ const Login: React.FC = () => {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <p className="text-center text-sm text-gray-500">
-              <Link to="/forgot-password" className="text-indigo-600 font-semibold">
+              <Link to="/forgot-password" className="text-accent font-semibold">
                 Forgot password?
               </Link>
             </p>

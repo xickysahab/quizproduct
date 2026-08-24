@@ -29,8 +29,8 @@ const Navbar: React.FC = () => {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? 'bg-white/80 backdrop-blur-xl border-b border-gray-200 py-3 shadow-sm'
-          : 'bg-transparent py-5'
+          ? 'bg-[color:var(--color-surface)]/92 backdrop-blur-xl border-b border-line py-3 shadow-sm'
+          : 'bg-[color:var(--color-paper)]/85 backdrop-blur-md border-b border-transparent py-4'
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between">
@@ -38,7 +38,7 @@ const Navbar: React.FC = () => {
         <Link to="/" className="flex items-center gap-3 group">
           <Logo size={38} className="group-hover:scale-105 transition-transform duration-300" />
           <div className="flex flex-col">
-            <span className="font-heading text-xl font-bold tracking-tight text-gray-900 group-hover:text-indigo-600 transition-colors">
+            <span className="font-heading text-xl font-bold tracking-tight text-gray-900 group-hover:text-accent transition-colors">
               QuizPulse
             </span>
             <span className="text-[9px] tracking-[0.2em] text-gray-500 uppercase font-medium -mt-0.5">
@@ -51,16 +51,16 @@ const Navbar: React.FC = () => {
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <Link
             to="/"
-            className={`transition-colors hover:text-indigo-600 ${
-              location.pathname === '/' ? 'text-indigo-600 font-semibold' : 'text-gray-600'
+            className={`transition-colors hover:text-accent ${
+              location.pathname === '/' ? 'text-accent font-semibold' : 'text-gray-600'
             }`}
           >
             Join Quiz
           </Link>
-          <a href="#features" className="transition-colors hover:text-indigo-600 text-gray-600">
+          <a href="#features" className="transition-colors hover:text-accent text-gray-600">
             Features
           </a>
-          <a href="#how-it-works" className="transition-colors hover:text-indigo-600 text-gray-600">
+          <a href="#how-it-works" className="transition-colors hover:text-accent text-gray-600">
             How It Works
           </a>
         </nav>
@@ -71,9 +71,9 @@ const Navbar: React.FC = () => {
             <div className="flex items-center gap-3">
               <Link
                 to="/dashboard"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:border-accent-soft hover:bg-gray-50 transition-all shadow-sm"
               >
-                <LayoutDashboard className="w-4 h-4 text-indigo-600" />
+                <LayoutDashboard className="w-4 h-4 text-accent" />
                 <span>Dashboard</span>
               </Link>
               <button

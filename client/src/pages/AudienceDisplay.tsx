@@ -12,6 +12,7 @@ import OptionTile from '../components/OptionTile';
 import RoomPin from '../components/RoomPin';
 import LivePodium from '../components/LivePodium';
 import type { EventDetail, LeaderboardRow, QuestionTally } from '../types/analytics';
+import { themeFor } from '../utils/sessionTheme';
 
 /**
  * Projector / secondary-screen view — question + live tally only.
@@ -36,6 +37,9 @@ const AudienceDisplay: React.FC = () => {
   const [podiumOpen, setPodiumOpen] = useState(false);
 
   const activeQuestionIdRef = useRef<string | null>(null);
+
+  // Colour temperature follows the session's personality.
+  const themeMode = themeFor(event);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +188,7 @@ const AudienceDisplay: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-heading text-lg">
+      <div data-mode={themeMode} className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-heading text-lg">
         Opening audience display…
       </div>
     );
@@ -198,8 +202,9 @@ const AudienceDisplay: React.FC = () => {
 
   const activeQuestion = currentQuestionIndex >= 0 ? event.questions[currentQuestionIndex] : null;
 
+
   return (
-    <div className="min-h-screen flex flex-col bg-live-stage text-white font-sans">
+    <div data-mode={themeMode} className="min-h-screen flex flex-col bg-live-stage text-white font-sans">
       <header className="px-8 py-5 flex justify-between items-center border-b border-white/10">
         <div className="flex items-center gap-4">
           <Logo size={40} />
@@ -240,7 +245,7 @@ const AudienceDisplay: React.FC = () => {
             className="w-full max-w-5xl space-y-8"
           >
             <div className="text-center space-y-3">
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-indigo-300">Session over</p>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-accent-lift">Session over</p>
               <h2 className="font-heading text-5xl md:text-6xl font-bold">
                 {event.sessionMode === 'SURVEY' ? 'Survey results' : 'Thanks for playing'}
               </h2>
@@ -259,7 +264,7 @@ const AudienceDisplay: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-h-[60vh] overflow-y-auto">
                 {finalResults.map((tally, index) => (
                   <div key={tally.id} className="bg-white text-slate-900 rounded-3xl p-5 text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
                       Q{index + 1}
                     </span>
                     <div className="mt-2">
@@ -285,7 +290,7 @@ const AudienceDisplay: React.FC = () => {
                       <span>
                         {row.rank}. {row.name}
                       </span>
-                      <span className="font-bold text-indigo-300">{row.score}</span>
+                      <span className="font-bold text-accent-lift">{row.score}</span>
                     </li>
                   ))}
                 </ol>
@@ -299,12 +304,12 @@ const AudienceDisplay: React.FC = () => {
             className="text-center space-y-8"
           >
             <div className="space-y-3">
-              <p className="text-sm font-bold uppercase tracking-[0.3em] text-indigo-300">Join now</p>
+              <p className="text-sm font-bold uppercase tracking-[0.3em] text-accent-lift">Join now</p>
               <h2 className="font-heading text-5xl md:text-7xl font-bold">Scan or enter the PIN</h2>
             </div>
             <RoomPin code={event.roomCode} size="hero" tone="dark" />
             <div className="inline-flex flex-col items-center gap-4 bg-white text-slate-900 p-8 rounded-[2rem]">
-              <QrCode className="w-5 h-5 text-indigo-600" />
+              <QrCode className="w-5 h-5 text-accent" />
               <QRCodeSVG
                 value={`${window.location.origin}/?code=${event.roomCode}`}
                 size={220}
@@ -321,7 +326,7 @@ const AudienceDisplay: React.FC = () => {
             className="w-full max-w-5xl space-y-8"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-300">
+              <span className="text-sm font-bold uppercase tracking-[0.2em] text-accent-lift">
                 Question {currentQuestionIndex + 1} of {event.questions.length}
               </span>
               <span className="text-sm text-white/70 tabular-nums">

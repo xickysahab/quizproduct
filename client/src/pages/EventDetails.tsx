@@ -11,6 +11,7 @@ import type { SessionSwitches } from '../components/SessionSettingsPanel';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmModal from '../components/ConfirmModal';
+import { themeFor } from '../utils/sessionTheme';
 
 const EventDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,9 @@ const EventDetails: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
   const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, questionId: string | null}>({ isOpen: false, questionId: null });
   const [clearDataModal, setClearDataModal] = useState(false);
+
+  // Colour temperature follows the session's personality.
+  const themeMode = themeFor(event);
 
   useEffect(() => {
     fetchEventDetails();
@@ -101,7 +105,7 @@ const EventDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-heading text-lg">
+      <div data-mode={themeMode} className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-heading text-lg">
         Loading event details...
       </div>
     );
@@ -109,8 +113,9 @@ const EventDetails: React.FC = () => {
 
   if (!event) return null;
 
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
+    <div data-mode={themeMode} className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-accent-wash">
       <Navbar />
 
       <main className="flex-1 pt-32 pb-24 px-6 md:px-12 max-w-5xl mx-auto w-full">
@@ -127,7 +132,7 @@ const EventDetails: React.FC = () => {
         <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-gray-200 mb-12 flex flex-col md:flex-row md:items-center justify-between gap-8 hover-card transition-all">
           <div className="space-y-3 max-w-xl">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
                 Event Studio
               </span>
               <span className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-700">
@@ -142,7 +147,7 @@ const EventDetails: React.FC = () => {
                 className={`inline-flex mr-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border align-middle ${
                   event.sessionMode === 'SURVEY'
                     ? 'bg-teal-50 text-teal-700 border-teal-100'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                    : 'bg-accent-wash text-accent border-accent-soft'
                 }`}
               >
                 {event.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'}
@@ -179,7 +184,7 @@ const EventDetails: React.FC = () => {
               }}
               className="bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 px-6 py-3 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 border border-gray-200 shadow-sm"
             >
-              <Download className="w-3.5 h-3.5 text-indigo-600" />
+              <Download className="w-3.5 h-3.5 text-accent" />
               <span>Export CSV Report</span>
             </button>
             <button
@@ -215,7 +220,6 @@ const EventDetails: React.FC = () => {
             soundEnabled: Boolean(event.soundEnabled),
             qaEnabled: event.qaEnabled !== false,
             qaModerated: Boolean(event.qaModerated),
-            allowAnonymous: event.allowAnonymous !== false,
           } as SessionSwitches}
           passcodeSet={Boolean(event.passcodeSet)}
           roomCodeRetiredAt={event.roomCodeRetiredAt ?? null}
@@ -245,7 +249,7 @@ const EventDetails: React.FC = () => {
         {/* Questions List */}
         {event.questions.length === 0 ? (
           <div className="text-center bg-white rounded-3xl border border-gray-200 p-16 space-y-4 shadow-sm">
-            <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mx-auto">
+            <div className="w-14 h-14 rounded-full bg-accent-wash flex items-center justify-center text-accent mx-auto">
               <HelpCircle className="w-6 h-6" />
             </div>
             <h3 className="font-heading text-2xl font-bold text-gray-900">No questions added yet</h3>
@@ -254,7 +258,7 @@ const EventDetails: React.FC = () => {
             </p>
               <button
               onClick={openAddModal}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:underline pt-2"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline pt-2"
             >
               <Plus className="w-4 h-4" />
               <span>Create First Question</span>
@@ -282,10 +286,10 @@ const EventDetails: React.FC = () => {
                           {q.text}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold uppercase tracking-wider">
+                          <span className="px-2 py-0.5 rounded-full bg-accent-wash text-accent font-bold uppercase tracking-wider">
                             {(q.type || 'MCQ').replace('_', ' ')}
                           </span>
-                          <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                          <Clock className="w-3.5 h-3.5 text-accent" />
                           <span>{q.timeLimit > 0 ? `${q.timeLimit} seconds timer` : 'Manual advance (No timer)'}</span>
                         </div>
                       </div>
@@ -300,18 +304,18 @@ const EventDetails: React.FC = () => {
                             key={optIdx}
                             className={`p-3.5 rounded-2xl border text-sm transition-all flex items-center gap-3 ${
                               isCorrect
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold shadow-sm'
+                                ? 'bg-accent-wash border-accent-soft text-accent font-semibold shadow-sm'
                                 : 'bg-gray-50 border-gray-200 text-gray-700'
                             }`}
                           >
                             <span className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                              isCorrect ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-500'
+                              isCorrect ? 'bg-accent text-white' : 'bg-white border border-gray-200 text-gray-500'
                             }`}>
                               {['A', 'B', 'C', 'D'][optIdx]}
                             </span>
                             <span className="flex-1">{opt}</span>
                             {isCorrect && (
-                              <CheckCircle className="w-4 h-4 text-indigo-600" />
+                              <CheckCircle className="w-4 h-4 text-accent" />
                             )}
                           </div>
                         );
@@ -405,7 +409,7 @@ const EventReports: React.FC<{ eventId: string }> = ({ eventId }) => {
     <div className="mt-12 space-y-6 print:block">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Results</h2>
-        <button onClick={() => window.print()} className="text-sm font-semibold text-indigo-600">
+        <button onClick={() => window.print()} className="text-sm font-semibold text-accent">
           Print / Save PDF
         </button>
       </div>

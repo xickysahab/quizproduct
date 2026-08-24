@@ -48,11 +48,11 @@ const LivePodium: React.FC<LivePodiumProps> = ({
       {standing && (
         <div
           className={`mb-4 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 ${
-            dark ? 'bg-white/10 border border-white/10' : 'bg-indigo-50 border border-indigo-100'
+            dark ? 'bg-white/10 border border-white/10' : 'bg-accent-wash border border-accent-soft'
           }`}
         >
           <div>
-            <p className={`text-[10px] font-bold uppercase tracking-[0.18em] ${dark ? 'text-indigo-300' : 'text-indigo-600'}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-[0.18em] ${dark ? 'text-accent-lift' : 'text-accent'}`}>
               Your place
             </p>
             <p className="font-heading text-xl font-bold mt-0.5">

@@ -54,7 +54,7 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({ isOpen, onClose, onCr
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-accent-wash flex items-center justify-center text-accent shadow-sm">
                   <Presentation className="w-5 h-5" />
                 </div>
                 <h2 className="font-heading text-2xl font-bold text-gray-900">Create Quiz</h2>
@@ -78,7 +78,7 @@ const CreateQuizModal: React.FC<CreateQuizModalProps> = ({ isOpen, onClose, onCr
                   autoFocus
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm"
                   placeholder="E.g., Product Knowledge Quiz"
                 />
               </div>

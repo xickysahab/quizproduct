@@ -9,6 +9,10 @@
  * throughout, scoring on, podium off".
  *
  * Kept free of Prisma so every rule here is directly testable.
+ *
+ * Note: anonymous joining was removed as a product decision — every participant
+ * gives a name. The `allowAnonymous` column survives for existing rows but is
+ * no longer a switch, and the server requires a name regardless of its value.
  */
 
 export type SessionPreset = 'DISCUSSION' | 'GAME' | 'SURVEY' | 'CUSTOM';
@@ -29,7 +33,6 @@ export interface SessionSwitches {
   soundEnabled: boolean;
   qaEnabled: boolean;
   qaModerated: boolean;
-  allowAnonymous: boolean;
 }
 
 export const SWITCH_KEYS = [
@@ -45,7 +48,6 @@ export const SWITCH_KEYS = [
   'soundEnabled',
   'qaEnabled',
   'qaModerated',
-  'allowAnonymous',
 ] as const satisfies readonly (keyof SessionSwitches)[];
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +74,6 @@ export const PRESETS: Record<Exclude<SessionPreset, 'CUSTOM'>, SessionSwitches> 
     soundEnabled: false,
     qaEnabled: true,
     qaModerated: true,
-    allowAnonymous: true,
   },
 
   /** A race. Speed, streaks, standings between questions, podium at the end. */
@@ -92,7 +93,6 @@ export const PRESETS: Record<Exclude<SessionPreset, 'CUSTOM'>, SessionSwitches> 
     soundEnabled: true,
     qaEnabled: false,
     qaModerated: false,
-    allowAnonymous: false,
   },
 
   /** Opinion collection. Never graded; the room does not see the split. */
@@ -109,7 +109,6 @@ export const PRESETS: Record<Exclude<SessionPreset, 'CUSTOM'>, SessionSwitches> 
     soundEnabled: false,
     qaEnabled: false,
     qaModerated: false,
-    allowAnonymous: true,
   },
 };
 
@@ -234,15 +233,6 @@ export const resolveSwitches = (
         'Results stay hidden, but the scoreboard will still show standings.'
       );
     }
-  }
-
-  // --- A public leaderboard of anonymous people is a list of blanks.
-  if (out.allowAnonymous && out.leaderboardVisibility === 'EVERYONE' && out.scoringEnabled) {
-    warn(
-      'leaderboardVisibility',
-      'allowAnonymous',
-      'Anyone who joins without a name appears unnamed on the leaderboard.'
-    );
   }
 
   // --- Hiding the question from phones only works if something else shows it.

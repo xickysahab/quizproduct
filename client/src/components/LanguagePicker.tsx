@@ -24,7 +24,7 @@ const LanguagePicker: React.FC<{ compact?: boolean; tone?: 'light' | 'dark' }> =
       <select
         value={language}
         onChange={(e) => setLanguage(e.target.value as LanguageCode)}
-        className={`bg-transparent border-none outline-none font-medium cursor-pointer focus:ring-2 focus:ring-indigo-500 rounded ${
+        className={`bg-transparent border-none outline-none font-medium cursor-pointer focus:ring-2 focus:ring-accent rounded ${
           dark ? 'text-white/80' : 'text-gray-600'
         }`}
       >
