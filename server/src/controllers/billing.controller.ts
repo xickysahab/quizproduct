@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { env } from '../config/env';
+import { seller, sellerIdentityComplete, isGstRegistered } from '../config/seller';
 import { slog } from '../utils/slog';
 import { PlanName, PLAN_LIMITS, currentPeriod } from '../utils/plans';
 import { createOrder, fetchOrder, fetchPayment, isRazorpayConfigured } from '../utils/razorpay';
@@ -12,9 +13,13 @@ import {
   financialYear,
   isValidGstin,
   isValidStateCode,
+  GST_RATE,
   stateCodeFromGstin,
   stateNameFor,
   selectableStates,
+  treatmentFor,
+  documentTypeFor,
+  placeOfSupplyRequired,
   SAC_CODE,
 } from '../utils/gst';
 import { verifyRazorpaySignature, verifyStripeSignature } from '../utils/webhookSignature';
@@ -66,9 +71,21 @@ interface BillingProfile {
 const placeOfSupply = (profile: BillingProfile): string | null =>
   profile.billingCountry === 'IN' ? profile.stateCode : null;
 
-/** An Indian buyer with no state on file cannot be invoiced correctly. */
+/** How this sale is taxed, given who is selling and who is buying. */
+const treatmentOf = (profile: BillingProfile) =>
+  treatmentFor({ sellerGstin: seller.gstin, buyerCountry: profile.billingCountry });
+
+/**
+ * Whether checkout should stop and ask for a place of supply.
+ *
+ * Only when it changes the tax. An unregistered supplier charges nothing
+ * either way, so blocking a sale to collect a field that no calculation reads
+ * would be friction for its own sake.
+ */
 const missingTaxDetails = (profile: BillingProfile): boolean =>
-  profile.billingCountry === 'IN' && !profile.stateCode;
+  placeOfSupplyRequired(treatmentOf(profile)) &&
+  profile.billingCountry === 'IN' &&
+  !profile.stateCode;
 
 /** The states a buyer may pick, for the billing form. */
 export const listStates = async (_req: Request, res: Response): Promise<void> => {
@@ -76,9 +93,16 @@ export const listStates = async (_req: Request, res: Response): Promise<void> =>
 };
 
 export const listPlans = async (_req: Request, res: Response): Promise<void> => {
+  // The public price has to match what checkout will actually ask for. An
+  // unregistered supplier charges no GST, so quoting a tax-inclusive figure
+  // here would advertise a price nobody is ever charged.
+  const registered = isGstRegistered();
+  const treatment = registered ? 'GST' : 'UNREGISTERED';
+
   res.json({
     currency: 'INR',
-    gstRatePercent: 18,
+    gstRatePercent: registered ? Math.round(GST_RATE * 100) : 0,
+    gstApplies: registered,
     sac: SAC_CODE,
     plans: (Object.keys(PLAN_LIMITS) as PlanName[]).map((name) => {
       const plan = PLAN_LIMITS[name];
@@ -87,8 +111,15 @@ export const listPlans = async (_req: Request, res: Response): Promise<void> => 
         label: plan.label,
         blurb: plan.blurb,
         pricePaise: plan.pricePaise,
-        // Shown alongside so nobody is surprised at checkout.
-        priceWithGstPaise: computeGst(plan.pricePaise, '27').totalPaise,
+        // Shown alongside so nobody is surprised at checkout. Computed against
+        // the seller's own state, which is the intra-state case — the total is
+        // the same 18% either way, only the split differs.
+        priceWithGstPaise: computeGst(
+          plan.pricePaise,
+          seller.stateCode,
+          undefined,
+          treatment
+        ).totalPaise,
         eventsPerMonth: plan.eventsPerMonth,
         participantsPerEvent: plan.participantsPerEvent,
         questionsPerEvent: plan.questionsPerEvent,
@@ -152,7 +183,13 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
     }
 
     const plan = PLAN_LIMITS[planName];
-    const tax = computeGst(plan.pricePaise, placeOfSupply(organization));
+    const treatment = treatmentOf(organization);
+    const tax = computeGst(
+      plan.pricePaise,
+      placeOfSupply(organization),
+      undefined,
+      treatment
+    );
 
     const order = await createOrder(tax.totalPaise, `qp_${Date.now()}`, {
       organizationId: user.organizationId,
@@ -169,6 +206,9 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
       tax,
       placeOfSupply: organization.stateCode,
       placeOfSupplyName: stateNameFor(organization.stateCode),
+      /// So the sheet can say what the buyer is actually paying and why.
+      taxTreatment: treatment,
+      documentType: documentTypeFor(treatment),
       organizationName: organization.name,
       prefill: { email: user.email, name: user.name },
     });
@@ -299,9 +339,15 @@ const issueInvoice = async (
     select: { gstin: true, stateCode: true, billingCountry: true },
   });
 
+  const treatment = organization
+    ? treatmentOf(organization)
+    : treatmentFor({ sellerGstin: seller.gstin, buyerCountry: 'IN' });
+
   const tax = computeGst(
     PLAN_LIMITS[plan].pricePaise,
-    organization ? placeOfSupply(organization) : null
+    organization ? placeOfSupply(organization) : null,
+    undefined,
+    treatment
   );
 
   return prisma.invoice.create({
@@ -318,6 +364,7 @@ const issueInvoice = async (
       provider,
       providerRef,
       plan,
+      documentType: documentTypeFor(treatment),
       periodStart: period?.start ?? null,
       periodEnd: period?.end ?? null,
     },
@@ -350,11 +397,102 @@ export const listInvoices = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 /**
+ * One invoice, as a document rather than a row.
+ *
+ * Assembles both parties, because a tax invoice is a statement about a
+ * transaction between two identified businesses and half of it — the supplier
+ * — lives in configuration rather than in the row. The buyer's details are
+ * read from the invoice, not from the organisation as it stands today: a
+ * customer who moves office or registers for GST later must not silently
+ * rewrite an invoice that was already filed.
+ */
+export const getInvoice = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { organizationId: true },
+    });
+
+    if (!user?.organizationId) {
+      res.status(404).json({ message: 'No organization is attached to this account.' });
+      return;
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: req.params.id as string },
+      include: { organization: { select: { id: true, name: true, billingName: true, billingAddress: true } } },
+    });
+
+    // Scoped to the caller's workspace, and a 404 rather than a 403 so the
+    // response does not confirm that someone else's invoice id exists.
+    if (!invoice || invoice.organizationId !== user.organizationId) {
+      res.status(404).json({ message: 'Invoice not found.' });
+      return;
+    }
+
+    const taxTotal = invoice.cgstPaise + invoice.sgstPaise + invoice.igstPaise;
+
+    res.json({
+      invoice: {
+        id: invoice.id,
+        number: invoice.invoiceNumber,
+        issuedAt: invoice.issuedAt,
+        status: invoice.status,
+        plan: invoice.plan,
+        periodStart: invoice.periodStart,
+        periodEnd: invoice.periodEnd,
+        provider: invoice.provider,
+        providerRef: invoice.providerRef,
+        hsnSac: invoice.hsnSac,
+        documentType: invoice.documentType,
+        placeOfSupply: invoice.placeOfSupply,
+        placeOfSupplyName: stateNameFor(invoice.placeOfSupply),
+        currency: invoice.currency,
+        subtotalPaise: invoice.subtotalPaise,
+        cgstPaise: invoice.cgstPaise,
+        sgstPaise: invoice.sgstPaise,
+        igstPaise: invoice.igstPaise,
+        taxTotalPaise: taxTotal,
+        totalPaise: invoice.totalPaise,
+        /// Zero tax on a tax invoice with no place of supply is an export.
+        /// Zero tax on a bill of supply is simply an unregistered supplier —
+        /// a different thing, and the document has to say which.
+        isExport:
+          invoice.documentType === 'TAX_INVOICE' && taxTotal === 0 && !invoice.placeOfSupply,
+        gstRatePercent: Math.round(GST_RATE * 100),
+      },
+      supplier: {
+        legalName: seller.legalName,
+        gstin: seller.gstin ?? null,
+        address: seller.address ?? null,
+        email: seller.email ?? null,
+        stateCode: seller.stateCode,
+        stateName: seller.stateName,
+        /// The UI says so plainly rather than printing a document that looks
+        /// official and is not.
+        complete: sellerIdentityComplete(),
+      },
+      buyer: {
+        name: invoice.organization.billingName || invoice.organization.name,
+        address: invoice.organization.billingAddress,
+        gstin: invoice.gstin,
+      },
+    });
+  } catch (error) {
+    slog('error', 'billing.invoice_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
  * Starts or extends a paid period.
  *
- * Returns the period so the invoice can name it. A renewal that arrives before
- * the current period ends extends from the existing expiry rather than from
- * today — see nextPeriodEnd — so paying early never costs the customer days.
+ * Returns the period *this payment bought*, which is not the workspace's new
+ * expiry. A customer who renews a week early has access extended from the
+ * existing expiry rather than from today, so the resulting expiry can be five
+ * weeks out — but the invoice must still cover one month, because one month is
+ * what was sold and what the 18% was charged on. Billing a month and
+ * documenting five weeks is how a GST return stops reconciling.
  */
 const activatePlan = async (
   organizationId: string,
@@ -367,7 +505,12 @@ const activatePlan = async (
     select: { planExpiresAt: true },
   });
 
-  const end = nextPeriodEnd(organization?.planExpiresAt ?? null, now, months);
+  const currentExpiry = organization?.planExpiresAt ?? null;
+  const end = nextPeriodEnd(currentExpiry, now, months);
+  // Where the bought month actually begins: when the old one runs out if it
+  // has not yet, otherwise today.
+  const start =
+    currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
 
   await prisma.organization.update({
     where: { id: organizationId },
@@ -380,7 +523,7 @@ const activatePlan = async (
     },
   });
 
-  return { start: now, end };
+  return { start, end };
 };
 
 /** Drops a workspace back to the free tier and records why. */

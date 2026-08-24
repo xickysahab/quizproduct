@@ -24,6 +24,7 @@ const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
 const Organizations = lazy(() => import('./pages/Organizations'));
 const Signup = lazy(() => import('./pages/Signup'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const InvoiceView = lazy(() => import('./pages/InvoiceView'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">
@@ -183,6 +184,9 @@ function AppRoutes() {
         } />
         <Route path="/host/display/:id" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><AudienceDisplay /></ProtectedRoute>
+        } />
+        <Route path="/invoice/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'TENANT']}><InvoiceView /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

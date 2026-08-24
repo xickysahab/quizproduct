@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CreditCard, Receipt, AlertTriangle, Check, Loader2, ShieldCheck } from 'lucide-react';
+import { CreditCard, Receipt, AlertTriangle, Check, Loader2, ShieldCheck, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { formatRupees, formatRupeesShort } from '../utils/money';
@@ -61,6 +62,15 @@ interface GstState {
   name: string;
 }
 
+interface InvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  issuedAt: string;
+  plan: string | null;
+  totalPaise: number;
+  status: string;
+}
+
 const prettyDate = (value: string | null): string =>
   value ? format(new Date(value), 'd MMM yyyy') : '';
 
@@ -99,7 +109,9 @@ const BillingPanel: React.FC = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [details, setDetails] = useState<BillingDetails | null>(null);
   const [plans, setPlans] = useState<PlanCard[]>([]);
+  const [gstApplies, setGstApplies] = useState(true);
   const [states, setStates] = useState<GstState[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingDetails, setSavingDetails] = useState(false);
   const [buyingPlan, setBuyingPlan] = useState<PlanId | null>(null);
@@ -124,15 +136,18 @@ const BillingPanel: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const [sub, planList, stateList] = await Promise.all([
+      const [sub, planList, stateList, invoiceList] = await Promise.all([
         api.get('/billing/subscription'),
         api.get('/billing/plans'),
         api.get('/billing/states'),
+        api.get('/billing/invoices'),
       ]);
       setSubscription(sub.data.subscription);
       applyDetails(sub.data.billingDetails);
       setPlans(planList.data.plans);
+      setGstApplies(planList.data.gstApplies !== false);
       setStates(stateList.data.states);
+      setInvoices(invoiceList.data.invoices);
     } catch {
       toast.error('Could not load your billing details.');
     } finally {
@@ -286,7 +301,9 @@ const BillingPanel: React.FC = () => {
           <h2 className="text-xl font-bold text-ink">Billing details</h2>
         </div>
         <p className="text-sm text-muted mb-5">
-          These appear on your tax invoice. We need your state before we can charge you the right GST.
+          {gstApplies
+            ? 'These appear on your tax invoice. We need your state before we can charge you the right GST.'
+            : 'These appear on your bill of supply. No GST is charged.'}
         </p>
 
         {details.incomplete && (
@@ -336,7 +353,12 @@ const BillingPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-                  State <span className="text-wrong font-medium normal-case">(required)</span>
+                  State{' '}
+                  {gstApplies ? (
+                    <span className="text-wrong font-medium normal-case">(required)</span>
+                  ) : (
+                    <span className="text-faint font-medium normal-case">(optional)</span>
+                  )}
                 </label>
                 <select
                   value={effectiveState}
@@ -430,7 +452,7 @@ const BillingPanel: React.FC = () => {
                 </p>
                 {isPaid && (
                   <p className="text-xs text-muted mb-3 tabular">
-                    {formatRupees(plan.priceWithGstPaise)} incl. 18% GST
+                    {gstApplies ? `${formatRupees(plan.priceWithGstPaise)} incl. 18% GST` : 'No GST charged'}
                   </p>
                 )}
 
@@ -474,6 +496,44 @@ const BillingPanel: React.FC = () => {
           Payments are handled by Razorpay. We never see your card or UPI details.
         </p>
       </div>
+
+      {/* ---- Receipts ------------------------------------------------------ */}
+      {invoices.length > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-accent-wash flex items-center justify-center text-accent">
+              <FileText className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-ink">Invoices</h2>
+          </div>
+          <p className="text-sm text-muted mb-5">
+            {gstApplies
+              ? 'GST tax invoices, numbered in sequence per financial year. Open one to print or save it.'
+              : 'Numbered in sequence per financial year. Open one to print or save it.'}
+          </p>
+
+          <ul className="divide-y divide-line-soft">
+            {invoices.map((invoice) => (
+              <li key={invoice.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 text-sm">
+                <Link
+                  to={`/invoice/${invoice.id}`}
+                  className="font-mono font-semibold text-accent tabular"
+                >
+                  {invoice.invoiceNumber}
+                </Link>
+                <span className="text-muted">{prettyDate(invoice.issuedAt)}</span>
+                {invoice.plan && <span className="text-muted">{invoice.plan}</span>}
+                <span className="ml-auto tabular font-medium text-ink">
+                  {formatRupees(invoice.totalPaise)}
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-accent">
+                  {invoice.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

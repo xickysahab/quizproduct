@@ -9,6 +9,9 @@ import {
   isValidStateCode,
   stateNameFor,
   selectableStates,
+  treatmentFor,
+  documentTypeFor,
+  placeOfSupplyRequired,
   GST_RATE,
 } from '../utils/gst';
 import { verifyStripeSignature, verifyRazorpaySignature, safeEquals } from '../utils/webhookSignature';
@@ -198,5 +201,52 @@ describe('GST state codes', () => {
     const code = stateCodeFromGstin(gstin);
     expect(code).toBe('27');
     expect(isValidStateCode(code!)).toBe(true);
+  });
+});
+
+describe('how a sale is taxed and what document it produces', () => {
+  const REGISTERED = '27AAPFU0939F1ZV';
+
+  it('charges GST when a registered supplier sells to an Indian buyer', () => {
+    expect(treatmentFor({ sellerGstin: REGISTERED, buyerCountry: 'IN' })).toBe('GST');
+  });
+
+  it('zero-rates a registered supplier selling abroad', () => {
+    expect(treatmentFor({ sellerGstin: REGISTERED, buyerCountry: 'US' })).toBe('EXPORT');
+  });
+
+  it('charges nothing when the supplier is not registered, wherever the buyer is', () => {
+    // Registration is the first branch, before the buyer is considered at all.
+    expect(treatmentFor({ sellerGstin: null, buyerCountry: 'IN' })).toBe('UNREGISTERED');
+    expect(treatmentFor({ sellerGstin: undefined, buyerCountry: 'US' })).toBe('UNREGISTERED');
+    expect(treatmentFor({ sellerGstin: 'not-a-gstin', buyerCountry: 'IN' })).toBe('UNREGISTERED');
+  });
+
+  it('calls the document what it legally is', () => {
+    expect(documentTypeFor('GST')).toBe('TAX_INVOICE');
+    expect(documentTypeFor('EXPORT')).toBe('TAX_INVOICE');
+    expect(documentTypeFor('UNREGISTERED')).toBe('BILL_OF_SUPPLY');
+  });
+
+  it('adds no tax at all for an unregistered supplier', () => {
+    const tax = computeGst(149_900, '27', '27', 'UNREGISTERED');
+    expect(tax.totalPaise).toBe(149_900);
+    expect(tax.cgstPaise + tax.sgstPaise + tax.igstPaise).toBe(0);
+    // Not an export — that is zero-rated GST, this is no GST. The document
+    // has to be able to tell the two apart.
+    expect(tax.isExport).toBe(false);
+    expect(tax.isUnregistered).toBe(true);
+  });
+
+  it('still charges an Indian buyer once the supplier registers', () => {
+    const tax = computeGst(149_900, '27', '27', 'GST');
+    expect(tax.totalPaise).toBe(176_882);
+    expect(tax.isUnregistered).toBeUndefined();
+  });
+
+  it('only demands a place of supply when it changes the tax', () => {
+    expect(placeOfSupplyRequired('GST')).toBe(true);
+    expect(placeOfSupplyRequired('EXPORT')).toBe(false);
+    expect(placeOfSupplyRequired('UNREGISTERED')).toBe(false);
   });
 });

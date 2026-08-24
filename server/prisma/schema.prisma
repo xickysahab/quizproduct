@@ -264,6 +264,11 @@ model Invoice {
   /// Buyer's state code, which decides CGST+SGST versus IGST.
   placeOfSupply  String?
   hsnSac         String       @default("998434")
+  /// TAX_INVOICE when the supplier is GST-registered, BILL_OF_SUPPLY when not.
+  /// Recorded per document rather than derived from config, because config
+  /// changes the day registration comes through and must not retroactively
+  /// relabel documents already issued and filed.
+  documentType   String       @default("TAX_INVOICE")
   status         String       @default("PAID")
   provider       String?
   providerRef    String?
