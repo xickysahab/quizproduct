@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award, LogOut, QrCode, X, Eye, MessageSquare, Monitor, Trophy, ListOrdered } from 'lucide-react';
+import { Play, Square, ChevronRight, ChevronLeft, BarChart3, Award, LogOut, QrCode, Eye, MessageSquare, Monitor, Trophy, ListOrdered } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Logo from '../components/Logo';
 import { socket, connectSocket } from '../socket/socket';
@@ -14,9 +13,9 @@ import Countdown from '../components/Countdown';
 import ShareRoom from '../components/ShareRoom';
 import OptionTile from '../components/OptionTile';
 import RoomPin from '../components/RoomPin';
-import LivePodium from '../components/LivePodium';
 import type { EventDetail, EventSummary, LeaderboardRow, QuestionTally } from '../types/analytics';
-import { themeFor } from '../utils/sessionTheme';
+import { themeFor, themeLabel } from '../utils/sessionTheme';
+import { formatRoomCode } from '../utils/roomCode';
 
 const HostLive: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,13 +40,6 @@ const HostLive: React.FC = () => {
   const [scoreboardOpen, setScoreboardOpen] = useState(false);
   const [podiumOpen, setPodiumOpen] = useState(false);
 
-  // The conclude config's colours still theme the charts. Its option *labels*
-  // no longer label anything — results are labelled from each question's own
-  // options — so a mismatched palette is simply ignored rather than applied to
-  // the wrong number of bars.
-  const brandPalette = event?.concludeConfig?.options?.length
-    ? event.concludeConfig.options.map((option) => option.themeColor)
-    : undefined;
 
   // Socket handlers are registered once, so they read the live question through
   // a ref rather than closing over a stale render's state.
@@ -75,6 +67,19 @@ const HostLive: React.FC = () => {
           (q: { id: string }) => q.id === loaded.currentQuestionId
         );
         if (resumeIndex >= 0) setCurrentQuestionIndex(resumeIndex);
+
+        // Hydrate the live state too, not just which question is up. The
+        // cockpit is often reopened mid-session — on a refresh, or on a second
+        // laptop — and until now that showed no timer and zero answers until
+        // the next socket event happened to arrive.
+        setQuestionStartedAt(loaded.currentQuestionStartedAt ?? null);
+
+        if (loaded.currentQuestionId) {
+          api
+            .get(`/analytics/questions/${loaded.currentQuestionId}`)
+            .then((tally) => setResponsesCount(tally.data.totalResponses ?? 0))
+            .catch(() => undefined);
+        }
       }
 
       // Connect socket with auth token so the server can authorize host actions
@@ -250,397 +255,375 @@ const HostLive: React.FC = () => {
 
   if (loading) {
     return (
-      <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex items-center justify-center font-heading text-lg">
-        Opening the live stage…
+      <div data-mode={themeMode} className="min-h-screen bg-paper grid place-items-center">
+        <span className="eyebrow">Opening the cockpit…</span>
       </div>
     );
   }
 
   if (!event || !event.questions || event.questions.length === 0) {
     return (
-      <div data-mode={themeMode} className="min-h-screen bg-gray-50 text-gray-900 flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <p className="font-heading text-2xl">No questions configured for this event.</p>
-        <button
-          onClick={() => navigate(`/events/${id}`)}
-          className="px-6 py-3 rounded-2xl gradient-btn text-white font-medium shadow-sm"
-        >
-          Add Questions First
-        </button>
+      <div data-mode={themeMode} className="min-h-screen bg-paper grid place-items-center p-6">
+        <div className="card p-8 text-center max-w-sm">
+          <p className="font-heading text-xl font-semibold mb-2">Nothing to run yet</p>
+          <p className="text-sm text-muted mb-6">
+            This session has no questions. Add a few and come back.
+          </p>
+          <button
+            onClick={() => navigate(`/events/${id}`)}
+            className="btn-primary w-full py-3 rounded-xl"
+          >
+            Add questions
+          </button>
+        </div>
       </div>
     );
   }
 
   const activeQuestion = currentQuestionIndex >= 0 ? event.questions[currentQuestionIndex] : null;
   const isFinished = currentQuestionIndex >= event.questions.length - 1;
+  const total = event.questions.length;
+  const scored = event.scoringEnabled !== false;
+  const answeredPct =
+    participantCount > 0 ? Math.min(100, Math.round((responsesCount / participantCount) * 100)) : 0;
+  const nextQuestion =
+    currentQuestionIndex + 1 < total ? event.questions[currentQuestionIndex + 1] : null;
 
+  /* ---------------------------------------------------------------------
+     The cockpit.
 
+     Deliberately not a second projector: the big screen is already showing the
+     room what it needs, and duplicating it here wastes the one surface where
+     the host can see what the audience cannot. So this is dense on purpose —
+     what is on screen now, what is coming next, how many have answered, and
+     what needs reviewing — with the controls pinned to the bottom where a hand
+     already is.
+  --------------------------------------------------------------------- */
   return (
-    <div data-mode={themeMode} className="min-h-screen flex flex-col bg-live-stage text-white font-sans relative">
-      {/* Header Bar */}
-      <header className="bg-black/25 px-6 md:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-white/10 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <Logo size={36} />
-          <div>
-            <h1 className="font-heading text-xl font-bold text-white">{event.title}</h1>
-            <div className="flex items-center gap-3 text-xs text-white/55">
-              <span className="flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{participantCount} Joined</span>
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>Live Broadcast</span>
-              </span>
-              <span>•</span>
-              <span
-                className={`px-2 py-0.5 rounded-full font-semibold ${
-                  event.sessionMode === 'SURVEY'
-                    ? 'bg-teal-400/15 text-teal-200 border border-teal-400/30'
-                    : 'bg-indigo-400/15 text-accent-lift border border-indigo-400/30'
-                }`}
-              >
-                {event.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'}
-              </span>
+    <div data-mode={themeMode} className="min-h-screen bg-paper flex flex-col">
+
+      {/* ---- top rail ---- */}
+      <header className="border-b border-line bg-surface/95 backdrop-blur-sm sticky top-0 z-30">
+        <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-3 flex items-center gap-5 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Logo size={30} />
+            <div className="min-w-0">
+              <h1 className="font-heading text-base font-semibold truncate">{event.title}</h1>
+              <p className="text-xs text-muted flex items-center gap-1.5">
+                <span className="live-dot inline-block w-1.5 h-1.5 rounded-full bg-accent" />
+                Live
+                <span className="text-faint">· {themeLabel(themeMode)}</span>
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <Stat label="In the room" value={participantCount} />
+            {activeQuestion && <Stat label="Answered" value={responsesCount} accent />}
+
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-[0.15em] text-faint">Code</p>
+              <p className="code-display text-lg text-accent">{formatRoomCode(event.roomCode)}</p>
+            </div>
+
+            <button
+              onClick={() => window.open(`/host/display/${id}`, '_blank', 'noopener')}
+              title="Open a projector-friendly audience screen"
+              className="btn-quiet px-3 py-2 rounded-lg text-xs flex items-center gap-1.5"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Big screen</span>
+            </button>
           </div>
         </div>
 
-        {/* PIN Badge */}
-        <div className="text-right flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => window.open(`/host/display/${id}`, '_blank', 'noopener,noreferrer')}
-            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all flex items-center gap-2 border border-white/15"
-            title="Open a projector-friendly audience screen"
-          >
-            <Monitor className="w-3.5 h-3.5" />
-            Audience screen
-          </button>
-          <RoomPin code={event.roomCode} tone="dark" />
+        {/* One thin line of progress across the whole session. */}
+        <div className="h-0.5 bg-line">
+          <div
+            className="h-full bg-accent transition-[width] duration-500 ease-out"
+            style={{ width: `${total ? ((currentQuestionIndex + 1) / total) * 100 : 0}%` }}
+          />
         </div>
       </header>
 
-      {/* Stage Main View */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 text-center w-full flex items-center justify-center">
-        <div className="max-w-4xl mx-auto w-full h-full flex items-center justify-center">
-          {showFinalSummary && summaryData ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-left w-full"
-            >
-              <div className="w-full space-y-6">
-                <div className="flex flex-col md:flex-row items-center justify-between bg-white p-6 rounded-3xl border border-gray-200 shadow-sm hover-card gap-4">
-                  <div>
-                    <h3 className="font-heading text-2xl md:text-3xl font-bold text-gray-900">
-                      {summaryData.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-0.5">Final results</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-500">
-                      Participants
-                    </span>
-                    <span className="text-lg font-bold text-accent bg-accent-wash px-4 py-1.5 rounded-full border border-accent-soft tabular-nums">
-                      {summaryData.totalParticipants}
-                    </span>
-                  </div>
-                </div>
+      {/* ---- body ---- */}
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-5 lg:px-8 py-6 pb-28">
+        {showFinalSummary && summaryData ? (
+          <FinalSummary summary={summaryData} scored={scored} />
+        ) : currentQuestionIndex === -1 ? (
+          /* ---- lobby ---- */
+          <div className="max-w-3xl mx-auto text-center pt-10 animate-rise">
+            <p className="eyebrow mb-3">Waiting to start</p>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold mb-3">
+              {participantCount === 0
+                ? 'Nobody has joined yet'
+                : `${participantCount} ${participantCount === 1 ? 'person is' : 'people are'} in`}
+            </h2>
+            <p className="text-muted mb-8">
+              Put the big screen up so the room can see the code, then start when you are ready.
+            </p>
 
-                {/* Pooled view, shown only when every question shares one scale.
-                    The server returns null otherwise — averaging unlike questions
-                    produced a chart with borrowed labels and no meaning. */}
-                {summaryData.collective && (
-                  <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm">
-                    <h4 className="font-heading text-xl font-bold text-gray-900 mb-1">
-                      Across all questions
-                    </h4>
-                    <p className="text-xs text-gray-500 mb-5">
-                      Every question uses the same scale, so responses are pooled.
-                    </p>
-                    <QuestionResults
-                      compact
-                      tally={{
-                        id: 'collective',
-                        text: 'Across all questions',
-                        type: 'MCQ',
-                        options: summaryData.collective.optionsText,
-                        totalResponses: summaryData.collective.totalResponses,
-                        optionCounts: summaryData.collective.optionCounts,
-                        percentages: summaryData.collective.percentages,
-                        textAnswers: [],
-                        words: [],
-                        ranking: [],
-                      }}
-                      palette={brandPalette}
+            <div className="card p-6 inline-block mb-8">
+              <RoomPin code={event.roomCode} />
+              <div className="mt-5 flex flex-col items-center gap-4">
+                <ShareRoom roomCode={event.roomCode} title={event.title} />
+                <button
+                  onClick={() => setShowQR((v) => !v)}
+                  className="text-xs font-semibold text-accent hover:underline flex items-center gap-1.5"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  {showQR ? 'Hide QR code' : 'Show QR code'}
+                </button>
+                {showQR && (
+                  <div className="p-3 bg-white rounded-xl border border-line animate-rise">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/?code=${event.roomCode}`}
+                      size={140}
+                      fgColor="#14100E"
+                      level="M"
                     />
                   </div>
                 )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {summaryData.questions.map((tally, index) => (
-                    <div
-                      key={tally.id}
-                      className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm"
-                    >
-                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
-                        Question {index + 1}
-                      </span>
-                      <div className="mt-2">
-                        <QuestionResults
-                          tally={tally}
-                          palette={brandPalette}
-                          revealCorrect={event.sessionMode !== 'SURVEY'}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </motion.div>
-          ) : currentQuestionIndex === -1 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="space-y-8 text-center"
-            >
-              <div className="space-y-6">
-                <span className="text-xs font-bold uppercase tracking-[0.3em] text-accent-lift">
-                  Lobby
-                </span>
-                <h2 className="font-heading text-4xl md:text-6xl font-bold text-white">
-                  {participantCount === 0 ? 'Waiting for the room…' : `${participantCount} in the room`}
-                </h2>
+            </div>
 
-                <RoomPin code={event.roomCode} size="hero" tone="dark" />
-                
-                {!showQR ? (
-                  <div className="flex flex-col items-center gap-4 mt-2">
-                    <p className="text-base text-white/55 max-w-lg mx-auto">
-                      Show this PIN on the projector — people join from any phone, no app.
-                    </p>
-                    <div className="pt-1">
-                      <ShareRoom roomCode={event.roomCode} title={event.title} />
-                    </div>
-                    <button
-                      onClick={() => setShowQR(true)}
-                      className="text-sm font-semibold text-white flex items-center gap-2 hover:bg-white/15 transition-colors bg-white/10 px-4 py-2 rounded-full border border-white/15"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      Show QR Code
-                    </button>
-                  </div>
-                ) : (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center gap-4 mt-2 bg-white text-slate-950 p-6 rounded-3xl max-w-xs mx-auto relative"
-                  >
-                    <button
-                      onClick={() => setShowQR(false)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    <span className="text-xs font-bold uppercase tracking-widest text-accent">Scan to Join</span>
-                    <div className="p-4 bg-gray-50 rounded-xl">
-                      <QRCodeSVG 
-                        value={`${window.location.origin}/?code=${event.roomCode}`} 
-                        size={180}
-                        fgColor="#111827"
-                        level="H"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-
-              <div className="pt-4">
-                <button
-                  onClick={handleNextQuestion}
-                  className="px-10 py-5 rounded-2xl gradient-btn text-white font-heading text-2xl font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-1 inline-flex items-center gap-3"
-                >
-                  <Play className="w-6 h-6 fill-current text-white" />
-                  <span>{event.sessionMode === 'SURVEY' ? 'Begin survey' : 'Begin quiz'}</span>
-                </button>
-              </div>
-            </motion.div>
-          ) : activeQuestion ? (
-            <motion.div
-              key={currentQuestionIndex}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-8 text-left"
-            >
-              {/* Question Index & Live Response Count */}
-              <div className="flex items-center justify-between pb-2">
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-accent-lift">
-                  Question {currentQuestionIndex + 1} of {event.questions.length}
-                </span>
-
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/10 text-xs font-medium text-white/80">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>
-                    {responsesCount} / {participantCount} answers
-                  </span>
-                </div>
-              </div>
-
-              <h2 className="font-heading text-4xl md:text-5xl font-bold text-white leading-tight">
-                {activeQuestion.text}
-              </h2>
-
-              {activeQuestion.timeLimit ? (
-                <div className="max-w-sm">
-                  <Countdown startedAt={questionStartedAt} timeLimit={activeQuestion.timeLimit} tone="dark" />
-                </div>
-              ) : null}
-
-              <div className={liveResults ? 'bg-white text-slate-900 rounded-3xl p-5' : ''}>
-                {liveResults ? (
-                  <QuestionResults
-                    tally={liveResults}
-                    palette={brandPalette}
-                    revealCorrect={revealed && event.sessionMode !== 'SURVEY'}
-                    compact
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(activeQuestion.options || []).map((opt: string, idx: number) => (
-                      <OptionTile key={idx} index={idx} label={opt} size="stage" />
-                    ))}
-                    {(activeQuestion.options || []).length === 0 && (
-                      <p className="text-sm text-white/50">Waiting for the first response…</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {showQa && id && <QaModerationPanel eventId={id} />}
-              {event.sessionMode !== 'SURVEY' && leaderboard.length > 0 && (
-                <div className="bg-white/8 border border-white/10 rounded-2xl p-5 text-left">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-white/50 mb-3">Live leaderboard</h3>
-                  <LivePodium rows={leaderboard} tone="dark" size={podiumOpen ? 'stage' : 'mini'} />
-                </div>
-              )}
-            </motion.div>
-          ) : null}
-        </div>
-      </main>
-
-      {/* Control Footer */}
-      <footer className="bg-black/30 px-6 md:px-8 py-5 flex justify-between items-center border-t border-white/10 backdrop-blur-md">
-        <button
-          onClick={handleEndQuiz}
-          className="px-5 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 text-xs font-semibold transition-all flex items-center gap-2 border border-rose-400/20"
-        >
-          <Square className="w-3.5 h-3.5 fill-current" />
-          <span>{showFinalSummary ? 'Exit cockpit' : event.sessionMode === 'SURVEY' ? 'End survey' : 'End quiz'}</span>
-        </button>
-
-        {!showFinalSummary && (
-          <button
-            onClick={() => setShowQa((v) => !v)}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
-              showQa
-                ? 'bg-white text-slate-950 border-white'
-                : 'bg-white/8 hover:bg-white/12 border-white/15 text-white/80'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Questions</span>
-            {qaPending > 0 && (
-              <span className="px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 text-[10px] tabular-nums">
-                {qaPending}
-              </span>
-            )}
-          </button>
-        )}
-
-        {!showFinalSummary && currentQuestionIndex !== -1 && (
-          <div className="flex items-center gap-3">
-            {event.sessionMode !== 'SURVEY' && (
-              <button
-                onClick={handleShowPodium}
-                title="Put the leaderboard on phones and the audience screen"
-                className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 text-xs font-semibold transition-all flex items-center gap-1.5"
-              >
-                <Trophy className="w-3.5 h-3.5" />
-                <span>Show podium</span>
-              </button>
-            )}
-
-            {event.scoringEnabled !== false && (
-              <button
-                onClick={toggleScoreboard}
-                title="Put the standings on the big screen"
-                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                  scoreboardOpen
-                    ? 'bg-accent border-accent text-white'
-                    : 'btn-quiet'
-                }`}
-              >
-                <ListOrdered className="w-3.5 h-3.5" />
-                <span>{scoreboardOpen ? 'Hide standings' : 'Standings'}</span>
-              </button>
-            )}
-
-            <button
-              onClick={handleRevealResults}
-              disabled={revealed}
-              title="Show the distribution to everyone in the room"
-              className="px-5 py-2.5 rounded-xl bg-white/8 hover:bg-white/12 border border-white/15 text-white/80 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>{revealed ? 'Results shown' : 'Show results'}</span>
-            </button>
-
-            <button
-              onClick={handlePrevQuestion}
-              disabled={currentQuestionIndex === 0}
-              className="px-5 py-2.5 rounded-xl bg-white/8 hover:bg-white/12 border border-white/15 text-white/80 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Previous</span>
-            </button>
-
-            {isFinished ? (
-              <button
-                onClick={handleFinishAndViewSummary}
-                className="px-7 py-3 rounded-2xl gradient-btn text-white font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
-              >
-              <span>Conclude & Show Results</span>
-              <BarChart3 className="w-4 h-4" />
-              </button>
-            ) : (
+            <div>
               <button
                 onClick={handleNextQuestion}
-                className="px-7 py-3 rounded-2xl gradient-btn text-white hover:opacity-90 font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                className="btn-primary px-8 py-4 rounded-2xl text-base inline-flex items-center gap-2.5"
               >
-              <span>Next Question</span>
-              <ChevronRight className="w-4 h-4" />
+                <Play className="w-4 h-4 fill-current" />
+                <span>Start · {total} question{total === 1 ? '' : 's'}</span>
+              </button>
+            </div>
+          </div>
+        ) : activeQuestion ? (
+          /* ---- running ---- */
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+            <div className="space-y-5">
+              <div className="card card-live p-6 animate-cut-in" key={activeQuestion.id}>
+                <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+                  <span className="eyebrow">
+                    On screen now · {currentQuestionIndex + 1} of {total}
+                  </span>
+                  {activeQuestion.timeLimit && questionStartedAt && (
+                    <div className="w-40">
+                      <Countdown
+                        startedAt={questionStartedAt}
+                        timeLimit={activeQuestion.timeLimit}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <h2 className="font-heading text-2xl md:text-3xl font-bold leading-snug mb-5">
+                  {activeQuestion.text}
+                </h2>
+
+                {/* The host sees the answer key. The room does not, until a
+                    reveal — that boundary is enforced on the server. */}
+                {liveResults ? (
+                  <QuestionResults tally={liveResults} revealCorrect={scored} compact />
+                ) : activeQuestion.options?.length ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {activeQuestion.options.map((option, index) => (
+                      <OptionTile
+                        key={index}
+                        index={index}
+                        label={option}
+                        as="div"
+                        selected={scored && isKeyed(activeQuestion, index)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">Open response — answers appear as they land.</p>
+                )}
+
+                <div className="mt-5 pt-4 border-t border-line-soft flex items-center gap-3">
+                  <span className="font-mono text-sm tabular text-ink">
+                    {responsesCount}
+                    <span className="text-faint"> / {participantCount}</span>
+                  </span>
+                  <div className="flex-1 h-1.5 rounded-full bg-sunken overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
+                      style={{ width: `${answeredPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-faint whitespace-nowrap">answered</span>
+                </div>
+              </div>
+
+              {/* What the host is about to put up. Reading it before pressing
+                  Next is the difference between a smooth room and a stumble. */}
+              {nextQuestion && (
+                <div className="card p-4 opacity-70 hover:opacity-100 transition-opacity">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-faint mb-1">
+                    Up next · {currentQuestionIndex + 2} of {total}
+                  </p>
+                  <p className="text-sm text-ink-soft leading-snug">{nextQuestion.text}</p>
+                </div>
+              )}
+            </div>
+
+            {/* ---- side rail ---- */}
+            <aside className="space-y-4 lg:sticky lg:top-24">
+              {scored && leaderboard.length > 0 && (
+                <div className="card p-4">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-faint mb-3">
+                    Leading
+                  </p>
+                  <ol className="space-y-1.5">
+                    {leaderboard.slice(0, 5).map((row) => (
+                      <li key={row.participantId} className="flex items-center gap-2.5 text-sm">
+                        <span className="font-mono text-xs tabular text-faint w-4">{row.rank}</span>
+                        <span className="flex-1 truncate">{row.name || 'Anonymous'}</span>
+                        <span className="font-mono tabular text-accent">{row.score}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {showQa && id ? (
+                <QaModerationPanel eventId={id} />
+              ) : (
+                event.qaEnabled !== false && (
+                  <button
+                    onClick={() => setShowQa(true)}
+                    className="card p-4 w-full text-left hover-card"
+                  >
+                    <span className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">Audience questions</span>
+                      {qaPending > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-[color:var(--color-caution-wash)] text-[color:var(--color-caution)] text-[11px] font-bold tabular">
+                          {qaPending} to review
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-xs text-muted mt-1">
+                      {qaPending > 0 ? 'Somebody is waiting on you.' : 'Open the queue'}
+                    </span>
+                  </button>
+                )
+              )}
+            </aside>
+          </div>
+        ) : null}
+      </main>
+
+      {/* ---- control bar ----
+          Pinned, because during a live session the host's hand is already here
+          and hunting for a button mid-room is how a session stumbles. */}
+      {!showFinalSummary && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface/95 backdrop-blur-sm">
+          <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-3 flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleEndQuiz}
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold border border-[color:var(--color-wrong)]/25 bg-[color:var(--color-wrong-wash)] text-[color:var(--color-wrong)] flex items-center gap-1.5"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span className="hidden sm:inline">End session</span>
+            </button>
+
+            {event.qaEnabled !== false && (
+              <button
+                onClick={() => setShowQa((v) => !v)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
+                  showQa ? 'bg-accent border-accent text-white' : 'btn-quiet'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Questions</span>
+                {qaPending > 0 && (
+                  <span className="px-1.5 rounded bg-[color:var(--color-caution)] text-white text-[10px] tabular">
+                    {qaPending}
+                  </span>
+                )}
               </button>
             )}
+
+            <div className="flex-1" />
+
+            {currentQuestionIndex !== -1 && (
+              <>
+                {scored && (
+                  <button
+                    onClick={toggleScoreboard}
+                    title="Put the standings on the big screen"
+                    className={`px-4 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 ${
+                      scoreboardOpen ? 'bg-accent border-accent text-white' : 'btn-quiet'
+                    }`}
+                  >
+                    <ListOrdered className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">
+                      {scoreboardOpen ? 'Hide standings' : 'Standings'}
+                    </span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleRevealResults}
+                  disabled={revealed}
+                  title="Show the distribution to everyone in the room"
+                  className="btn-quiet px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">{revealed ? 'Results shown' : 'Show results'}</span>
+                </button>
+
+                <button
+                  onClick={handlePrevQuestion}
+                  disabled={currentQuestionIndex === 0}
+                  className="btn-quiet px-3 py-2.5 rounded-xl text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden lg:inline">Back</span>
+                </button>
+
+                {isFinished ? (
+                  <>
+                    {scored && event.podiumAtEnd !== false && (
+                      <button
+                        onClick={handleShowPodium}
+                        disabled={podiumOpen}
+                        className="btn-quiet px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-40"
+                      >
+                        <Trophy className="w-3.5 h-3.5" />
+                        <span className="hidden md:inline">Podium</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={handleFinishAndViewSummary}
+                      className="btn-primary px-6 py-2.5 rounded-xl text-sm flex items-center gap-2"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Finish</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleNextQuestion}
+                    className="btn-primary px-6 py-2.5 rounded-xl text-sm flex items-center gap-2"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </>
+            )}
           </div>
-        )}
-      </footer>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={confirmModal.isOpen}
-        title={
-          confirmModal.action === 'conclude'
-            ? event.sessionMode === 'SURVEY'
-              ? 'Conclude Survey'
-              : 'Conclude Quiz'
-            : 'Exit Broadcast'
-        }
+        title={confirmModal.action === 'conclude' ? 'Finish the session?' : 'Leave the cockpit?'}
         message={
           confirmModal.action === 'conclude'
-            ? event.sessionMode === 'SURVEY'
-              ? 'End the survey and show the response summary to the room?'
-              : 'Are you sure you want to conclude the live quiz and display final analytics?'
-            : 'Are you sure you want to exit the broadcast?'
+            ? 'The room stops here and everyone sees the final results.'
+            : 'The session ends for everyone in the room.'
         }
         icon={confirmModal.action === 'conclude' ? <Award className="w-7 h-7" /> : <LogOut className="w-7 h-7" />}
         onConfirm={() => {
@@ -653,5 +636,44 @@ const HostLive: React.FC = () => {
     </div>
   );
 };
+
+/** Does this option carry the answer key? Host-only — never sent to the room. */
+const isKeyed = (question: { correctOption?: number | null; correctOptions?: number[] }, index: number): boolean => {
+  if (question.correctOptions?.length) return question.correctOptions.includes(index);
+  return question.correctOption === index;
+};
+
+const Stat: React.FC<{ label: string; value: number; accent?: boolean }> = ({ label, value, accent }) => (
+  <div className="text-right hidden sm:block">
+    <p className="text-[10px] uppercase tracking-[0.15em] text-faint">{label}</p>
+    <p className={`font-mono text-lg tabular ${accent ? 'text-accent' : 'text-ink'}`}>{value}</p>
+  </div>
+);
+
+const FinalSummary: React.FC<{ summary: EventSummary; scored: boolean }> = ({ summary, scored }) => (
+  <div className="animate-rise">
+    <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
+      <div>
+        <p className="eyebrow mb-1">Session complete</p>
+        <h2 className="font-heading text-3xl font-bold">{summary.title}</h2>
+      </div>
+      <p className="text-sm text-muted">
+        <span className="font-mono text-2xl tabular text-ink">{summary.totalParticipants}</span>{' '}
+        took part
+      </p>
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {summary.questions.map((tally, index) => (
+        <div key={tally.id} className="card p-5">
+          <p className="text-[10px] uppercase tracking-[0.15em] text-faint mb-2">
+            Question {index + 1}
+          </p>
+          <QuestionResults tally={tally} revealCorrect={scored} />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default HostLive;

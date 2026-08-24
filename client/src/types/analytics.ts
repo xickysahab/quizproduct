@@ -102,6 +102,8 @@ export interface EventDetail {
   autoAdvance?: boolean;
   phoneShowsQuestion?: boolean;
   soundEnabled?: boolean;
+  qaEnabled?: boolean;
+  qaModerated?: boolean;
   questions: HostQuestion[];
   _count?: { participants?: number; questions?: number };
 }
