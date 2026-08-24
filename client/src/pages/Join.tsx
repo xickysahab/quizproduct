@@ -90,6 +90,12 @@ const Join: React.FC = () => {
       localStorage.setItem('eventId', response.data.event.id);
       localStorage.setItem('participantToken', response.data.participantToken);
       localStorage.setItem('qaEnabled', String(response.data.event.qaEnabled !== false));
+      // The phone hides the question in Game-shaped sessions so the room looks
+      // up at the shared screen instead of down at six phones.
+      localStorage.setItem(
+        'phoneShowsQuestion',
+        String(response.data.event.phoneShowsQuestion !== false)
+      );
       localStorage.setItem(
         'sessionMode',
         response.data.event.sessionMode === 'SURVEY' ? 'SURVEY' : 'QUIZ'
@@ -122,7 +128,7 @@ const Join: React.FC = () => {
       <Navbar />
 
       <main className="flex-1 flex flex-col">
-        <section className="relative flex-1 flex items-center justify-center px-5 pt-28 pb-16 bg-ambient-glow">
+        <section className="relative flex-1 flex flex-col justify-start md:justify-center items-center px-5 pt-32 md:pt-28 pb-16 bg-ambient-glow">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}

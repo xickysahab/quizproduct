@@ -78,6 +78,8 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         organizationId: true,
         allowAnonymous: true,
         qaEnabled: true,
+        phoneShowsQuestion: true,
+        scoringEnabled: true,
         sessionMode: true,
         roomCodeRetiredAt: true,
         passcodeHash: true,
@@ -141,6 +143,10 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
             isLive: event.isLive,
             currentQuestionId: event.currentQuestionId,
             qaEnabled: event.qaEnabled,
+            // When false the phone shows only the answer tiles, so attention goes
+            // to the shared screen rather than down at six phones.
+            phoneShowsQuestion: event.phoneShowsQuestion,
+            scoringEnabled: event.scoringEnabled,
             sessionMode: event.sessionMode,
           },
           branding: event.organization
@@ -185,6 +191,10 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         isLive: event.isLive,
         currentQuestionId: event.currentQuestionId,
         qaEnabled: event.qaEnabled,
+        // When false the phone shows only the answer tiles, so attention goes
+        // to the shared screen rather than down at six phones.
+        phoneShowsQuestion: event.phoneShowsQuestion,
+        scoringEnabled: event.scoringEnabled,
         sessionMode: event.sessionMode,
       },
       branding: event.organization
