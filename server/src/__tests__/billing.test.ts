@@ -6,6 +6,9 @@ import {
   stateCodeFromGstin,
   financialYear,
   formatInvoiceNumber,
+  isValidStateCode,
+  stateNameFor,
+  selectableStates,
   GST_RATE,
 } from '../utils/gst';
 import { verifyStripeSignature, verifyRazorpaySignature, safeEquals } from '../utils/webhookSignature';
@@ -150,5 +153,50 @@ describe('constant-time comparison', () => {
   it('handles different lengths without throwing', () => {
     // timingSafeEqual throws on length mismatch, so this must be guarded.
     expect(safeEquals('short', 'much longer string')).toBe(false);
+  });
+});
+
+describe('GST state codes', () => {
+  it('accepts a real state code', () => {
+    expect(isValidStateCode('27')).toBe(true);
+    expect(isValidStateCode('07')).toBe(true);
+  });
+
+  it('rejects codes the old [0-3][0-9] pattern let through', () => {
+    // "00" and "39" are not states, and a place of supply that is not a state
+    // makes the invoice unfilable.
+    expect(isValidStateCode('00')).toBe(false);
+    expect(isValidStateCode('39')).toBe(false);
+  });
+
+  it('rejects anything that is not two digits', () => {
+    expect(isValidStateCode('')).toBe(false);
+    expect(isValidStateCode('MH')).toBe(false);
+    expect(isValidStateCode('270')).toBe(false);
+  });
+
+  it('names a state for the invoice', () => {
+    expect(stateNameFor('27')).toBe('Maharashtra');
+    expect(stateNameFor('33')).toBe('Tamil Nadu');
+    expect(stateNameFor(null)).toBeNull();
+    expect(stateNameFor('99')).toBeNull();
+  });
+
+  it('keeps merged and split states out of the picker but still valid', () => {
+    // 25 merged into 26 in 2020; 28 was split in 2014. Historic GSTINs
+    // carrying them must still validate.
+    expect(isValidStateCode('25')).toBe(true);
+    expect(isValidStateCode('28')).toBe(true);
+    const selectable = selectableStates().map((state) => state.code);
+    expect(selectable).not.toContain('25');
+    expect(selectable).not.toContain('28');
+    expect(selectable).toContain('27');
+  });
+
+  it('agrees with the state a GSTIN encodes', () => {
+    const gstin = '27AAPFU0939F1ZV';
+    const code = stateCodeFromGstin(gstin);
+    expect(code).toBe('27');
+    expect(isValidStateCode(code!)).toBe(true);
   });
 });

@@ -4,13 +4,17 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { env } from '../config/env';
 import { slog } from '../utils/slog';
 import { PlanName, PLAN_LIMITS } from '../utils/plans';
-import { createOrder, fetchPayment, isRazorpayConfigured } from '../utils/razorpay';
+import { createOrder, fetchOrder, fetchPayment, isRazorpayConfigured } from '../utils/razorpay';
+import { nextPeriodEnd, resolvePlanState, SubscriptionRow } from '../utils/subscription';
 import {
   computeGst,
   formatInvoiceNumber,
   financialYear,
   isValidGstin,
+  isValidStateCode,
   stateCodeFromGstin,
+  stateNameFor,
+  selectableStates,
   SAC_CODE,
 } from '../utils/gst';
 import { verifyRazorpaySignature, verifyStripeSignature } from '../utils/webhookSignature';
@@ -43,6 +47,32 @@ const consumeWebhookEvent = async (
     slog('info', 'billing.webhook_duplicate', { provider, externalId, type });
     return false;
   }
+};
+
+interface BillingProfile {
+  billingCountry: string;
+  stateCode: string | null;
+  gstin?: string | null;
+}
+
+/**
+ * The place of supply GST should be computed against.
+ *
+ * Null means, and now only means, a genuine export of services. Previously a
+ * null state code carried both meanings — "outside India" and "we never
+ * asked" — and the second one silently took the first one's zero-rated
+ * treatment.
+ */
+const placeOfSupply = (profile: BillingProfile): string | null =>
+  profile.billingCountry === 'IN' ? profile.stateCode : null;
+
+/** An Indian buyer with no state on file cannot be invoiced correctly. */
+const missingTaxDetails = (profile: BillingProfile): boolean =>
+  profile.billingCountry === 'IN' && !profile.stateCode;
+
+/** The states a buyer may pick, for the billing form. */
+export const listStates = async (_req: Request, res: Response): Promise<void> => {
+  res.json({ states: selectableStates() });
 };
 
 export const listPlans = async (_req: Request, res: Response): Promise<void> => {
@@ -96,13 +126,33 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
 
     const organization = await prisma.organization.findUnique({
       where: { id: user.organizationId },
-      select: { id: true, name: true, gstin: true, stateCode: true },
+      select: {
+        id: true,
+        name: true,
+        gstin: true,
+        stateCode: true,
+        billingCountry: true,
+      },
     });
 
+    if (!organization) {
+      res.status(404).json({ message: 'Organization not found.' });
+      return;
+    }
+
+    // Stop rather than guess. Charging an Indian buyer without a place of
+    // supply produces an invoice that cannot be filed and a GST liability we
+    // never collected — a far worse outcome than one extra form.
+    if (missingTaxDetails(organization)) {
+      res.status(428).json({
+        message: 'Add your billing state before checking out, so the invoice carries the right GST.',
+        code: 'BILLING_DETAILS_REQUIRED',
+      });
+      return;
+    }
+
     const plan = PLAN_LIMITS[planName];
-    // The buyer's state decides CGST+SGST versus IGST; no state means an
-    // export of services, which is zero-rated.
-    const tax = computeGst(plan.pricePaise, organization?.stateCode ?? null);
+    const tax = computeGst(plan.pricePaise, placeOfSupply(organization));
 
     const order = await createOrder(tax.totalPaise, `qp_${Date.now()}`, {
       organizationId: user.organizationId,
@@ -117,7 +167,9 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
       currency: order.currency,
       plan: planName,
       tax,
-      organizationName: organization?.name,
+      placeOfSupply: organization.stateCode,
+      placeOfSupplyName: stateNameFor(organization.stateCode),
+      organizationName: organization.name,
       prefill: { email: user.email, name: user.name },
     });
   } catch (error) {
@@ -126,6 +178,15 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
   }
 };
 
+/**
+ * The buyer's tax identity. Everything on an invoice that is not the price.
+ *
+ * The ordering here matters and used to be wrong. A GSTIN carries its own
+ * state code in its first two digits, so when one is supplied it is
+ * authoritative — the previous version derived the state from the GSTIN and
+ * then let a `stateCode` field in the same request overwrite it, which is
+ * exactly the disagreement the derivation was there to prevent.
+ */
 export const updateTaxDetails = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
@@ -138,23 +199,51 @@ export const updateTaxDetails = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const { gstin, billingName, billingAddress, stateCode } = req.body || {};
+    const { gstin, billingName, billingAddress, stateCode, billingCountry } = req.body || {};
     const data: Record<string, string | null> = {};
 
-    if (gstin !== undefined) {
-      const value = typeof gstin === 'string' ? gstin.trim().toUpperCase() : '';
-      if (value && !isValidGstin(value)) {
-        res.status(400).json({ message: 'That does not look like a valid 15-character GSTIN.' });
+    let country: string | undefined;
+    if (billingCountry !== undefined) {
+      const value = typeof billingCountry === 'string' ? billingCountry.trim().toUpperCase() : '';
+      if (!/^[A-Z]{2}$/.test(value)) {
+        res.status(400).json({ message: 'Country must be a two-letter ISO code, such as IN.' });
         return;
       }
-      data.gstin = value || null;
-      // The state code lives inside the GSTIN, so derive it rather than asking
-      // twice and risking the two disagreeing on the invoice.
-      if (value) data.stateCode = stateCodeFromGstin(value);
+      country = value;
+      data.billingCountry = value;
     }
 
-    if (typeof stateCode === 'string' && /^[0-3][0-9]$/.test(stateCode.trim())) {
-      data.stateCode = stateCode.trim();
+    // Outside India there is no GST, so a state code and a GSTIN are
+    // meaningless. Clearing them keeps the invoice from claiming a place of
+    // supply the buyer does not have.
+    if (country && country !== 'IN') {
+      data.stateCode = null;
+      data.gstin = null;
+    } else {
+      let derivedFromGstin: string | null = null;
+
+      if (gstin !== undefined) {
+        const value = typeof gstin === 'string' ? gstin.trim().toUpperCase() : '';
+        if (value && !isValidGstin(value)) {
+          res.status(400).json({ message: 'That does not look like a valid 15-character GSTIN.' });
+          return;
+        }
+        data.gstin = value || null;
+        derivedFromGstin = value ? stateCodeFromGstin(value) : null;
+      }
+
+      if (derivedFromGstin) {
+        // The GSTIN wins. It is the registration the invoice will be filed
+        // against, so its state is the only one that can be right.
+        data.stateCode = derivedFromGstin;
+      } else if (typeof stateCode === 'string' && stateCode.trim()) {
+        const value = stateCode.trim();
+        if (!isValidStateCode(value)) {
+          res.status(400).json({ message: 'Choose a valid Indian state or union territory.' });
+          return;
+        }
+        data.stateCode = value;
+      }
     }
 
     if (typeof billingName === 'string') data.billingName = billingName.trim().slice(0, 120) || null;
@@ -168,10 +257,21 @@ export const updateTaxDetails = async (req: AuthRequest, res: Response): Promise
     const organization = await prisma.organization.update({
       where: { id: user.organizationId },
       data,
-      select: { gstin: true, stateCode: true, billingName: true, billingAddress: true },
+      select: {
+        gstin: true,
+        stateCode: true,
+        billingCountry: true,
+        billingName: true,
+        billingAddress: true,
+      },
     });
 
-    res.json({ message: 'Billing details updated.', organization });
+    res.json({
+      message: 'Billing details updated.',
+      organization: { ...organization, stateName: stateNameFor(organization.stateCode) },
+      /// True while checkout would still be refused.
+      incomplete: missingTaxDetails(organization),
+    });
   } catch (error) {
     slog('error', 'billing.tax_details_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
@@ -191,14 +291,18 @@ const issueInvoice = async (
   organizationId: string,
   plan: PlanName,
   provider: string,
-  providerRef: string
+  providerRef: string,
+  period?: { start: Date; end: Date }
 ) => {
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { gstin: true, stateCode: true },
+    select: { gstin: true, stateCode: true, billingCountry: true },
   });
 
-  const tax = computeGst(PLAN_LIMITS[plan].pricePaise, organization?.stateCode ?? null);
+  const tax = computeGst(
+    PLAN_LIMITS[plan].pricePaise,
+    organization ? placeOfSupply(organization) : null
+  );
 
   return prisma.invoice.create({
     data: {
@@ -213,6 +317,9 @@ const issueInvoice = async (
       placeOfSupply: organization?.stateCode ?? null,
       provider,
       providerRef,
+      plan,
+      periodStart: period?.start ?? null,
+      periodEnd: period?.end ?? null,
     },
   });
 };
@@ -242,8 +349,46 @@ export const listInvoices = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
-const setPlan = async (organizationId: string, plan: PlanName) => {
-  await prisma.organization.update({ where: { id: organizationId }, data: { plan } });
+/**
+ * Starts or extends a paid period.
+ *
+ * Returns the period so the invoice can name it. A renewal that arrives before
+ * the current period ends extends from the existing expiry rather than from
+ * today — see nextPeriodEnd — so paying early never costs the customer days.
+ */
+const activatePlan = async (
+  organizationId: string,
+  plan: PlanName,
+  months = 1
+): Promise<{ start: Date; end: Date }> => {
+  const now = new Date();
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { planExpiresAt: true },
+  });
+
+  const end = nextPeriodEnd(organization?.planExpiresAt ?? null, now, months);
+
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: {
+      plan,
+      planStatus: 'ACTIVE',
+      planStartedAt: now,
+      planExpiresAt: end,
+      planCancelledAt: null,
+    },
+  });
+
+  return { start: now, end };
+};
+
+/** Drops a workspace back to the free tier and records why. */
+const lapsePlan = async (organizationId: string) => {
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: { plan: 'FREE', planStatus: 'EXPIRED', planCancelledAt: new Date() },
+  });
 };
 
 export const razorpayWebhook = async (req: Request, res: Response): Promise<void> => {
@@ -295,9 +440,14 @@ export const razorpayWebhook = async (req: Request, res: Response): Promise<void
     const plan = (entity?.notes?.plan as PlanName) || 'PRO';
 
     if (organizationId && (event.event === 'payment.captured' || event.event === 'order.paid')) {
-      await setPlan(organizationId, plan);
-      await issueInvoice(organizationId, plan, 'razorpay', externalId);
-      slog('info', 'billing.plan_activated', { organizationId, plan, provider: 'razorpay' });
+      const period = await activatePlan(organizationId, plan);
+      await issueInvoice(organizationId, plan, 'razorpay', externalId, period);
+      slog('info', 'billing.plan_activated', {
+        organizationId,
+        plan,
+        provider: 'razorpay',
+        periodEnd: period.end.toISOString(),
+      });
     }
 
     res.json({ received: true });
@@ -348,15 +498,15 @@ export const stripeWebhook = async (req: Request, res: Response): Promise<void> 
       event.data.object.metadata?.organizationId || event.data.object.client_reference_id;
 
     if (organizationId && (event.type === 'checkout.session.completed' || event.type === 'invoice.paid')) {
-      await setPlan(organizationId, 'PRO');
-      await issueInvoice(organizationId, 'PRO', 'stripe', event.id || 'unknown');
+      const period = await activatePlan(organizationId, 'PRO');
+      await issueInvoice(organizationId, 'PRO', 'stripe', event.id || 'unknown', period);
     }
 
     // A failed invoice no longer downgrades immediately. Stripe retries for
     // days, so cutting a paying customer off mid-event on the first failure is
     // the wrong response — only an actually cancelled subscription downgrades.
     if (organizationId && event.type === 'customer.subscription.deleted') {
-      await setPlan(organizationId, 'FREE');
+      await lapsePlan(organizationId);
     }
 
     res.json({ received: true });
@@ -366,7 +516,19 @@ export const stripeWebhook = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-/** Confirms a payment straight from the client, as a fallback if the webhook is slow. */
+/**
+ * Confirms a payment straight from the client, as a fallback if the webhook is
+ * slow — which it routinely is, and a customer staring at a spinner after
+ * paying will not wait for it.
+ *
+ * Two things this must not do, both of which it used to. It must not trust the
+ * caller about which workspace was paid for: the previous version upgraded
+ * *the caller's* organisation on the strength of any captured payment id, so
+ * one shared id upgraded any account that pasted it. And it must not assume
+ * the plan — it hardcoded PRO, so an ENTERPRISE payment bought a PRO
+ * workspace. Both are settled by reading the order this payment belongs to,
+ * whose notes we wrote ourselves at checkout.
+ */
 export const confirmPayment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const paymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId : '';
@@ -394,17 +556,179 @@ export const confirmPayment = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    if (!(await consumeWebhookEvent('razorpay', payment.id, 'client.confirm'))) {
-      res.json({ message: 'Already applied.', duplicate: true });
+    if (!payment.order_id) {
+      res.status(400).json({ message: 'That payment is not attached to an order.' });
       return;
     }
 
-    await setPlan(user.organizationId, 'PRO');
-    const invoice = await issueInvoice(user.organizationId, 'PRO', 'razorpay', payment.id);
+    const order = await fetchOrder(payment.order_id);
+    const paidForOrganizationId = order.notes?.organizationId;
+    const paidPlan = order.notes?.plan as PlanName | undefined;
 
-    res.json({ message: 'Payment confirmed.', invoice });
+    // The order was created by this server for one specific workspace. If the
+    // caller is not that workspace, this is someone else's receipt.
+    if (!paidForOrganizationId || paidForOrganizationId !== user.organizationId) {
+      slog('warn', 'billing.confirm_org_mismatch', {
+        organizationId: user.organizationId,
+        paidForOrganizationId: paidForOrganizationId ?? null,
+        paymentId,
+      });
+      res.status(403).json({ message: 'That payment belongs to a different workspace.' });
+      return;
+    }
+
+    if (!paidPlan || !PLAN_LIMITS[paidPlan] || paidPlan === 'FREE') {
+      res.status(400).json({ message: 'That payment is not for a subscription plan.' });
+      return;
+    }
+
+    if (!(await consumeWebhookEvent('razorpay', payment.id, 'client.confirm'))) {
+      // The webhook almost certainly won the race. Report the plan as it now
+      // stands rather than as an error — from the customer's side it worked.
+      const organization = await prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { plan: true, planStatus: true, planExpiresAt: true },
+      });
+
+      res.json({
+        message: 'Payment already applied.',
+        duplicate: true,
+        subscription: organization ? resolvePlanState(organization as SubscriptionRow) : null,
+      });
+      return;
+    }
+
+    const period = await activatePlan(user.organizationId, paidPlan);
+    const invoice = await issueInvoice(
+      user.organizationId,
+      paidPlan,
+      'razorpay',
+      payment.id,
+      period
+    );
+
+    slog('info', 'billing.plan_activated', {
+      organizationId: user.organizationId,
+      plan: paidPlan,
+      provider: 'razorpay',
+      via: 'client.confirm',
+      periodEnd: period.end.toISOString(),
+    });
+
+    res.json({
+      message: 'Payment confirmed.',
+      plan: paidPlan,
+      periodEnd: period.end,
+      invoice,
+    });
   } catch (error) {
     slog('error', 'billing.confirm_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Could not confirm that payment.' });
   }
+};
+
+/**
+ * The workspace's subscription as the billing page needs to render it.
+ *
+ * Separate from GET /org/me because that endpoint is read on nearly every
+ * page load, and this one exists to answer "when does this run out".
+ */
+export const getSubscription = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { organizationId: true },
+    });
+
+    if (!user?.organizationId) {
+      res.status(404).json({ message: 'No organization is attached to this account.' });
+      return;
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: {
+        plan: true,
+        planStatus: true,
+        planStartedAt: true,
+        planExpiresAt: true,
+        gstin: true,
+        stateCode: true,
+        billingCountry: true,
+        billingName: true,
+        billingAddress: true,
+      },
+    });
+
+    if (!organization) {
+      res.status(404).json({ message: 'Organization not found.' });
+      return;
+    }
+
+    const state = resolvePlanState(organization as SubscriptionRow);
+
+    res.json({
+      subscription: {
+        ...state,
+        startedAt: organization.planStartedAt,
+        limits: PLAN_LIMITS[state.effectivePlan],
+      },
+      billingDetails: {
+        gstin: organization.gstin,
+        stateCode: organization.stateCode,
+        stateName: stateNameFor(organization.stateCode),
+        billingCountry: organization.billingCountry,
+        billingName: organization.billingName,
+        billingAddress: organization.billingAddress,
+        /// Checkout is refused while this is true.
+        incomplete: missingTaxDetails(organization),
+      },
+    });
+  } catch (error) {
+    slog('error', 'billing.subscription_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Moves every workspace whose grace window has closed back to the free tier.
+ *
+ * Enforcement does not depend on this running — `resolvePlanState` already
+ * treats a lapsed period as free at read time. This exists so the stored row
+ * matches reality, so admin screens and exports are not quietly wrong.
+ */
+export const expireOverdueSubscriptions = async (): Promise<number> => {
+  const candidates = await prisma.organization.findMany({
+    where: {
+      planStatus: { in: ['ACTIVE', 'GRACE'] },
+      planExpiresAt: { not: null },
+    },
+    select: { id: true, plan: true, planStatus: true, planExpiresAt: true },
+  });
+
+  let lapsed = 0;
+
+  for (const organization of candidates) {
+    const state = resolvePlanState(organization as SubscriptionRow);
+
+    if (state.lapsed) {
+      await lapsePlan(organization.id);
+      lapsed += 1;
+      slog('info', 'billing.plan_lapsed', {
+        organizationId: organization.id,
+        was: organization.plan,
+      });
+      continue;
+    }
+
+    // Record the move into grace so the row is not still claiming ACTIVE.
+    if (state.status !== organization.planStatus) {
+      await prisma.organization.update({
+        where: { id: organization.id },
+        data: { planStatus: state.status },
+      });
+    }
+  }
+
+  return lapsed;
 };

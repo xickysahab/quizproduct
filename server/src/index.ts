@@ -26,6 +26,7 @@ import { ensureSuperAdmin } from './utils/bootstrap';
 import { allowedOrigins, corsOriginHandler } from './config/cors';
 import { env, configWarnings } from './config/env';
 import { apiLimiter } from './config/rateLimit';
+import { expireOverdueSubscriptions } from './controllers/billing.controller';
 import { attachSocketAdapter, closeRedis } from './config/redis';
 import { responseBatcher } from './utils/responseBatcher';
 import { slog } from './utils/slog';
@@ -99,6 +100,30 @@ app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ message: 'Internal server error' });
 });
 
+/**
+ * Hourly, so a lapsed workspace's stored row catches up with reality.
+ *
+ * Access control does not wait for this — `resolvePlanState` already reads a
+ * run-out period as the free tier at request time. This only keeps the
+ * database honest, so admin screens and any export built from `plan` are not
+ * quietly a month stale. An hour is frequent enough for that and cheap enough
+ * to run on the same box as the live sockets.
+ */
+const SUBSCRIPTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+const sweepSubscriptions = async () => {
+  try {
+    const lapsed = await expireOverdueSubscriptions();
+    if (lapsed > 0) slog('info', 'billing.sweep_completed', { lapsed });
+  } catch (error) {
+    // A failed sweep must not take the process down with it — live sessions
+    // are running on this box, and enforcement is correct without it anyway.
+    slog('error', 'billing.sweep_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 const start = async () => {
   await attachSocketAdapter(io);
   initializeSocket(io);
@@ -106,6 +131,9 @@ const start = async () => {
   httpServer.listen(env.port, () => {
     slog('info', 'server.listening', { port: env.port, origins: allowedOrigins });
     configWarnings().forEach((warning) => slog('warn', 'config.warning', { warning }));
+    void sweepSubscriptions();
+    setInterval(() => void sweepSubscriptions(), SUBSCRIPTION_SWEEP_INTERVAL_MS).unref();
+
     void ensureSuperAdmin().catch((error) => {
       // A refusal to create a default-password administrator is fatal in
       // production — better to fail the deploy than to serve with one.

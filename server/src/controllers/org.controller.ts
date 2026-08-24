@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { currentPeriod, limitsFor, PlanName } from '../utils/plans';
+import { resolvePlanState, SubscriptionRow } from '../utils/subscription';
 import { slog } from '../utils/slog';
 
 export const getMyOrganization = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -28,10 +29,15 @@ export const getMyOrganization = async (req: AuthRequest, res: Response): Promis
     const meter = await prisma.usageMeter.findUnique({
       where: { organizationId_period: { organizationId: org.id, period } },
     });
-    const limits = limitsFor(org.plan as PlanName);
+    // Limits follow the plan that is actually in force. Reporting the billed
+    // plan's limits to a lapsed workspace would have the UI promise a quota
+    // the API then refuses.
+    const subscription = resolvePlanState(org as SubscriptionRow);
+    const limits = limitsFor(subscription.effectivePlan);
 
     res.json({
       organization: org,
+      subscription,
       usage: {
         period,
         eventsCreated: meter?.eventsCreated ?? 0,
@@ -63,7 +69,9 @@ export const updateMyOrganization = async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const limits = limitsFor(org.plan as PlanName);
+    // Branding is a paid feature, so it follows the plan in force rather than
+    // the one on the row — otherwise a lapsed workspace keeps editing it.
+    const limits = limitsFor(resolvePlanState(org as SubscriptionRow).effectivePlan);
     const { name, logoUrl, primaryColor } = req.body || {};
     const data: { name?: string; logoUrl?: string | null; primaryColor?: string | null } = {};
 
@@ -108,7 +116,15 @@ export const setOrganizationPlan = async (req: AuthRequest, res: Response): Prom
 
     const updated = await prisma.organization.update({
       where: { id },
-      data: { plan },
+      // Assigned rather than bought, so it carries no billing period. Leaving
+      // the status alone would let a previously-expired workspace lapse again
+      // the moment the sweep next ran, undoing the grant.
+      data: {
+        plan,
+        planStatus: plan === 'FREE' ? 'NONE' : 'MANUAL',
+        planExpiresAt: null,
+        planCancelledAt: null,
+      },
     });
 
     res.json({ message: 'Plan updated.', organization: updated });
