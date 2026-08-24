@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Users, Radio, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Logo from '../components/Logo';
 import { socket, connectSocket } from '../socket/socket';
 import api from '../services/api';
 import QuestionResults from '../components/QuestionResults';
-import Countdown from '../components/Countdown';
 import OptionTile from '../components/OptionTile';
-import RoomPin from '../components/RoomPin';
 import LivePodium from '../components/LivePodium';
 import type { EventDetail, LeaderboardRow, QuestionTally } from '../types/analytics';
+
+/** A standings row plus how far it moved since the last scoreboard. */
+type ScoreboardRow = LeaderboardRow & { movement?: number | null; previousRank?: number | null };
 import { themeFor } from '../utils/sessionTheme';
+import { formatRoomCode } from '../utils/roomCode';
 
 /**
  * Projector / secondary-screen view — question + live tally only.
@@ -35,6 +35,8 @@ const AudienceDisplay: React.FC = () => {
   const [ended, setEnded] = useState(false);
   const [finalResults, setFinalResults] = useState<QuestionTally[]>([]);
   const [podiumOpen, setPodiumOpen] = useState(false);
+  // The between-question beat. Null means it is not currently on screen.
+  const [scoreboard, setScoreboard] = useState<ScoreboardRow[] | null>(null);
 
   const activeQuestionIdRef = useRef<string | null>(null);
 
@@ -57,6 +59,19 @@ const AudienceDisplay: React.FC = () => {
             (q: { id: string }) => q.id === loaded.currentQuestionId
           );
           if (resumeIndex >= 0) setCurrentQuestionIndex(resumeIndex);
+
+          // Hydrate the live state, not just the question. A projector is
+          // routinely opened after a question has already started, and until
+          // now that showed no timer and zero answers until the next socket
+          // event happened to arrive.
+          setQuestionStartedAt(loaded.currentQuestionStartedAt ?? null);
+
+          try {
+            const tally = await api.get(`/analytics/questions/${loaded.currentQuestionId}`);
+            if (!cancelled) setResponsesCount(tally.data.totalResponses ?? 0);
+          } catch {
+            /* the counter catches up on the next answer */
+          }
         }
 
         connectSocket();
@@ -81,7 +96,16 @@ const AudienceDisplay: React.FC = () => {
           setLeaderboard(data.leaderboard || []);
         });
 
+        // The scoreboard beat: a deliberate pause showing who moved. The
+        // server sends it only when the host asks for one.
+        socket.on('host:scoreboard', (data: { standings?: ScoreboardRow[] }) => {
+          setScoreboard(data.standings || []);
+        });
+
+        socket.on('host:scoreboardClosed', () => setScoreboard(null));
+
         socket.on('host:podium', (data: { leaderboard?: LeaderboardRow[] }) => {
+          setScoreboard(null);
           setLeaderboard(data.leaderboard || []);
           setPodiumOpen(true);
         });
@@ -93,6 +117,7 @@ const AudienceDisplay: React.FC = () => {
           setResponsesCount(0);
           setEnded(false);
           setPodiumOpen(false);
+          setScoreboard(null);
 
           if (data.question?.id && loaded.questions) {
             const idx = loaded.questions.findIndex((q) => q.id === data.question!.id);
@@ -142,6 +167,8 @@ const AudienceDisplay: React.FC = () => {
       socket.off('host:liveResults');
       socket.off('host:leaderboard');
       socket.off('host:podium');
+      socket.off('host:scoreboard');
+      socket.off('host:scoreboardClosed');
       socket.off('host:questionActive');
       socket.off('host:resultsRevealed');
       socket.off('host:quizEnded');
@@ -174,8 +201,14 @@ const AudienceDisplay: React.FC = () => {
             setCurrentQuestionIndex(idx);
             setLiveResults(null);
             setRevealed(false);
-            setResponsesCount(0);
             setQuestionStartedAt(loaded.currentQuestionStartedAt || new Date().toISOString());
+
+            try {
+              const tally = await api.get(`/analytics/questions/${loaded.currentQuestionId}`);
+              setResponsesCount(tally.data.totalResponses ?? 0);
+            } catch {
+              setResponsesCount(0);
+            }
           }
         }
       } catch {
@@ -186,178 +219,309 @@ const AudienceDisplay: React.FC = () => {
     return () => window.clearInterval(interval);
   }, [id, event, currentQuestionIndex]);
 
-  if (loading) {
+  const activeQuestion =
+    currentQuestionIndex >= 0 ? event?.questions?.[currentQuestionIndex] : null;
+
+  const total = event?.questions?.length ?? 0;
+  const answeredPct =
+    participantCount > 0 ? Math.min(100, Math.round((responsesCount / participantCount) * 100)) : 0;
+
+  if (loading || !event) {
     return (
-      <div data-mode={themeMode} className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-heading text-lg">
-        Opening audience display…
+      <div data-mode="discussion" className="stage min-h-screen grid place-items-center">
+        <span className="eyebrow">Preparing the room…</span>
       </div>
     );
   }
 
-  if (!event) return null;
+  /* ---------------------------------------------------------------------
+     The projected screen.
 
-  const brandPalette = event.concludeConfig?.options?.length
-    ? event.concludeConfig.options.map((option: { themeColor: string }) => option.themeColor)
-    : undefined;
-
-  const activeQuestion = currentQuestionIndex >= 0 ? event.questions[currentQuestionIndex] : null;
-
-
+     Designed to be read from the back of a room rather than from a desk:
+     nothing under ~18px, no thin strokes, no low-contrast greys, and the
+     single most useful thing on screen at any moment is also the largest.
+     Host controls deliberately live on /host/live/:id — the big screen stays
+     clean for the audience.
+  --------------------------------------------------------------------- */
   return (
-    <div data-mode={themeMode} className="min-h-screen flex flex-col bg-live-stage text-white font-sans">
-      <header className="px-8 py-5 flex justify-between items-center border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <Logo size={40} />
-          <div>
-            <h1 className="font-heading text-2xl font-bold">{event.title}</h1>
-            <div className="flex items-center gap-3 text-sm text-white/60">
-              <span className="flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-emerald-400" />
-                {participantCount} joined
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-                Audience display
-              </span>
-            </div>
+    <div data-mode={themeMode} className="stage min-h-screen flex flex-col relative overflow-hidden">
+      <div className="stage-grid" aria-hidden="true" />
+
+      {/* The timer runs edge to edge along the very top. At forty feet a number
+          is unreadable but a draining bar is not, so the bar is the timer and
+          the number is only a courtesy. */}
+      {activeQuestion?.timeLimit && questionStartedAt && !revealed && !ended && !podiumOpen && (
+        <StageTimer startedAt={questionStartedAt} timeLimit={activeQuestion.timeLimit} />
+      )}
+
+      {/* ---- header rail ---- */}
+      <header className="relative z-10 flex items-center justify-between gap-6 px-8 lg:px-12 py-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <Logo size={30} />
+          <div className="min-w-0">
+            <p className="font-heading text-lg font-semibold truncate text-[color:var(--color-stage-ink)]">
+              {event.title}
+            </p>
+            <p className="text-xs text-[color:var(--color-stage-muted)] flex items-center gap-2">
+              <span className="live-dot inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--accent-lift)]" />
+              Live
+              {total > 0 && currentQuestionIndex >= 0 && (
+                <span className="tabular">
+                  · Question {currentQuestionIndex + 1} of {total}
+                </span>
+              )}
+            </p>
           </div>
         </div>
-        <RoomPin code={event.roomCode} tone="dark" />
+
+        <div className="flex items-center gap-8">
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--color-stage-muted)]">
+              In the room
+            </p>
+            <p className="font-mono text-2xl font-medium tabular text-[color:var(--color-stage-ink)]">
+              {participantCount}
+            </p>
+          </div>
+
+          {/* The code never leaves the screen — people arrive late. */}
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--color-stage-muted)]">
+              Join at quizpulse · code
+            </p>
+            <p className="code-display text-2xl text-[color:var(--accent-lift)]">
+              {formatRoomCode(event.roomCode)}
+            </p>
+          </div>
+        </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-8">
-        {podiumOpen && !ended && event.sessionMode !== 'SURVEY' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-3xl space-y-6"
-          >
-            <div className="text-center space-y-2">
-              <p className="text-sm font-bold uppercase tracking-[0.3em] text-amber-300">Leaderboard</p>
-              <h2 className="font-heading text-5xl md:text-6xl font-bold">Race so far</h2>
-            </div>
-            <LivePodium rows={leaderboard} tone="dark" size="stage" />
-          </motion.div>
-        ) : ended ? (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-5xl space-y-8"
-          >
-            <div className="text-center space-y-3">
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-accent-lift">Session over</p>
-              <h2 className="font-heading text-5xl md:text-6xl font-bold">
-                {event.sessionMode === 'SURVEY' ? 'Survey results' : 'Thanks for playing'}
-              </h2>
-              <p className="text-white/60">
-                {participantCount} participant{participantCount === 1 ? '' : 's'}
-              </p>
-            </div>
+      {/* ---- stage ---- */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-8 lg:px-16 pb-10">
 
-            {event.sessionMode !== 'SURVEY' && leaderboard.length > 0 && (
-              <div className="max-w-xl mx-auto w-full">
+        {/* 1. Podium ------------------------------------------------------ */}
+        {podiumOpen && !ended ? (
+          <div className="w-full max-w-5xl animate-rise">
+            <p className="eyebrow text-center mb-6">Final standings</p>
+            <LivePodium rows={leaderboard} tone="dark" size="stage" />
+          </div>
+
+        /* 2. Scoreboard beat -------------------------------------------- */
+        ) : scoreboard ? (
+          <div className="w-full max-w-4xl animate-cut-in">
+            <p className="eyebrow text-center mb-8">Standings</p>
+            <ol className="space-y-2.5">
+              {scoreboard.map((row, i) => (
+                <li
+                  key={row.participantId}
+                  className="flex items-center gap-5 px-6 py-4 rounded-2xl bg-[color:var(--color-stage-2)] border border-[color:var(--color-stage-3)]"
+                  style={{ animation: `rise-in var(--dur-base) var(--ease-out-soft) ${i * 55}ms both` }}
+                >
+                  <span className="font-mono text-2xl tabular w-12 text-[color:var(--color-stage-muted)]">
+                    {row.rank}
+                  </span>
+
+                  {/* Movement is the whole reason this screen exists — a list
+                      of positions is a readout, a list of changes is a moment. */}
+                  <Movement value={row.movement} />
+
+                  <span className="flex-1 min-w-0 truncate text-2xl lg:text-3xl font-medium text-[color:var(--color-stage-ink)]">
+                    {row.name || 'Anonymous'}
+                  </span>
+                  <span className="font-mono text-2xl lg:text-3xl tabular text-[color:var(--accent-lift)]">
+                    {row.score}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+        /* 3. Session over ------------------------------------------------ */
+        ) : ended ? (
+          <div className="w-full max-w-6xl animate-rise">
+            <p className="eyebrow text-center mb-2">That's a wrap</p>
+            <h2 className="font-heading text-4xl lg:text-5xl font-bold text-center mb-10 text-[color:var(--color-stage-ink)]">
+              {event.scoringEnabled === false ? 'Thanks for taking part' : 'Thanks for playing'}
+            </h2>
+
+            {event.scoringEnabled !== false && leaderboard.length > 0 && (
+              <div className="mb-10">
                 <LivePodium rows={leaderboard} tone="dark" size="stage" />
               </div>
             )}
 
-            {finalResults.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-h-[60vh] overflow-y-auto">
-                {finalResults.map((tally, index) => (
-                  <div key={tally.id} className="bg-white text-slate-900 rounded-3xl p-5 text-left">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
-                      Q{index + 1}
-                    </span>
-                    <div className="mt-2">
-                      <QuestionResults
-                        tally={tally}
-                        palette={brandPalette}
-                        revealCorrect={event.sessionMode !== 'SURVEY'}
-                        compact
-                      />
-                    </div>
+            {finalResults.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 max-h-[46vh] overflow-y-auto pr-1">
+                {finalResults.map((tally, i) => (
+                  <div
+                    key={tally.id}
+                    className="rounded-2xl bg-[color:var(--color-stage-2)] border border-[color:var(--color-stage-3)] p-5"
+                  >
+                    <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--color-stage-muted)] mb-2">
+                      Question {i + 1}
+                    </p>
+                    <QuestionResults tally={tally} revealCorrect={event.scoringEnabled !== false} />
                   </div>
                 ))}
               </div>
-            ) : (
-              leaderboard.length > 0 &&
-              event.sessionMode !== 'SURVEY' && (
-                <ol className="mt-8 max-w-md mx-auto space-y-3 text-left">
-                  {leaderboard.slice(0, 5).map((row) => (
-                    <li
-                      key={row.participantId}
-                      className="flex justify-between bg-white/5 border border-white/10 rounded-2xl px-5 py-3"
-                    >
-                      <span>
-                        {row.rank}. {row.name}
-                      </span>
-                      <span className="font-bold text-accent-lift">{row.score}</span>
-                    </li>
-                  ))}
-                </ol>
-              )
             )}
-          </motion.div>
+          </div>
+
+        /* 4. Lobby ------------------------------------------------------- */
         ) : currentQuestionIndex < 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center space-y-8"
-          >
-            <div className="space-y-3">
-              <p className="text-sm font-bold uppercase tracking-[0.3em] text-accent-lift">Join now</p>
-              <h2 className="font-heading text-5xl md:text-7xl font-bold">Scan or enter the PIN</h2>
-            </div>
-            <RoomPin code={event.roomCode} size="hero" tone="dark" />
-            <div className="inline-flex flex-col items-center gap-4 bg-white text-slate-900 p-8 rounded-[2rem]">
-              <QrCode className="w-5 h-5 text-accent" />
-              <QRCodeSVG
-                value={`${window.location.origin}/?code=${event.roomCode}`}
-                size={220}
-                fgColor="#0f172a"
-                level="H"
-              />
-            </div>
-          </motion.div>
-        ) : activeQuestion ? (
-          <motion.div
-            key={activeQuestion.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-5xl space-y-8"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold uppercase tracking-[0.2em] text-accent-lift">
-                Question {currentQuestionIndex + 1} of {event.questions.length}
-              </span>
-              <span className="text-sm text-white/70 tabular-nums">
-                {responsesCount} / {participantCount} answers
-              </span>
-            </div>
-            <h2 className="font-heading text-4xl md:text-6xl font-bold leading-tight">{activeQuestion.text}</h2>
-            {activeQuestion.timeLimit ? (
-              <div className="max-w-sm">
-                <Countdown startedAt={questionStartedAt} timeLimit={activeQuestion.timeLimit} tone="dark" />
-              </div>
-            ) : null}
-            {liveResults ? (
-              <div className="bg-white text-slate-900 rounded-3xl p-6 md:p-8">
-                <QuestionResults
-                  tally={liveResults}
-                  palette={brandPalette}
-                  revealCorrect={revealed && event.sessionMode !== 'SURVEY'}
+          <div className="w-full max-w-5xl text-center">
+            <p className="eyebrow mb-5">Join now</p>
+
+            {/* The single largest thing on the screen, because for these two
+                minutes it is the only thing anybody needs. */}
+            <p className="code-display leading-none whitespace-nowrap text-[color:var(--color-stage-ink)]
+                          text-[clamp(3rem,9.5vw,9rem)] mb-8">
+              {formatRoomCode(event.roomCode)}
+            </p>
+
+            <div className="flex flex-col md:flex-row items-center justify-center gap-10">
+              <div className="p-4 rounded-2xl bg-white join-pulse">
+                <QRCodeSVG
+                  value={`${window.location.origin}/?code=${event.roomCode}`}
+                  size={168}
+                  fgColor="#14100E"
+                  level="M"
                 />
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(activeQuestion.options || []).map((opt: string, idx: number) => (
-                  <OptionTile key={idx} index={idx} label={opt} size="stage" />
+
+              <div className="text-left max-w-xs">
+                <p className="text-2xl font-medium text-[color:var(--color-stage-ink)] mb-2">
+                  Scan, or go to this site and enter the code.
+                </p>
+                <p className="text-lg text-[color:var(--color-stage-muted)]">
+                  {participantCount === 0
+                    ? 'Waiting for the first person…'
+                    : `${participantCount} ${participantCount === 1 ? 'person is' : 'people are'} in.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+        /* 5. A question is live ------------------------------------------ */
+        ) : activeQuestion ? (
+          <div key={activeQuestion.id} className="w-full max-w-6xl animate-cut-in">
+            <h2 className="font-heading font-bold leading-[1.08] text-center mx-auto mb-10
+                           text-[clamp(2rem,4.6vw,4.25rem)] max-w-5xl text-[color:var(--color-stage-ink)]">
+              {activeQuestion.text}
+            </h2>
+
+            {revealed && liveResults ? (
+              <div className="max-w-4xl mx-auto rounded-3xl bg-[color:var(--color-stage-2)] border border-[color:var(--color-stage-3)] p-8">
+                <QuestionResults
+                  tally={liveResults}
+                  revealCorrect={event.scoringEnabled !== false}
+                  compact
+                />
+              </div>
+            ) : activeQuestion.options?.length ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5 stagger">
+                {activeQuestion.options.map((option, index) => (
+                  <OptionTile key={index} index={index} label={option} size="stage" as="div" />
                 ))}
               </div>
+            ) : (
+              <p className="text-center text-2xl text-[color:var(--color-stage-muted)]">
+                Answering on your phone…
+              </p>
             )}
-          </motion.div>
+          </div>
         ) : null}
       </main>
+
+      {/* ---- answer counter ----
+          Bottom rail, because the host reads it constantly to decide when to
+          move on, and the room reads it to know whether it is waiting on them. */}
+      {activeQuestion && !ended && !podiumOpen && !scoreboard && (
+        <footer className="relative z-10 px-8 lg:px-12 pb-6">
+          <div className="flex items-center gap-4">
+            <span className="font-mono text-xl tabular text-[color:var(--color-stage-ink)]">
+              {responsesCount}
+              <span className="text-[color:var(--color-stage-muted)]"> / {participantCount}</span>
+            </span>
+            <div className="flex-1 h-1.5 rounded-full bg-[color:var(--color-stage-3)] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-[width] duration-500 ease-out"
+                style={{ width: `${answeredPct}%`, background: 'var(--accent-lift)' }}
+              />
+            </div>
+            <span className="text-sm text-[color:var(--color-stage-muted)] whitespace-nowrap">
+              answered
+            </span>
+          </div>
+        </footer>
+      )}
     </div>
+  );
+};
+
+/**
+ * The timer, as a bar the full width of the screen.
+ *
+ * Runs off the server's `startedAt` rather than a local clock, so the projector
+ * and every phone in the room agree. Turns red and tightens for the last five
+ * seconds — legible in peripheral vision, which is where a room's attention
+ * actually is once they have started answering.
+ */
+const StageTimer: React.FC<{ startedAt: string; timeLimit: number }> = ({ startedAt, timeLimit }) => {
+  const [remaining, setRemaining] = useState(timeLimit);
+
+  useEffect(() => {
+    const deadline = new Date(startedAt).getTime() + timeLimit * 1000;
+    const tick = () => setRemaining(Math.max(0, (deadline - Date.now()) / 1000));
+    tick();
+    const interval = window.setInterval(tick, 100);
+    return () => window.clearInterval(interval);
+  }, [startedAt, timeLimit]);
+
+  const fraction = Math.max(0, Math.min(1, remaining / timeLimit));
+  const urgent = remaining <= 5 && remaining > 0;
+
+  return (
+    <div className="absolute top-0 left-0 right-0 z-20" aria-hidden="true">
+      <div className="h-1.5 w-full bg-[color:var(--color-stage-3)]">
+        <div
+          className="h-full transition-[width] duration-100 ease-linear"
+          style={{
+            width: `${fraction * 100}%`,
+            background: urgent ? 'var(--color-wrong)' : 'var(--accent-lift)',
+          }}
+        />
+      </div>
+      {/* Centred under the bar: the header has the logo on the left and the
+          room stats on the right, so the middle is the only place a large
+          number does not collide with something people need. */}
+      <span
+        className={`absolute left-1/2 -translate-x-1/2 top-3 font-mono text-4xl tabular leading-none ${
+          urgent ? 'timer-urgent' : ''
+        }`}
+        style={{ color: urgent ? 'var(--color-wrong)' : 'var(--color-stage-muted)' }}
+      >
+        {Math.ceil(remaining)}
+      </span>
+    </div>
+  );
+};
+
+/** Rank change since the previous scoreboard. Null on the first one. */
+const Movement: React.FC<{ value?: number | null }> = ({ value }) => {
+  if (!value) {
+    return <span className="w-10 text-center text-[color:var(--color-stage-3)] text-xl">–</span>;
+  }
+  const up = value > 0;
+  return (
+    <span
+      className="w-10 text-center font-mono text-lg tabular"
+      style={{ color: up ? 'var(--color-right)' : 'var(--color-wrong)' }}
+      title={up ? `Up ${value}` : `Down ${Math.abs(value)}`}
+    >
+      {up ? '▲' : '▼'}
+      {Math.abs(value)}
+    </span>
   );
 };
 

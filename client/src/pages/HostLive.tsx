@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award, LogOut, QrCode, X, Eye, MessageSquare, Monitor, Trophy } from 'lucide-react';
+import { Play, Square, ChevronRight, ChevronLeft, Users, BarChart3, Radio, Award, LogOut, QrCode, X, Eye, MessageSquare, Monitor, Trophy, ListOrdered } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import Logo from '../components/Logo';
 import { socket, connectSocket } from '../socket/socket';
@@ -38,6 +38,7 @@ const HostLive: React.FC = () => {
   const [revealed, setRevealed] = useState(false);
   const [showQa, setShowQa] = useState(false);
   const [qaPending, setQaPending] = useState(0);
+  const [scoreboardOpen, setScoreboardOpen] = useState(false);
   const [podiumOpen, setPodiumOpen] = useState(false);
 
   // The conclude config's colours still theme the charts. Its option *labels*
@@ -189,6 +190,20 @@ const HostLive: React.FC = () => {
     setPodiumOpen(false);
     setQuestionStartedAt(new Date().toISOString());
     socket.emit('host:nextQuestion', id, event.questions[prevIndex]);
+  };
+
+  /**
+   * The between-question beat. Not a readout — a pause with a purpose: the room
+   * looks up, sees who moved, reacts, and the host gets a moment to talk.
+   */
+  const toggleScoreboard = () => {
+    if (scoreboardOpen) {
+      socket.emit('host:hideScoreboard', id);
+      setScoreboardOpen(false);
+      return;
+    }
+    socket.emit('host:showScoreboard', id);
+    setScoreboardOpen(true);
   };
 
   const handleRevealResults = () => {
@@ -553,6 +568,21 @@ const HostLive: React.FC = () => {
               >
                 <Trophy className="w-3.5 h-3.5" />
                 <span>Show podium</span>
+              </button>
+            )}
+
+            {event.scoringEnabled !== false && (
+              <button
+                onClick={toggleScoreboard}
+                title="Put the standings on the big screen"
+                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+                  scoreboardOpen
+                    ? 'bg-accent border-accent text-white'
+                    : 'btn-quiet'
+                }`}
+              >
+                <ListOrdered className="w-3.5 h-3.5" />
+                <span>{scoreboardOpen ? 'Hide standings' : 'Standings'}</span>
               </button>
             )}
 
