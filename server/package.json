@@ -9,7 +9,9 @@
     "migrate:deploy": "prisma migrate deploy",
     "start": "prisma migrate deploy && node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:all": "npm run test && npm run test:integration"
   },
   "keywords": [],
   "author": "",
