@@ -39,8 +39,9 @@ const Terms: React.FC = () => {
           participants join it with a room code, and answers are collected and shown in real time.
         </p>
         <p>
-          Participants are not required to hold an account. Where a session allows anonymous
-          joining, no name is collected from them at all.
+          Participants are not required to hold an account, and we never ask them for one. Joining
+          takes a room code and a display name, and nothing else — no email address, no password,
+          no sign-up.
         </p>
       </Clause>
 

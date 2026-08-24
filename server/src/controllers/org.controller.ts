@@ -34,7 +34,7 @@ export const getMyOrganization = async (req: AuthRequest, res: Response): Promis
     // plan's limits to a lapsed workspace would have the UI promise a quota
     // the API then refuses.
     const subscription = resolvePlanState(org as SubscriptionRow);
-    const limits = limitsFor(subscription.effectivePlan);
+    const limits = await limitsFor(subscription.effectivePlan);
 
     res.json({
       organization: org,
@@ -72,7 +72,7 @@ export const updateMyOrganization = async (req: AuthRequest, res: Response): Pro
 
     // Branding is a paid feature, so it follows the plan in force rather than
     // the one on the row — otherwise a lapsed workspace keeps editing it.
-    const limits = limitsFor(resolvePlanState(org as SubscriptionRow).effectivePlan);
+    const limits = await limitsFor(resolvePlanState(org as SubscriptionRow).effectivePlan);
     const { name, logoUrl, primaryColor } = req.body || {};
     const data: { name?: string; logoUrl?: string | null; primaryColor?: string | null } = {};
 

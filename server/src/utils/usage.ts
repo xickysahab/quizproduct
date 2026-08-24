@@ -61,7 +61,7 @@ export const assertCanCreateEvent = async (
   if (isPlatformAccount(organizationId)) return { ok: true };
 
   const plan = await enforceablePlan(organizationId!);
-  const limits = limitsFor(plan);
+  const limits = await limitsFor(plan);
   const period = currentPeriod();
 
   // Reserve the slot and read the new total in one atomic step, so two
@@ -94,7 +94,7 @@ export const participantCapForOrg = async (
 ): Promise<number> => {
   if (isPlatformAccount(organizationId)) return globalCap;
 
-  const planCap = limitsFor(await enforceablePlan(organizationId!)).participantsPerEvent;
+  const planCap = (await limitsFor(await enforceablePlan(organizationId!))).participantsPerEvent;
   return Math.min(planCap, globalCap);
 };
 
@@ -111,7 +111,7 @@ export const assertCanAddQuestion = async (
   }
 
   const plan = await enforceablePlan(organizationId!);
-  const limits = limitsFor(plan);
+  const limits = await limitsFor(plan);
 
   if (currentCount >= limits.questionsPerEvent) {
     return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { limitsFor, PLAN_LIMITS, currentPeriod } from '../utils/plans';
+import { currentPeriod } from '../utils/plans';
 import { normalizeQuestionInput, scoreAnswer } from '../utils/questionTypes';
 import { normalizeEmail, parsePagination, validateNewUser, validateLogoUrl } from '../utils/validation';
 import { generateParticipantToken, verifyParticipantToken } from '../utils/participantToken';
@@ -7,9 +7,8 @@ import { generateToken, verifyToken } from '../utils/auth';
 import { hashSecret } from '../utils/mailer';
 
 describe('plan limits', () => {
-  it('falls back to FREE when the plan is missing', () => {
-    expect(limitsFor(undefined).eventsPerMonth).toBe(PLAN_LIMITS.FREE.eventsPerMonth);
-  });
+  // Looking a plan up now reads the catalogue table, so that behaviour is
+  // covered in the integration suite, where there is a database to read.
 
   it('formats the billing period as YYYY-MM', () => {
     expect(currentPeriod(new Date('2026-08-21T00:00:00Z'))).toBe('2026-08');

@@ -3,7 +3,8 @@ import request from 'supertest';
 import { Client } from 'pg';
 import { createApp } from '../../app';
 import prisma from '../../config/prisma';
-import { truncateAll, testDatabaseUrl } from './setup';
+import { invalidatePlanCache } from '../../utils/plans';
+import { truncateAll, seedPlans, testDatabaseUrl } from './setup';
 
 /**
  * Billing and plan enforcement, driven over HTTP.
@@ -55,6 +56,10 @@ beforeEach(async () => {
     await db.connect();
   }
   await truncateAll(db);
+  await seedPlans(db);
+  // The catalogue is cached in-process; the truncate above invalidated it in
+  // the database but not in memory.
+  invalidatePlanCache();
 });
 
 afterAll(async () => {

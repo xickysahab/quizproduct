@@ -26,6 +26,7 @@ const Signup = lazy(() => import('./pages/Signup'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const InvoiceView = lazy(() => import('./pages/InvoiceView'));
 const Pricing = lazy(() => import('./pages/Pricing'));
+const PricingPlans = lazy(() => import('./pages/PricingPlans'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
 const Privacy = lazy(() => import('./pages/legal/Privacy'));
 const Refunds = lazy(() => import('./pages/legal/Refunds'));
@@ -121,6 +122,9 @@ function AppRoutes() {
         } />
         <Route path="/superadmin/quizzes" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN']}><Quizzes /></ProtectedRoute>
+        } />
+        <Route path="/superadmin/pricing" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN']}><PricingPlans /></ProtectedRoute>
         } />
         <Route path="/superadmin/organizations" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN']}><Organizations /></ProtectedRoute>

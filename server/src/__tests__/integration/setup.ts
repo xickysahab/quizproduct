@@ -98,3 +98,27 @@ export const truncateAll = async (client: Client): Promise<void> => {
   const list = rows.map((row) => `"public"."${row.tablename}"`).join(', ');
   await client.query(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
 };
+
+/**
+ * Re-seeds the plan catalogue after a truncate.
+ *
+ * The migration seeds these, but `truncateAll` empties every table between
+ * tests — and an empty catalogue is not a state the application is ever
+ * supposed to be in. Every test starts from the same three plans the product
+ * actually ships with.
+ */
+export const seedPlans = async (client: Client): Promise<void> => {
+  await client.query(`
+    INSERT INTO "PricingPlan"
+      ("id", "code", "label", "blurb", "pricePaise", "eventsPerMonth",
+       "participantsPerEvent", "questionsPerEvent", "branding", "isDefault", "sortOrder", "updatedAt")
+    VALUES
+      (gen_random_uuid()::text, 'FREE', 'Free', 'For trying it out.',
+       0, 5, 50, 20, false, true, 0, CURRENT_TIMESTAMP),
+      (gen_random_uuid()::text, 'PRO', 'Pro', 'For a department or a college.',
+       149900, 100, 500, 100, true, false, 1, CURRENT_TIMESTAMP),
+      (gen_random_uuid()::text, 'ENTERPRISE', 'Enterprise', 'For campus-wide rollouts.',
+       749900, 10000, 5000, 500, true, false, 2, CURRENT_TIMESTAMP)
+    ON CONFLICT ("code") DO NOTHING
+  `);
+};

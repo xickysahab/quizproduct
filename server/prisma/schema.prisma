@@ -13,11 +13,10 @@ enum Role {
   STAFF
 }
 
-enum Plan {
-  FREE
-  PRO
-  ENTERPRISE
-}
+/// Plans used to be this enum. They are rows in PricingPlan now, because a
+/// SuperAdmin introducing a new tier or changing a price should not require a
+/// migration and a deploy. `Organization.plan` and `Invoice.plan` hold a plan
+/// code as text; PricingPlan.code is the authority on what codes exist.
 
 /// Where a workspace sits in the paid lifecycle.
 ///
@@ -115,7 +114,9 @@ model Organization {
   id                   String        @id @default(uuid())
   name                 String
   slug                 String        @unique
-  plan                 Plan          @default(FREE)
+  /// PricingPlan.code. Text rather than a foreign key so that archiving or
+  /// renaming a plan can never cascade into deleting a customer's workspace.
+  plan                 String        @default("FREE")
   logoUrl              String?
   primaryColor         String?
   stripeCustomerId     String?
@@ -151,6 +152,42 @@ model Organization {
 
   /// The expiry sweep scans by these two and nothing else.
   @@index([planStatus, planExpiresAt])
+}
+
+/// A plan a workspace can be on.
+///
+/// Previously a constant in the source, which meant a price change was a code
+/// change, a review, a deploy — and no record of who changed it or when. Prices
+/// are a commercial decision, not an engineering one.
+///
+/// Nothing here is read at the moment a past invoice is rendered. Invoices
+/// store their own amounts, so repricing a plan never rewrites what somebody
+/// was already charged.
+model PricingPlan {
+  id                   String   @id @default(uuid())
+  /// Stable identifier written onto organisations and invoices. Immutable
+  /// once created: changing it would orphan every row that refers to it.
+  code                 String   @unique
+  label                String
+  blurb                String
+  /// Monthly price in paise, exclusive of tax. Zero for a free tier.
+  pricePaise           Int      @default(0)
+  eventsPerMonth       Int
+  participantsPerEvent Int
+  questionsPerEvent    Int
+  branding             Boolean  @default(false)
+  /// Withdrawn plans stay here and keep working for whoever is on them; they
+  /// simply stop being offered. Deleting one would strand those workspaces.
+  isActive             Boolean  @default(true)
+  /// The tier a new workspace starts on, and the one a lapsed subscription
+  /// falls back to. Exactly one plan carries this.
+  isDefault            Boolean  @default(false)
+  /// Display order on the pricing page.
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 model UsageMeter {
@@ -272,9 +309,10 @@ model Invoice {
   status         String       @default("PAID")
   provider       String?
   providerRef    String?
-  /// What was actually bought. Without this an invoice cannot be read back
-  /// years later, which is exactly what a tax invoice is for.
-  plan           Plan?
+  /// What was actually bought, as a plan code. Deliberately not a relation:
+  /// an invoice is a historical record, and it must keep saying what was sold
+  /// even after that plan is renamed, repriced or withdrawn.
+  plan           String?
   periodStart    DateTime?
   periodEnd      DateTime?
   issuedAt       DateTime     @default(now())
