@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { sellerIdentityGaps, sellerStateMismatch, isGstRegistered } from './seller';
 
 const DEV_JWT_SECRET = 'super_secret_slido_key_for_development';
 const MIN_SECRET_LENGTH = 32;
@@ -77,6 +78,26 @@ export const configWarnings = (): string[] => {
 
   if (!env.resendApiKey) {
     warnings.push('RESEND_API_KEY is not set — invite and reset emails are logged to stdout instead of sent.');
+  }
+
+  // Only worth warning about once payments are switched on. Before that no
+  // invoice is ever issued and the fields have nothing to be missing from.
+  if (process.env.RAZORPAY_KEY_ID) {
+    const gaps = sellerIdentityGaps();
+    if (gaps.length > 0) {
+      warnings.push(
+        `Billing documents will be issued without a complete supplier identity (missing: ${gaps.join(', ')}). Every invoice and bill of supply must carry the supplier's name and address.`
+      );
+    }
+
+    if (!isGstRegistered()) {
+      warnings.push(
+        'SELLER_GSTIN is not set — selling as an unregistered supplier. No GST will be charged and customers receive a bill of supply rather than a tax invoice. This is correct below the registration threshold; set SELLER_GSTIN once registered, or GST will be under-collected.'
+      );
+    }
+
+    const mismatch = sellerStateMismatch();
+    if (mismatch) warnings.push(mismatch);
   }
 
   return warnings;

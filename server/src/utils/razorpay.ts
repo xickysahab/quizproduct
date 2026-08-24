@@ -80,3 +80,14 @@ export interface RazorpayPayment {
 
 export const fetchPayment = async (paymentId: string): Promise<RazorpayPayment> =>
   call<RazorpayPayment>(`/payments/${paymentId}`);
+
+/**
+ * The order a payment belongs to.
+ *
+ * Needed because the plan the customer actually paid for lives in the order's
+ * notes, not on the payment. Without reading it back, a client-side confirm
+ * has to guess — and the guess was hardcoded to PRO, so anyone who paid the
+ * ENTERPRISE price got a PRO workspace.
+ */
+export const fetchOrder = async (orderId: string): Promise<RazorpayOrder & { notes?: Record<string, string> }> =>
+  call<RazorpayOrder & { notes?: Record<string, string> }>(`/orders/${orderId}`);

@@ -39,6 +39,7 @@ const LiveQuiz: React.FC = () => {
   const [results, setResults] = useState<(QuestionTally & { correctOption: number | null; correctOptions: number[] }) | null>(null);
   const [tab, setTab] = useState<'poll' | 'qa'>('poll');
   const [qaEnabled, setQaEnabled] = useState(true);
+  const [showQuestionOnPhone, setShowQuestionOnPhone] = useState(true);
   const [sessionMode, setSessionMode] = useState<'QUIZ' | 'SURVEY'>('QUIZ');
   const [queued, setQueued] = useState(0);
   const [myResult, setMyResult] = useState<{ score: number; rank: number; totalParticipants: number } | null>(null);
@@ -51,6 +52,8 @@ const LiveQuiz: React.FC = () => {
     scored: boolean;
     isCorrect: boolean | null;
     score: number;
+    /** Consecutive correct answers including this one. */
+    streak: number;
   } | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [standing, setStanding] = useState<{
@@ -80,6 +83,7 @@ const LiveQuiz: React.FC = () => {
     setParticipantName(pName && pName.trim() ? pName : 'Anonymous');
     setMeId(pId);
     setQaEnabled(localStorage.getItem('qaEnabled') !== 'false');
+    setShowQuestionOnPhone(localStorage.getItem('phoneShowsQuestion') !== 'false');
     setSessionMode(localStorage.getItem('sessionMode') === 'SURVEY' ? 'SURVEY' : 'QUIZ');
     setBranding(readRoomBranding());
 
@@ -222,6 +226,7 @@ const LiveQuiz: React.FC = () => {
         scored: Boolean(res.data?.scored),
         isCorrect: res.data?.isCorrect ?? null,
         score: Number(res.data?.score) || 0,
+        streak: Number(res.data?.streak) || 0,
       });
       if (res.data?.standing) setStanding(res.data.standing);
       return true;
@@ -482,11 +487,22 @@ const LiveQuiz: React.FC = () => {
               >
                 <div className="bg-white/8 border border-white/10 rounded-[1.6rem] p-6 md:p-7">
                   <span className="text-[11px] font-bold tracking-[0.22em] text-accent-lift uppercase">
-                    {t('live.activeQuestion')}
+                    {showQuestionOnPhone ? t('live.activeQuestion') : t('live.lookUp')}
                   </span>
-                  <h2 className="font-heading text-2xl md:text-3xl font-bold text-white mt-1.5 leading-snug">
-                    {activeQuestion.text}
-                  </h2>
+
+                  {showQuestionOnPhone ? (
+                    <h2 className="font-heading text-2xl md:text-3xl font-bold text-white mt-1.5 leading-snug">
+                      {activeQuestion.text}
+                    </h2>
+                  ) : (
+                    /* The question deliberately is not here. In a Game-shaped
+                       session the room should be looking at the shared screen,
+                       and a phone showing the same text is what stops that. */
+                    <p className="font-heading text-xl font-bold text-white/80 mt-1.5 leading-snug">
+                      {t('live.lookUpBody')}
+                    </p>
+                  )}
+
                   <div className="mt-5">
                     <Countdown
                       startedAt={startedAt}
@@ -641,43 +657,54 @@ const LiveQuiz: React.FC = () => {
                 </fieldset>
 
                 {submitted && !expired && (
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={
-                        feedback?.scored
-                          ? feedback.isCorrect
-                            ? 'correct'
-                            : 'wrong'
-                          : 'recorded'
-                      }
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      className="pt-2 text-center"
-                    >
-                      {feedback?.scored && feedback.isCorrect ? (
-                        <span className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-200 shadow-sm">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>
-                            {t('live.correct')}
-                            {feedback.score > 0 ? ` · +${feedback.score}` : ''}
-                          </span>
+                  /* The moment a player actually waits for. A small pill was
+                     too quiet for it — right and wrong now have different
+                     shapes of motion, so the answer registers before the
+                     colour is even read. */
+                  <div
+                    key={feedback?.scored ? (feedback.isCorrect ? 'correct' : 'wrong') : 'recorded'}
+                    className="pt-1"
+                  >
+                    {feedback?.scored && feedback.isCorrect ? (
+                      <div className="animate-right rounded-[1.4rem] px-6 py-5 text-center border"
+                           style={{
+                             background: 'color-mix(in oklab, var(--color-right) 20%, transparent)',
+                             borderColor: 'color-mix(in oklab, var(--color-right) 45%, transparent)',
+                           }}>
+                        <CheckCircle2 className="w-8 h-8 mx-auto mb-1.5 text-white" />
+                        <p className="font-heading text-2xl font-bold text-white">
+                          {t('live.correct')}
+                        </p>
+                        {feedback.score > 0 && (
+                          <p className="font-mono text-lg tabular-nums text-white/85 mt-0.5">
+                            +{feedback.score}
+                            {feedback.streak > 1 && (
+                              <span className="text-white/60"> · {feedback.streak} in a row</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    ) : feedback?.scored ? (
+                      <div className="animate-wrong rounded-[1.4rem] px-6 py-5 text-center border"
+                           style={{
+                             background: 'color-mix(in oklab, var(--color-wrong) 20%, transparent)',
+                             borderColor: 'color-mix(in oklab, var(--color-wrong) 45%, transparent)',
+                           }}>
+                        <span className="w-8 h-8 mx-auto mb-1.5 rounded-full border-2 border-white/80 flex items-center justify-center text-lg text-white/90">
+                          ×
                         </span>
-                      ) : feedback?.scored ? (
-                        <span className="inline-flex items-center gap-2 text-sm font-bold text-rose-800 bg-rose-50 px-5 py-2.5 rounded-2xl border border-rose-200 shadow-sm">
-                          <span className="w-4 h-4 rounded-full border-2 border-rose-500 inline-flex items-center justify-center text-[10px] leading-none">
-                            ×
-                          </span>
-                          <span>{t('live.incorrect')}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-accent bg-accent-wash px-4 py-2 rounded-full border border-accent-soft">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{t('live.recorded')}</span>
-                        </span>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                        <p className="font-heading text-2xl font-bold text-white">
+                          {t('live.incorrect')}
+                        </p>
+                      </div>
+                    ) : (
+                      /* Unscored sessions get an acknowledgement, not a verdict —
+                         there is nothing to be right about. */
+                      <p className="text-center text-sm text-white/60 px-4">
+                        {t('live.recorded')}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {sessionMode === 'QUIZ' && submitted && (leaderboard.length > 0 || standing) && (

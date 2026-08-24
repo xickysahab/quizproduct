@@ -24,6 +24,12 @@ const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
 const Organizations = lazy(() => import('./pages/Organizations'));
 const Signup = lazy(() => import('./pages/Signup'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const InvoiceView = lazy(() => import('./pages/InvoiceView'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const Terms = lazy(() => import('./pages/legal/Terms'));
+const Privacy = lazy(() => import('./pages/legal/Privacy'));
+const Refunds = lazy(() => import('./pages/legal/Refunds'));
+const Contact = lazy(() => import('./pages/legal/Contact'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">
@@ -75,6 +81,15 @@ function AppRoutes() {
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+
+        {/* Public, and deliberately unauthenticated — a payment gateway's
+            reviewer and a prospective buyer both have to be able to read these
+            without an account. */}
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/legal/terms" element={<Terms />} />
+        <Route path="/legal/privacy" element={<Privacy />} />
+        <Route path="/legal/refunds" element={<Refunds />} />
+        <Route path="/legal/contact" element={<Contact />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -183,6 +198,9 @@ function AppRoutes() {
         } />
         <Route path="/host/display/:id" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><AudienceDisplay /></ProtectedRoute>
+        } />
+        <Route path="/invoice/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'TENANT']}><InvoiceView /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

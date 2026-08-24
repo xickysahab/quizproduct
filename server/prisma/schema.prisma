@@ -19,6 +19,29 @@ enum Plan {
   ENTERPRISE
 }
 
+/// Where a workspace sits in the paid lifecycle.
+///
+/// `plan` alone cannot express this. A workspace whose PRO month has run out
+/// still has `plan = PRO` on the row until a sweep rewrites it, and a paying
+/// customer three days past due should not be cut off mid-event. The status
+/// and `planExpiresAt` together decide what the workspace can actually do —
+/// see utils/subscription.ts, which is the only place that decision is made.
+enum SubscriptionStatus {
+  /// Never paid. On the free tier by default, not by expiry.
+  NONE
+  /// Paid and inside the period.
+  ACTIVE
+  /// Past `planExpiresAt` but inside the grace window. Still full access,
+  /// because cutting someone off during a live session loses the customer
+  /// more surely than a few unpaid days costs.
+  GRACE
+  /// Past grace. Limits are the free tier's until they pay again.
+  EXPIRED
+  /// Assigned by a SuperAdmin rather than bought, so it does not expire.
+  /// Enterprise contracts and comped accounts live here.
+  MANUAL
+}
+
 enum QuestionType {
   MCQ
   MULTI_SELECT
@@ -99,6 +122,13 @@ model Organization {
   stripeSubscriptionId String?
   razorpayCustomerId     String?
   razorpaySubscriptionId String?
+  /// ---- Subscription lifecycle -------------------------------------------
+  /// `plan` is what was bought; these say whether it is still owed.
+  planStatus             SubscriptionStatus @default(NONE)
+  planStartedAt          DateTime?
+  /// Null means the plan does not expire — the free tier, or a MANUAL grant.
+  planExpiresAt          DateTime?
+  planCancelledAt        DateTime?
   users                User[]
   events               Event[]
   invites              Invite[]
@@ -108,10 +138,19 @@ model Organization {
   gstin                String?
   /// Two-digit Indian state code; decides CGST+SGST versus IGST.
   stateCode            String?
+  /// ISO-3166 alpha-2. "IN" means Indian GST applies and a state code is
+  /// required; anything else is an export of services and zero-rated. Without
+  /// this the two cases are indistinguishable, and a missing state code was
+  /// silently read as "not in India" — charging an Indian buyer no GST at all
+  /// while we still owed the 18%.
+  billingCountry       String        @default("IN")
   billingName          String?
   billingAddress       String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
+
+  /// The expiry sweep scans by these two and nothing else.
+  @@index([planStatus, planExpiresAt])
 }
 
 model UsageMeter {
@@ -225,9 +264,19 @@ model Invoice {
   /// Buyer's state code, which decides CGST+SGST versus IGST.
   placeOfSupply  String?
   hsnSac         String       @default("998434")
+  /// TAX_INVOICE when the supplier is GST-registered, BILL_OF_SUPPLY when not.
+  /// Recorded per document rather than derived from config, because config
+  /// changes the day registration comes through and must not retroactively
+  /// relabel documents already issued and filed.
+  documentType   String       @default("TAX_INVOICE")
   status         String       @default("PAID")
   provider       String?
   providerRef    String?
+  /// What was actually bought. Without this an invoice cannot be read back
+  /// years later, which is exactly what a tax invoice is for.
+  plan           Plan?
+  periodStart    DateTime?
+  periodEnd      DateTime?
   issuedAt       DateTime     @default(now())
 
   @@index([organizationId, issuedAt])

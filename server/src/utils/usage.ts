@@ -1,5 +1,6 @@
 import prisma from '../config/prisma';
 import { currentPeriod, limitsFor, PlanName } from './plans';
+import { resolvePlanState, SubscriptionRow } from './subscription';
 import { env } from '../config/env';
 
 /**
@@ -36,16 +37,31 @@ type Guard = { ok: true } | { ok: false; message: string };
  */
 const isPlatformAccount = (organizationId: string | null | undefined): boolean => !organizationId;
 
+/**
+ * The plan a workspace may actually be held to right now.
+ *
+ * Every quota check below used to read `organization.plan` straight off the
+ * row, which is what the customer bought and says nothing about whether the
+ * period they bought is still running. One payment therefore bought the paid
+ * quota permanently. Enforcement now goes through the lifecycle rules instead.
+ */
+const enforceablePlan = async (organizationId: string): Promise<PlanName> => {
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { plan: true, planStatus: true, planExpiresAt: true },
+  });
+
+  if (!org) return 'FREE';
+  return resolvePlanState(org as SubscriptionRow).effectivePlan;
+};
+
 export const assertCanCreateEvent = async (
   organizationId: string | null | undefined
 ): Promise<Guard> => {
   if (isPlatformAccount(organizationId)) return { ok: true };
 
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId! },
-    select: { plan: true },
-  });
-  const limits = limitsFor(org?.plan as PlanName);
+  const plan = await enforceablePlan(organizationId!);
+  const limits = limitsFor(plan);
   const period = currentPeriod();
 
   // Reserve the slot and read the new total in one atomic step, so two
@@ -65,7 +81,7 @@ export const assertCanCreateEvent = async (
 
     return {
       ok: false,
-      message: `Your ${org?.plan || 'FREE'} plan covers ${limits.eventsPerMonth} sessions a month. Upgrade to create more.`,
+      message: `Your ${plan} plan covers ${limits.eventsPerMonth} sessions a month. Upgrade to create more.`,
     };
   }
 
@@ -78,11 +94,7 @@ export const participantCapForOrg = async (
 ): Promise<number> => {
   if (isPlatformAccount(organizationId)) return globalCap;
 
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId! },
-    select: { plan: true },
-  });
-  const planCap = limitsFor(org?.plan as PlanName).participantsPerEvent;
+  const planCap = limitsFor(await enforceablePlan(organizationId!)).participantsPerEvent;
   return Math.min(planCap, globalCap);
 };
 
@@ -98,16 +110,13 @@ export const assertCanAddQuestion = async (
       : { ok: true };
   }
 
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId! },
-    select: { plan: true },
-  });
-  const limits = limitsFor(org?.plan as PlanName);
+  const plan = await enforceablePlan(organizationId!);
+  const limits = limitsFor(plan);
 
   if (currentCount >= limits.questionsPerEvent) {
     return {
       ok: false,
-      message: `Your ${org?.plan || 'FREE'} plan allows ${limits.questionsPerEvent} questions per session.`,
+      message: `Your ${plan} plan allows ${limits.questionsPerEvent} questions per session.`,
     };
   }
 

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import DashboardLayout from '../components/DashboardLayout';
+import BillingPanel from '../components/BillingPanel';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
 
 const SettingsPage: React.FC = () => {
@@ -130,7 +131,12 @@ const SettingsPage: React.FC = () => {
           </form>
         </div>
 
-        {user?.role === 'TENANT' && <OrganizationSettings />}
+        {user?.role === 'TENANT' && (
+          <>
+            <OrganizationSettings />
+            <BillingPanel />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
@@ -138,7 +144,6 @@ const SettingsPage: React.FC = () => {
 
 const OrganizationSettings: React.FC = () => {
   const [org, setOrg] = useState<any>(null);
-  const [usage, setUsage] = useState<any>(null);
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('');
   const [saving, setSaving] = useState(false);
@@ -146,7 +151,6 @@ const OrganizationSettings: React.FC = () => {
   useEffect(() => {
     api.get('/org/me').then((res) => {
       setOrg(res.data.organization);
-      setUsage(res.data.usage);
       setLogoUrl(res.data.organization.logoUrl || '');
       setPrimaryColor(res.data.organization.primaryColor || '');
     }).catch(() => undefined);
@@ -167,21 +171,11 @@ const OrganizationSettings: React.FC = () => {
     }
   };
 
-  const checkout = async () => {
-    try {
-      const res = await api.post('/billing/checkout');
-      if (res.data.url) window.location.href = res.data.url;
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Billing is not configured');
-    }
-  };
-
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-      <h2 className="text-xl font-bold text-gray-900">Organization</h2>
+      <h2 className="text-xl font-bold text-gray-900">Branding</h2>
       <p className="text-sm text-gray-500">
-        Plan: <strong>{org.plan}</strong>
-        {usage && ` · ${usage.eventsCreated}/${usage.limits.eventsPerMonth} quizzes this month · ${usage.limits.participantsPerEvent} participants / quiz`}
+        Shown to participants on the join screen. Plan and usage live in Plan &amp; billing below.
       </p>
       <form onSubmit={save} className="space-y-3">
         <input
@@ -196,16 +190,9 @@ const OrganizationSettings: React.FC = () => {
           placeholder="Primary color (#4F46E5)"
           className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
         />
-        <div className="flex gap-3">
-          <button type="submit" disabled={saving} className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50">
-            Save branding
-          </button>
-          {org.plan === 'FREE' && (
-            <button type="button" onClick={checkout} className="px-6 py-3 rounded-xl border border-accent-soft text-accent font-semibold text-sm">
-              Upgrade to Pro
-            </button>
-          )}
-        </div>
+        <button type="submit" disabled={saving} className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50">
+          Save branding
+        </button>
       </form>
     </div>
   );

@@ -529,3 +529,30 @@ input:-webkit-autofill:focus {
   background: var(--color-stage-3);
   border-color: var(--color-stage);
 }
+
+/* ============================================================================
+   Print
+
+   Only one thing in this app is ever printed: a tax invoice, which is filed
+   with an accountant and matched against a GST return. Strip the browser's
+   own furniture and the app's chrome so what comes out is the document.
+   ========================================================================= */
+
+@media print {
+  html, body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Card shadows and tinted grounds cost toner and add nothing to a document
+     that will be read in black and white. */
+  .card {
+    box-shadow: none;
+    border-color: #ccc;
+  }
+
+  /* Never break a total away from the figures it totals. */
+  section, footer, header {
+    break-inside: avoid;
+  }
+}

@@ -50,6 +50,11 @@ const Footer: React.FC = () => {
           </h4>
           <ul className="space-y-2.5 text-sm text-[#64748B]">
             <li>
+              <Link to="/pricing" className="hover:text-[#A78BFA] transition-colors">
+                Pricing
+              </Link>
+            </li>
+            <li>
               <Link to="/login" className="hover:text-[#A78BFA] transition-colors">
                 Sign In
               </Link>
@@ -65,7 +70,20 @@ const Footer: React.FC = () => {
 
       <div className="max-w-7xl mx-auto pt-8 border-t border-[#1E293B] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#475569]">
         <p>© {new Date().getFullYear()} QuizPulse. All rights reserved.</p>
-        <p className="text-sm text-[#64748B]">Built for live engagement.</p>
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          <Link to="/legal/terms" className="hover:text-[#A78BFA] transition-colors">
+            Terms
+          </Link>
+          <Link to="/legal/privacy" className="hover:text-[#A78BFA] transition-colors">
+            Privacy
+          </Link>
+          <Link to="/legal/refunds" className="hover:text-[#A78BFA] transition-colors">
+            Refunds
+          </Link>
+          <Link to="/legal/contact" className="hover:text-[#A78BFA] transition-colors">
+            Contact
+          </Link>
+        </nav>
       </div>
     </footer>
   );
