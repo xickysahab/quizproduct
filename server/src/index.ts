@@ -31,6 +31,8 @@ import { expireOverdueSubscriptions } from './controllers/billing.controller';
 import { attachSocketAdapter, closeRedis } from './config/redis';
 import { responseBatcher } from './utils/responseBatcher';
 import { slog } from './utils/slog';
+import { report, alertingConfigured } from './utils/errorReporter';
+import prisma from './config/prisma';
 
 const app = express();
 
@@ -67,8 +69,41 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), stripeWe
 app.post('/billing/razorpay-webhook', express.raw({ type: 'application/json' }), razorpayWebhook);
 app.use(express.json({ limit: '200kb' }));
 
+/**
+ * Liveness. Deliberately cheap and deliberately shallow — it answers "is this
+ * process running", nothing more, and is safe for a monitor to hit every few
+ * seconds without touching the database.
+ */
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'OK', uptimeSeconds: Math.floor(process.uptime()) });
+});
+
+/**
+ * Readiness. Answers "should traffic be sent here", which is a different
+ * question and the one a load balancer needs.
+ *
+ * The shallow check above reported OK from a process whose database had gone
+ * away, so an instance that could not serve a single request kept being sent
+ * every request. This one actually asks.
+ */
+app.get('/health/ready', async (_req, res) => {
+  const checks: Record<string, 'ok' | 'failed'> = {};
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = 'ok';
+  } catch (error) {
+    checks.database = 'failed';
+    report('health.database_unreachable', error);
+  }
+
+  const ready = Object.values(checks).every((value) => value === 'ok');
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'READY' : 'NOT_READY',
+    checks,
+    uptimeSeconds: Math.floor(process.uptime()),
+  });
 });
 
 app.use(apiLimiter);
@@ -97,8 +132,10 @@ app.use((_req, res) => {
 
 // Express 5 forwards rejected promises here, so async controller failures no
 // longer hang the request.
-app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Unhandled request error:', error);
+app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
+  // Was a bare console.error, which is invisible to anything aggregating logs
+  // and reaches nobody. The path and method are what make a 500 findable.
+  report('request.unhandled_error', error, { method: req.method, path: req.path });
   res.status(500).json({ message: 'Internal server error' });
 });
 
@@ -133,6 +170,13 @@ const start = async () => {
   httpServer.listen(env.port, () => {
     slog('info', 'server.listening', { port: env.port, origins: allowedOrigins });
     configWarnings().forEach((warning) => slog('warn', 'config.warning', { warning }));
+
+    if (!alertingConfigured()) {
+      slog('warn', 'config.warning', {
+        warning:
+          'ALERT_WEBHOOK_URL is not set — errors are logged but nobody is told. Set it to a Slack or Discord incoming webhook so a failure during a live session reaches a person.',
+      });
+    }
     void sweepSubscriptions();
     setInterval(() => void sweepSubscriptions(), SUBSCRIPTION_SWEEP_INTERVAL_MS).unref();
 
@@ -160,5 +204,27 @@ const shutdown = async (signal: string) => {
 
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
+
+/**
+ * An unhandled rejection terminates the process by default in modern Node.
+ *
+ * One missed `.catch()` anywhere therefore takes down every live session on
+ * this box — mid-question, with a room watching. Catching it here turns a
+ * guaranteed outage into a logged error, and pm2 is not asked to restart over
+ * something the process survived.
+ */
+process.on('unhandledRejection', (reason) => {
+  report('process.unhandled_rejection', reason);
+});
+
+/**
+ * An uncaught exception is different: execution unwound from an unknown point,
+ * so process state cannot be trusted afterwards. Report it, drain what can be
+ * drained, and let the supervisor start a clean one.
+ */
+process.on('uncaughtException', (error) => {
+  report('process.uncaught_exception', error);
+  void shutdown('uncaughtException');
+});
 
 void start();

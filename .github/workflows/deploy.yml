@@ -74,6 +74,15 @@ jobs:
             npm ci
             npx prisma generate
 
+            # Take a dump before touching the schema. A migration that goes
+            # wrong, or a mistaken one that got merged, previously had no route
+            # back — the deploy altered production with nothing held. The
+            # script exits non-zero on any problem, and `set -e` above means
+            # the migration never runs unprotected.
+            echo "Backing up the database..."
+            set -a; . ./.env; set +a
+            ./scripts/backup-db.sh
+
             # `migrate deploy` only, with no fallback. The previous
             # `|| npx prisma db push` would force-sync the schema on any
             # migration failure — which drops columns and tables to match, and
