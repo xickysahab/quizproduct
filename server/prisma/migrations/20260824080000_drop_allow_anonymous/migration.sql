@@ -1,0 +1,11 @@
+-- Removes a column nothing reads.
+--
+-- Anonymous joining was dropped as a product decision: every participant gives
+-- a name, and the join endpoint refuses a blank one regardless of what this
+-- column said. It has been dead for a while — two queries selected it and
+-- neither used it to decide anything, and the public room endpoint returned a
+-- hardcoded `false` rather than the stored value.
+--
+-- Leaving it would keep inviting the question of whether it means anything.
+-- It does not, and the schema should not imply otherwise.
+ALTER TABLE "Event" DROP COLUMN "allowAnonymous";

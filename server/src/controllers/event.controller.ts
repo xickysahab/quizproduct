@@ -585,7 +585,6 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
       where: { roomCode: code },
       select: {
         title: true,
-        allowAnonymous: true,
         passcodeHash: true,
         roomCodeRetiredAt: true,
         preset: true,
@@ -603,8 +602,6 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
 
     res.json({
       title: event.title,
-      // Kept in the response for older clients; always false in practice now.
-      allowAnonymous: false,
       passcodeRequired: Boolean(event.passcodeHash),
       // Enough for the join screen to take on the room's colour before anyone
       // is admitted — you can see whether you are walking into a game or a

@@ -76,7 +76,6 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         isLive: true,
         currentQuestionId: true,
         organizationId: true,
-        allowAnonymous: true,
         qaEnabled: true,
         phoneShowsQuestion: true,
         scoringEnabled: true,

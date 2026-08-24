@@ -401,8 +401,6 @@ model Event {
   qaEnabled                Boolean        @default(true)
   /// When true, submitted questions stay PENDING until a host approves them.
   qaModerated              Boolean        @default(false)
-  /// Participants may join without giving a name.
-  allowAnonymous           Boolean        @default(true)
   /// Set when the room is closed to new joins, so a code stops working instead
   /// of every code ever issued staying live forever.
   roomCodeRetiredAt        DateTime?

@@ -403,3 +403,34 @@ describe('abuse limits on the endpoints that send mail', () => {
     expect(statuses.slice(-1)[0]).toBe(429);
   });
 });
+
+describe('every participant is named', () => {
+  it('refuses a blank name, and says why', async () => {
+    // A product decision, not an oversight: a leaderboard, a Q&A attribution
+    // and a host's report are all meaningless without a name attached. Pinned
+    // here because the opposite used to be true, and a stray column and a
+    // placeholder string went on claiming it for a while afterwards.
+    const tenant = await signUp('named@example.com', 'Named College');
+    const event = await request(app)
+      .post('/events')
+      .set(auth(tenant.token))
+      .send({ title: 'Named room' })
+      .expect(201);
+
+    const roomCode = event.body.event.roomCode;
+
+    const blank = await request(app)
+      .post('/participants/join')
+      .send({ roomCode, name: '   ' });
+
+    expect(blank.status).toBe(400);
+    expect(blank.body.message).toMatch(/name/i);
+
+    const named = await request(app)
+      .post('/participants/join')
+      .send({ roomCode, name: 'Priya' });
+
+    expect(named.status).toBe(201);
+    expect(named.body.participant.name).toBe('Priya');
+  });
+});
