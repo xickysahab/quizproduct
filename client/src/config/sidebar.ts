@@ -6,6 +6,7 @@ import {
   Settings,
   ListPlus,
   Presentation,
+  Tag,
 } from 'lucide-react';
 import type { Role } from '../context/AuthContext';
 
@@ -36,6 +37,7 @@ export const sidebarForRole = (role?: Role): SidebarItem[] => {
         { name: 'SubAdmins', href: '/superadmin/subadmins', icon: Users },
         { name: 'All Tenants', href: '/superadmin/tenants', icon: Building2 },
         { name: 'All Quizzes', href: '/superadmin/quizzes', icon: ListPlus },
+        { name: 'Pricing', href: '/superadmin/pricing', icon: Tag },
         { name: 'Organizations', href: '/superadmin/organizations', icon: Building2 },
         { name: 'Activity Logs', href: '/superadmin/logs', icon: Activity },
         { name: 'Settings', href: '/superadmin/settings', icon: Settings },

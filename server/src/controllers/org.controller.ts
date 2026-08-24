@@ -3,6 +3,7 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { currentPeriod, limitsFor, PlanName } from '../utils/plans';
 import { resolvePlanState, SubscriptionRow } from '../utils/subscription';
+import { validateLogoUrl } from '../utils/validation';
 import { slog } from '../utils/slog';
 
 export const getMyOrganization = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -33,7 +34,7 @@ export const getMyOrganization = async (req: AuthRequest, res: Response): Promis
     // plan's limits to a lapsed workspace would have the UI promise a quota
     // the API then refuses.
     const subscription = resolvePlanState(org as SubscriptionRow);
-    const limits = limitsFor(subscription.effectivePlan);
+    const limits = await limitsFor(subscription.effectivePlan);
 
     res.json({
       organization: org,
@@ -71,7 +72,7 @@ export const updateMyOrganization = async (req: AuthRequest, res: Response): Pro
 
     // Branding is a paid feature, so it follows the plan in force rather than
     // the one on the row — otherwise a lapsed workspace keeps editing it.
-    const limits = limitsFor(resolvePlanState(org as SubscriptionRow).effectivePlan);
+    const limits = await limitsFor(resolvePlanState(org as SubscriptionRow).effectivePlan);
     const { name, logoUrl, primaryColor } = req.body || {};
     const data: { name?: string; logoUrl?: string | null; primaryColor?: string | null } = {};
 
@@ -82,7 +83,16 @@ export const updateMyOrganization = async (req: AuthRequest, res: Response): Pro
         res.status(402).json({ message: 'Custom branding is available on Pro and Enterprise plans.' });
         return;
       }
-      if (logoUrl !== undefined) data.logoUrl = typeof logoUrl === 'string' && logoUrl.trim() ? logoUrl.trim() : null;
+      if (logoUrl !== undefined) {
+        // Was stored verbatim, whatever it was. This goes on the join screen
+        // in front of a whole room.
+        const checked = validateLogoUrl(logoUrl);
+        if (!checked.ok) {
+          res.status(400).json({ message: checked.message });
+          return;
+        }
+        data.logoUrl = checked.value;
+      }
       if (primaryColor !== undefined) {
         data.primaryColor =
           typeof primaryColor === 'string' && /^#?[0-9a-fA-F]{3,8}$/.test(primaryColor)

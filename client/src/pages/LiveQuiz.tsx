@@ -73,8 +73,9 @@ const LiveQuiz: React.FC = () => {
     const eId = localStorage.getItem('eventId');
     const pToken = localStorage.getItem('participantToken');
 
-    // The token is what proves the session — a name is optional now that
-    // joining anonymously is allowed, so it is not part of this guard.
+    // The token is what proves the session. The name is stored alongside it and
+    // is always present — joining without one is refused — so there is nothing
+    // for this guard to check beyond the three identifiers.
     if (!pId || !eId || !pToken) {
       navigate('/');
       return;

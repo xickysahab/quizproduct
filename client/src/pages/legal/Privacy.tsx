@@ -46,7 +46,7 @@ const Privacy: React.FC = () => {
           the host set the session up, we record:
         </p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>the name you typed, or nothing at all if the session allows anonymous joining</li>
+          <li>the name you typed — a name is required to join, so there is always one</li>
           <li>the answers you submit, and when you submitted them</li>
           <li>any question you ask the host, and whether you chose to attach your name to it</li>
           <li>

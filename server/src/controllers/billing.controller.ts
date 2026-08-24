@@ -4,7 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { env } from '../config/env';
 import { seller, sellerIdentityComplete, isGstRegistered } from '../config/seller';
 import { slog } from '../utils/slog';
-import { PlanName, PLAN_LIMITS, currentPeriod } from '../utils/plans';
+import { PlanName, currentPeriod, offeredPlans, planByCode, limitsFor } from '../utils/plans';
 import { createOrder, fetchOrder, fetchPayment, isRazorpayConfigured } from '../utils/razorpay';
 import { nextPeriodEnd, resolvePlanState, SubscriptionRow } from '../utils/subscription';
 import {
@@ -99,15 +99,16 @@ export const listPlans = async (_req: Request, res: Response): Promise<void> => 
   const registered = isGstRegistered();
   const treatment = registered ? 'GST' : 'UNREGISTERED';
 
+  const catalogue = await offeredPlans();
+
   res.json({
     currency: 'INR',
     gstRatePercent: registered ? Math.round(GST_RATE * 100) : 0,
     gstApplies: registered,
     sac: SAC_CODE,
-    plans: (Object.keys(PLAN_LIMITS) as PlanName[]).map((name) => {
-      const plan = PLAN_LIMITS[name];
+    plans: catalogue.map((plan) => {
       return {
-        id: name,
+        id: plan.code,
         label: plan.label,
         blurb: plan.blurb,
         pricePaise: plan.pricePaise,
@@ -139,9 +140,14 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    const planName = (req.body?.plan as PlanName) || 'PRO';
-    if (!['PRO', 'ENTERPRISE'].includes(planName)) {
-      res.status(400).json({ message: 'Choose either the Pro or Enterprise plan.' });
+    const planName = (req.body?.plan as PlanName) || '';
+    const requested = await planByCode(planName);
+
+    // Anything currently offered and priced can be bought. Hardcoding the two
+    // paid codes here would have made a new tier unbuyable until someone
+    // remembered to edit this line.
+    if (!requested || !requested.isActive || requested.pricePaise <= 0) {
+      res.status(400).json({ message: 'Choose a plan that is currently on sale.' });
       return;
     }
 
@@ -182,7 +188,7 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
       return;
     }
 
-    const plan = PLAN_LIMITS[planName];
+    const plan = requested;
     const treatment = treatmentOf(organization);
     const tax = computeGst(
       plan.pricePaise,
@@ -194,6 +200,11 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response): Pr
     const order = await createOrder(tax.totalPaise, `qp_${Date.now()}`, {
       organizationId: user.organizationId,
       plan: planName,
+      // The price as it stood at this moment. Now that a SuperAdmin can edit
+      // pricing, the catalogue may say something different by the time the
+      // webhook lands — and the invoice has to state what was actually
+      // charged, not what the plan costs today.
+      pricePaise: String(plan.pricePaise),
     });
 
     res.json({
@@ -327,11 +338,40 @@ const nextInvoiceNumber = async (): Promise<string> => {
   return formatInvoiceNumber(count + 1);
 };
 
+/**
+ * The price this payment was actually made against.
+ *
+ * Written into the order's notes at checkout. Orders created before that was
+ * done have no such note, so those fall back to the catalogue — the best
+ * available answer for a payment taken while pricing was still a constant in
+ * the source, and by definition unchanged since.
+ */
+const pricedAt = async (
+  notes: Record<string, string> | undefined,
+  planCode: string
+): Promise<number> => {
+  const noted = Number(notes?.pricePaise);
+  if (Number.isFinite(noted) && noted > 0) return Math.round(noted);
+
+  const plan = await planByCode(planCode);
+  return plan?.pricePaise ?? 0;
+};
+
+/**
+ * Writes the invoice for a completed payment.
+ *
+ * `pricePaise` is the amount the plan cost **when the order was created**, not
+ * what it costs now. Prices are editable, so re-reading the catalogue here
+ * would let an edit between checkout and confirmation produce an invoice for a
+ * figure the customer was never charged — a document that disagrees with the
+ * bank statement it is filed against.
+ */
 const issueInvoice = async (
   organizationId: string,
   plan: PlanName,
   provider: string,
   providerRef: string,
+  pricePaise: number,
   period?: { start: Date; end: Date }
 ) => {
   const organization = await prisma.organization.findUnique({
@@ -344,7 +384,7 @@ const issueInvoice = async (
     : treatmentFor({ sellerGstin: seller.gstin, buyerCountry: 'IN' });
 
   const tax = computeGst(
-    PLAN_LIMITS[plan].pricePaise,
+    pricePaise,
     organization ? placeOfSupply(organization) : null,
     undefined,
     treatment
@@ -584,7 +624,8 @@ export const razorpayWebhook = async (req: Request, res: Response): Promise<void
 
     if (organizationId && (event.event === 'payment.captured' || event.event === 'order.paid')) {
       const period = await activatePlan(organizationId, plan);
-      await issueInvoice(organizationId, plan, 'razorpay', externalId, period);
+      const price = await pricedAt(entity?.notes, plan);
+      await issueInvoice(organizationId, plan, 'razorpay', externalId, price, period);
       slog('info', 'billing.plan_activated', {
         organizationId,
         plan,
@@ -642,7 +683,14 @@ export const stripeWebhook = async (req: Request, res: Response): Promise<void> 
 
     if (organizationId && (event.type === 'checkout.session.completed' || event.type === 'invoice.paid')) {
       const period = await activatePlan(organizationId, 'PRO');
-      await issueInvoice(organizationId, 'PRO', 'stripe', event.id || 'unknown', period);
+      await issueInvoice(
+        organizationId,
+        'PRO',
+        'stripe',
+        event.id || 'unknown',
+        await pricedAt(undefined, 'PRO'),
+        period
+      );
     }
 
     // A failed invoice no longer downgrades immediately. Stripe retries for
@@ -720,7 +768,12 @@ export const confirmPayment = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    if (!paidPlan || !PLAN_LIMITS[paidPlan] || paidPlan === 'FREE') {
+    const boughtPlan = await planByCode(paidPlan);
+
+    // Deliberately does not require the plan to still be on sale. Somebody who
+    // paid while a tier was offered must get what they paid for, even if it was
+    // withdrawn between checkout and confirmation.
+    if (!paidPlan || !boughtPlan || boughtPlan.pricePaise <= 0) {
       res.status(400).json({ message: 'That payment is not for a subscription plan.' });
       return;
     }
@@ -747,6 +800,7 @@ export const confirmPayment = async (req: AuthRequest, res: Response): Promise<v
       paidPlan,
       'razorpay',
       payment.id,
+      await pricedAt(order.notes, paidPlan),
       period
     );
 
@@ -822,7 +876,7 @@ export const getSubscription = async (req: AuthRequest, res: Response): Promise<
       subscription: {
         ...state,
         startedAt: organization.planStartedAt,
-        limits: PLAN_LIMITS[state.effectivePlan],
+        limits: await limitsFor(state.effectivePlan),
         usage: {
           period,
           eventsCreated: meter?.eventsCreated ?? 0,

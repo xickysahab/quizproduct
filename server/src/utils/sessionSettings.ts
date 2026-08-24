@@ -11,8 +11,9 @@
  * Kept free of Prisma so every rule here is directly testable.
  *
  * Note: anonymous joining was removed as a product decision — every participant
- * gives a name. The `allowAnonymous` column survives for existing rows but is
- * no longer a switch, and the server requires a name regardless of its value.
+ * gives a name, and the server refuses a blank one. There is deliberately no
+ * switch for it: a leaderboard, a Q&A attribution and a host's report all mean
+ * nothing without a name attached.
  */
 
 export type SessionPreset = 'DISCUSSION' | 'GAME' | 'SURVEY' | 'CUSTOM';

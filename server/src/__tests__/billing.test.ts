@@ -15,7 +15,6 @@ import {
   GST_RATE,
 } from '../utils/gst';
 import { verifyStripeSignature, verifyRazorpaySignature, safeEquals } from '../utils/webhookSignature';
-import { PLAN_LIMITS } from '../utils/plans';
 
 describe('GST computation (IN-02)', () => {
   const SELLER = '27'; // Maharashtra
@@ -61,7 +60,9 @@ describe('GST computation (IN-02)', () => {
   });
 
   it('treats a zero-priced plan as free of tax', () => {
-    expect(computeGst(PLAN_LIMITS.FREE.pricePaise, '27', SELLER).totalPaise).toBe(0);
+    // 18% of nothing is nothing — worth pinning, because a free tier still
+    // goes through the same tax path as a paid one.
+    expect(computeGst(0, '27', SELLER).totalPaise).toBe(0);
   });
 });
 

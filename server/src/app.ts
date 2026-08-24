@@ -50,7 +50,26 @@ export const createApp = () => {
   );
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      /**
+       * This server returns JSON and nothing else — no HTML, no scripts, no
+       * styles. So the policy can be the strictest one there is: nothing may
+       * load from anywhere, and nothing may frame it.
+       *
+       * It was switched off entirely, which is the setting you reach for when
+       * a policy written for a web app keeps breaking an API. The right answer
+       * for an API is not "no policy" but "deny everything", which costs
+       * nothing here and removes this origin as a place to host or frame
+       * anything.
+       */
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          'default-src': ["'none'"],
+          'frame-ancestors': ["'none'"],
+          'base-uri': ["'none'"],
+          'form-action': ["'none'"],
+        },
+      },
       crossOriginEmbedderPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     })

@@ -58,3 +58,58 @@ export const parsePagination = (
 
   return { skip: (page - 1) * limit, take: limit, page, limit };
 };
+
+/**
+ * A logo URL that is safe to put on a screen in front of a room.
+ *
+ * This is rendered as an `<img src>` on the join screen every participant
+ * sees, so it is worth being strict about. Three things are being prevented:
+ *
+ * `javascript:` and `data:` schemes — an image source will not execute a
+ * javascript: URL in any current browser, but the value is stored and nothing
+ * guarantees it is only ever used in an img tag. Rejecting non-https at the
+ * boundary means the question never has to be asked again.
+ *
+ * Plain http — the app is served over https, so an http image is blocked as
+ * mixed content and the logo silently does not appear.
+ *
+ * Credentials in the URL — `https://user:pass@host/logo.png` renders fine and
+ * leaks whatever was put in it to anyone who opens the settings page.
+ *
+ * What this deliberately does NOT prevent: the URL still points at a third
+ * party, which can log every participant's IP and user agent. Only hosting the
+ * image ourselves fixes that, and that is an upload pipeline, not a validator.
+ */
+export const validateLogoUrl = (
+  value: unknown
+): { ok: true; value: string | null } | { ok: false; message: string } => {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  if (typeof value !== 'string') return { ok: false, message: 'Logo URL must be text.' };
+
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, value: null };
+
+  if (trimmed.length > 2048) {
+    return { ok: false, message: 'That logo URL is too long.' };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { ok: false, message: 'That does not look like a valid URL.' };
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return {
+      ok: false,
+      message: 'The logo URL must start with https:// — anything else is blocked by the browser or unsafe.',
+    };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { ok: false, message: 'The logo URL must not contain a username or password.' };
+  }
+
+  return { ok: true, value: parsed.toString() };
+};
