@@ -3,7 +3,7 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { env } from '../config/env';
 import { slog } from '../utils/slog';
-import { PlanName, PLAN_LIMITS } from '../utils/plans';
+import { PlanName, PLAN_LIMITS, currentPeriod } from '../utils/plans';
 import { createOrder, fetchOrder, fetchPayment, isRazorpayConfigured } from '../utils/razorpay';
 import { nextPeriodEnd, resolvePlanState, SubscriptionRow } from '../utils/subscription';
 import {
@@ -667,11 +667,24 @@ export const getSubscription = async (req: AuthRequest, res: Response): Promise<
 
     const state = resolvePlanState(organization as SubscriptionRow);
 
+    // Consumption belongs next to the limit it counts against. Reporting it
+    // anywhere else invites two screens quoting different plans, which is
+    // exactly what happened while the settings page read `plan` off the row.
+    const period = currentPeriod();
+    const meter = await prisma.usageMeter.findUnique({
+      where: { organizationId_period: { organizationId: user.organizationId, period } },
+    });
+
     res.json({
       subscription: {
         ...state,
         startedAt: organization.planStartedAt,
         limits: PLAN_LIMITS[state.effectivePlan],
+        usage: {
+          period,
+          eventsCreated: meter?.eventsCreated ?? 0,
+          participantsJoined: meter?.participantsJoined ?? 0,
+        },
       },
       billingDetails: {
         gstin: organization.gstin,
