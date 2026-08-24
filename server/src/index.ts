@@ -20,6 +20,7 @@ import orgRoutes from './routes/org.routes';
 import billingRoutes from './routes/billing.routes';
 import audienceQuestionRoutes from './routes/audienceQuestion.routes';
 import privacyRoutes from './routes/privacy.routes';
+import legalRoutes from './routes/legal.routes';
 import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { initializeSocket } from './socket';
 import { ensureSuperAdmin } from './utils/bootstrap';
@@ -88,6 +89,7 @@ app.use('/org', orgRoutes);
 app.use('/billing', billingRoutes);
 app.use('/questions-from-audience', audienceQuestionRoutes);
 app.use('/privacy', privacyRoutes);
+app.use('/legal', legalRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Not found' });
