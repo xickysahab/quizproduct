@@ -99,7 +99,7 @@ const SuperAdminDashboard = () => {
                         <span className="ml-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] font-bold text-gray-500">{log.user.role}</span>
                       </td>
                       <td className="px-6 py-3.5">
-                        <span className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-indigo-50 text-indigo-700">{log.action}</span>
+                        <span className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-accent-wash text-accent">{log.action}</span>
                       </td>
                       <td className="px-6 py-3.5 text-gray-700">{log.resource}</td>
                     </tr>

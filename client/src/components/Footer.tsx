@@ -4,13 +4,13 @@ import Logo from './Logo';
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#0B0F1A] border-t border-[#8B5CF6]/10 pt-16 pb-12 px-6 md:px-12">
+    <footer className="stage border-t border-[color:var(--color-stage-3)] pt-14 pb-10 px-6 md:px-12">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
         {/* Brand & Description */}
         <div className="md:col-span-2 space-y-4">
           <div className="flex items-center gap-3">
             <Logo size={32} />
-            <span className="font-heading text-xl font-bold tracking-tight text-white">
+            <span className="font-heading text-xl font-bold tracking-tight text-[color:var(--color-stage-ink)]">
               QuizPulse
             </span>
           </div>
@@ -21,7 +21,7 @@ const Footer: React.FC = () => {
 
         {/* Column 1 - Product */}
         <div>
-          <h4 className="font-heading font-semibold text-white text-sm tracking-wide uppercase mb-4">
+          <h4 className="font-heading font-semibold text-[color:var(--color-stage-ink)] text-sm tracking-wide uppercase mb-4">
             Platform
           </h4>
           <ul className="space-y-2.5 text-sm text-[#64748B]">
@@ -45,7 +45,7 @@ const Footer: React.FC = () => {
 
         {/* Column 2 - Hosts */}
         <div>
-          <h4 className="font-heading font-semibold text-white text-sm tracking-wide uppercase mb-4">
+          <h4 className="font-heading font-semibold text-[color:var(--color-stage-ink)] text-sm tracking-wide uppercase mb-4">
             Host Portal
           </h4>
           <ul className="space-y-2.5 text-sm text-[#64748B]">

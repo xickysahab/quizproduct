@@ -46,7 +46,7 @@ const SettingsPage: React.FC = () => {
         {/* Account info */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <div className="w-10 h-10 rounded-xl bg-accent-wash flex items-center justify-center text-accent">
               <UserIcon className="w-5 h-5" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">Account</h2>
@@ -62,7 +62,7 @@ const SettingsPage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Role</p>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent-wash text-accent text-xs font-bold">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 {user?.role}
               </span>
@@ -73,7 +73,7 @@ const SettingsPage: React.FC = () => {
         {/* Change password */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <div className="w-10 h-10 rounded-xl bg-accent-wash flex items-center justify-center text-accent">
               <Lock className="w-5 h-5" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">Change Password</h2>
@@ -89,7 +89,7 @@ const SettingsPage: React.FC = () => {
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all shadow-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -103,7 +103,7 @@ const SettingsPage: React.FC = () => {
                   minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all shadow-sm"
                 />
               </div>
               <div>
@@ -116,7 +116,7 @@ const SettingsPage: React.FC = () => {
                   minLength={8}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -201,7 +201,7 @@ const OrganizationSettings: React.FC = () => {
             Save branding
           </button>
           {org.plan === 'FREE' && (
-            <button type="button" onClick={checkout} className="px-6 py-3 rounded-xl border border-indigo-200 text-indigo-700 font-semibold text-sm">
+            <button type="button" onClick={checkout} className="px-6 py-3 rounded-xl border border-accent-soft text-accent font-semibold text-sm">
               Upgrade to Pro
             </button>
           )}

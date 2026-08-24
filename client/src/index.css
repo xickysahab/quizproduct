@@ -1,187 +1,531 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   QuizPulse — "The Lit Room"
+
+   This product is not a dashboard. It is an instrument you point at a room:
+   a screen is lit, faces turn toward it, hands go up. The visual language is
+   borrowed from stage and broadcast graphics rather than SaaS — high contrast,
+   confident type, one signal colour that means "live", and motion that behaves
+   like a cut, never a bounce.
+
+   The system's one real idea: THE ACCENT IS THE SESSION'S PERSONALITY.
+   A Discussion runs cool and considered. A Game runs hot. A Survey runs
+   neutral. The whole interface shifts hue with the mode, so a host glancing up
+   knows what kind of room they are in before reading a word.
+
+   Set `data-mode="discussion" | "game" | "survey"` on any container to retint
+   everything inside it.
+   ========================================================================= */
+
 @theme {
-  --font-heading: "Inter", system-ui, -apple-system, sans-serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  /* ---- Type -------------------------------------------------------------
+     Familjen Grotesk carries the headlines: a grotesque with actual quirks
+     (that single-storey g, the flat-sided a) so it reads as chosen rather than
+     defaulted. Public Sans does the work — open apertures and a tall x-height,
+     which is what survives both a projector at forty feet and a cheap phone at
+     four inches. DM Mono is reserved for facts: join codes, scores, timers.
 
-  /* Core Light Palette */
-  --color-light-base: #F9FAFB; /* Gray-50 */
-  --color-light-card: #FFFFFF;
-  --color-light-surface: #F3F4F6; /* Gray-100 */
-  --color-light-elevated: #FFFFFF;
-  --color-light-border: #E5E7EB; /* Gray-200 */
-  --color-light-border-subtle: #F3F4F6;
+     The Noto Sans fallbacks matter more than they look. The participant UI
+     ships in eight Indian languages, and without a real Devanagari or Tamil
+     face in the stack the browser substitutes something that looks broken.
+     These are loaded on demand — see loadScriptFont() — so a Hindi participant
+     pays for Devanagari and nobody pays for all six.
+  */
+  --font-display: "Familjen Grotesk", "Public Sans", system-ui, sans-serif;
+  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-heading: var(--font-display);
 
-  /* Accent Colors (Premium Indigo) */
-  --color-accent-indigo: #4F46E5;
-  --color-accent-indigo-light: #818CF8;
-  --color-accent-indigo-dark: #4338CA;
-  --color-accent-coral: #F43F5E;
-  --color-accent-emerald: #10B981;
-  --color-accent-amber: #F59E0B;
+  /* ---- Ground -----------------------------------------------------------
+     Warm, not cool. A grey with a red bias reads as a room; a grey with a blue
+     bias reads as a spreadsheet. Nothing here is pure #FFF or #000.
+  */
+  --color-paper:        #FBFAF8;
+  --color-surface:      #FFFFFF;
+  --color-sunken:       #F2EFEB;
+  --color-ink:          #1A1614;
+  --color-ink-soft:     #4A423E;
+  --color-muted:        #6B615C;
+  --color-faint:        #9C918B;
+  --color-line:         #E8E3DE;
+  --color-line-soft:    #F1EDE9;
 
-  /* Text Colors */
-  --color-text-primary: #111827; /* Gray-900 */
-  --color-text-secondary: #4B5563; /* Gray-600 */
-  --color-text-muted: #9CA3AF; /* Gray-400 */
+  /* The projected screen. Warm near-black, never slate. */
+  --color-stage:        #14100E;
+  --color-stage-2:      #1E1815;
+  --color-stage-3:      #2A2320;
+  --color-stage-ink:    #F5F0EA;
+  --color-stage-muted:  #A69A92;
 
-  /* Shadows - Crisp SaaS Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
-  --shadow-card: 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-card-hover: 0 12px 24px -8px rgba(0,0,0,0.08), 0 4px 8px -4px rgba(0,0,0,0.04);
-  
-  --shadow-glow-primary: 0 0 15px -3px rgba(79, 70, 229, 0.3);
+  /* ---- Session accents --------------------------------------------------
+     Three personalities, three temperatures. Flame is deliberately not the
+     magenta a quiz product is expected to use, and teal is deliberately not
+     the corporate blue a meeting product is expected to use.
+  */
+  --color-discussion:      #0E8A7D;
+  --color-discussion-lift: #14B8A6;
+  --color-discussion-wash: #E4F3F1;
+
+  --color-game:      #DB5312;
+  --color-game-lift: #F97316;
+  --color-game-wash: #FCEBE0;
+
+  --color-survey:      #6D4C7D;
+  --color-survey-lift: #9268A6;
+  --color-survey-wash: #F0E9F3;
+
+  /* ---- Semantic ---------------------------------------------------------
+     Kept separate from the accent so "correct" never changes meaning when the
+     session mode does.
+  */
+  --color-right: #1F7A4C;
+  --color-right-wash: #E3F2E9;
+  --color-wrong: #B3261E;
+  --color-wrong-wash: #F9E8E6;
+  --color-caution: #A66A00;
+  --color-caution-wash: #FBF0DC;
+
+  /* ---- Answer tiles -----------------------------------------------------
+     Four colours that stay distinguishable for the most common colour-vision
+     deficiencies, which is why each tile also carries a shape.
+  */
+  --color-tile-1: #C2410C;
+  --color-tile-2: #1D4ED8;
+  --color-tile-3: #047857;
+  --color-tile-4: #A16207;
+  --color-tile-5: #7C3AED;
+  --color-tile-6: #BE123C;
+
+  /* ---- Elevation --------------------------------------------------------
+     Shadows tinted with the ink rather than pure black, so cards sit on the
+     paper instead of hovering over a void.
+  */
+  --shadow-sm:  0 1px 2px rgba(26, 22, 20, 0.05);
+  --shadow-md:  0 4px 12px -2px rgba(26, 22, 20, 0.07), 0 2px 4px -2px rgba(26, 22, 20, 0.05);
+  --shadow-lg:  0 12px 28px -8px rgba(26, 22, 20, 0.12), 0 4px 10px -4px rgba(26, 22, 20, 0.06);
+  --shadow-xl:  0 28px 56px -16px rgba(26, 22, 20, 0.18), 0 8px 20px -8px rgba(26, 22, 20, 0.08);
+  --shadow-lift: 0 20px 40px -12px rgba(26, 22, 20, 0.16);
+
+  /* ---- Motion -----------------------------------------------------------
+     One easing curve for almost everything: a fast start that settles, like a
+     camera cut. No overshoot — a live room does not need the interface to be
+     playful at it.
+  */
+  --ease-cut: cubic-bezier(0.22, 0.82, 0.24, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 260ms;
+  --dur-slow: 420ms;
 }
 
+/* ============================================================================
+   Mode tinting
+   ========================================================================= */
+
+:root {
+  --accent: var(--color-discussion);
+  --accent-lift: var(--color-discussion-lift);
+  --accent-wash: var(--color-discussion-wash);
+}
+
+[data-mode="discussion"] {
+  --accent: var(--color-discussion);
+  --accent-lift: var(--color-discussion-lift);
+  --accent-wash: var(--color-discussion-wash);
+}
+
+[data-mode="game"] {
+  --accent: var(--color-game);
+  --accent-lift: var(--color-game-lift);
+  --accent-wash: var(--color-game-wash);
+}
+
+[data-mode="survey"] {
+  --accent: var(--color-survey);
+  --accent-lift: var(--color-survey-lift);
+  --accent-wash: var(--color-survey-wash);
+}
+
+/* ============================================================================
+   Base
+   ========================================================================= */
+
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     font-family: var(--font-sans);
-    background-color: var(--color-light-base);
-    color: var(--color-text-primary);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1;
   }
 
-  h1, h2, h3, .font-heading {
-    font-family: var(--font-heading);
-    letter-spacing: -0.025em;
+  h1, h2, h3, h4, .font-heading {
+    font-family: var(--font-display);
     font-weight: 600;
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+  }
+
+  /* Numbers that represent a fact — a score, a code, a countdown — line up and
+     never reflow as they change. */
+  .tabular, .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Everything focusable gets a visible ring in the session's own colour. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    color: var(--color-ink);
   }
 }
 
-/* ===== Glassmorphism Surfaces (Light Mode) ===== */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--color-light-border);
+/* ============================================================================
+   Accent utilities
+
+   Everything that used to be a hardcoded indigo now points at the session's
+   colour instead. That is what makes the mode tinting real rather than a stripe
+   at the top of one card — a Game turns the whole interface warm.
+   ========================================================================= */
+
+.text-accent        { color: var(--accent); }
+.text-accent-lift   { color: var(--accent-lift); }
+.bg-accent          { background-color: var(--accent); }
+.bg-accent-lift     { background-color: var(--accent-lift); }
+.bg-accent-wash     { background-color: var(--accent-wash); }
+.border-accent      { border-color: var(--accent); }
+.border-accent-soft { border-color: color-mix(in oklab, var(--accent) 26%, var(--color-line)); }
+.ring-accent        { --tw-ring-color: color-mix(in oklab, var(--accent) 18%, transparent); }
+.fill-accent        { fill: var(--accent); }
+
+/* On the dark stage the accent needs lifting or it disappears into the ground. */
+.stage .text-accent,
+[data-stage] .text-accent { color: var(--accent-lift); }
+
+/* ============================================================================
+   Surfaces
+   ========================================================================= */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
   box-shadow: var(--shadow-sm);
 }
 
-.glass-panel-light {
-  background: rgba(249, 250, 251, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--color-light-border-subtle);
+/* The one flourish: a hairline of the session's colour along the top edge.
+   Used sparingly — on the surface that is currently "live", nowhere else. */
+.card-live {
+  position: relative;
+  overflow: hidden;
 }
-
-/* ===== Gradient Utilities (Subtle for Light Mode) ===== */
-.gradient-text {
-  background: linear-gradient(135deg, var(--color-accent-indigo) 0%, #3B82F6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.gradient-btn {
-  background: linear-gradient(135deg, var(--color-accent-indigo) 0%, var(--color-accent-indigo-dark) 100%);
-  color: white;
-  transition: all 0.2s ease;
-}
-.gradient-btn:hover {
-  opacity: 0.95;
-  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
-}
-
-.gradient-btn-coral {
-  background: linear-gradient(135deg, var(--color-accent-coral) 0%, #E11D48 100%);
-  color: white;
-}
-
-/* ===== Premium Borders ===== */
-.premium-border {
-  border: 1px solid var(--color-light-border);
-  box-shadow: var(--shadow-sm);
-}
-
-/* ===== Ambient Backgrounds (Subtle for Light Mode) ===== */
-.bg-ambient-glow {
-  background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(79, 70, 229, 0.08) 0%, transparent 60%),
-              radial-gradient(ellipse 60% 40% at 80% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
-              var(--color-light-base);
-}
-
-.bg-ambient-glow-bottom {
-  background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(79, 70, 229, 0.05) 0%, transparent 60%),
-              var(--color-light-base);
-}
-
-/* ===== Animated Gradient Orb (Very subtle for light mode) ===== */
-@keyframes float-orb {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(30px, -20px) scale(1.05); }
-  50% { transform: translate(-20px, 15px) scale(0.95); }
-  75% { transform: translate(15px, 25px) scale(1.02); }
-}
-
-.orb {
+.card-live::before {
+  content: "";
   position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.2; /* Much lower opacity for light mode */
-  animation: float-orb 15s ease-in-out infinite;
-  pointer-events: none;
-  z-index: -1;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-lift) 55%, transparent 100%);
 }
 
-.orb-violet {
-  background: radial-gradient(circle, var(--color-accent-indigo) 0%, transparent 70%);
-}
-
-.orb-coral {
-  background: radial-gradient(circle, var(--color-accent-coral) 0%, transparent 70%);
-  animation-delay: -5s;
-}
-
-.orb-cyan {
-  background: radial-gradient(circle, #3B82F6 0%, transparent 70%);
-  animation-delay: -10s;
-}
-
-/* ===== Input Autofill Styling (Light Mode) ===== */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
-  -webkit-text-fill-color: var(--color-text-primary) !important;
-  caret-color: var(--color-text-primary);
-}
-
-/* ===== Custom Scrollbar (Light Mode) ===== */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #D1D5DB; /* Gray-300 */
-  border-radius: 9999px;
-  border: 2px solid var(--color-light-base); /* Add padding effect */
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF; /* Gray-400 */
-}
-
-/* ===== Hover Effects ===== */
 .hover-card {
-  transition: all 0.2s ease;
+  transition: transform var(--dur-base) var(--ease-cut),
+              box-shadow var(--dur-base) var(--ease-cut),
+              border-color var(--dur-base) var(--ease-cut);
 }
 .hover-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-card-hover);
-  border-color: #D1D5DB;
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--color-line));
 }
 
-.hover-glow {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+/* Kept for markup that still references them, retuned to the new system so
+   nothing has to change to stop looking like the old one. */
+.glass-panel {
+  background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-sm);
 }
-.hover-glow:hover {
-  box-shadow: var(--shadow-sm), var(--shadow-glow-primary);
-  border-color: rgba(79, 70, 229, 0.4);
+.glass-panel-light { composes: glass-panel; }
+.premium-border { border: 1px solid var(--color-line); box-shadow: var(--shadow-sm); }
+
+/* ============================================================================
+   Buttons
+   ========================================================================= */
+
+/* Flat and confident. The old gradient pill is gone — a solid field of the
+   session's colour reads as a control, a gradient reads as a landing page. */
+.btn-primary,
+.gradient-btn {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid color-mix(in oklab, var(--accent) 82%, #000);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--accent-lift) 60%, transparent) inset,
+              var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease-cut),
+              filter var(--dur-fast) var(--ease-cut),
+              box-shadow var(--dur-fast) var(--ease-cut);
+}
+.btn-primary:hover:not(:disabled),
+.gradient-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--accent-lift) 60%, transparent) inset,
+              var(--shadow-md);
+}
+/* Press is a real press: down and immediate, no spring back up. */
+.btn-primary:active:not(:disabled),
+.gradient-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.995);
+  filter: brightness(0.97);
+}
+
+.btn-quiet {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  font-weight: 600;
+  transition: background var(--dur-fast) var(--ease-cut),
+              border-color var(--dur-fast) var(--ease-cut);
+}
+.btn-quiet:hover:not(:disabled) {
+  background: var(--color-sunken);
+  border-color: color-mix(in oklab, var(--accent) 26%, var(--color-line));
+}
+
+.gradient-btn-coral {
+  background: var(--color-wrong);
+  color: #fff;
+  border: 1px solid color-mix(in oklab, var(--color-wrong) 80%, #000);
+}
+
+/* ============================================================================
+   Type accents
+   ========================================================================= */
+
+/* Was a purple-to-blue gradient. Now the word simply carries the session's
+   colour — louder in context, and it survives being screenshotted. */
+.gradient-text {
+  color: var(--accent);
+  -webkit-text-fill-color: currentColor;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* The join code. It gets read aloud off a screen, so it is set large, monospaced
+   and widely tracked, with the grouping doing the work commas would do. */
+.code-display {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+
+/* ============================================================================
+   Stage — the projected audience screen
+   ========================================================================= */
+
+.bg-live-stage,
+.stage {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,
+      color-mix(in oklab, var(--accent) 26%, transparent) 0%, transparent 62%),
+    radial-gradient(ellipse 50% 40% at 88% 8%,
+      color-mix(in oklab, var(--accent-lift) 16%, transparent) 0%, transparent 58%),
+    var(--color-stage);
+  color: var(--color-stage-ink);
+}
+
+/* A faint grid, the way broadcast graphics sit on one. Barely visible, but it
+   stops a large dark field reading as empty. */
+.stage-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--color-stage-ink) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-stage-ink) 4%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 0%, transparent 78%);
+}
+
+/* Replaces the floating blurred orbs. Same job — stop the page being flat —
+   without the drifting purple blobs every generated interface has. */
+.bg-ambient-glow {
+  background:
+    radial-gradient(ellipse 76% 52% at 50% -14%,
+      color-mix(in oklab, var(--accent) 11%, transparent) 0%, transparent 60%),
+    var(--color-paper);
+}
+.bg-ambient-glow-bottom {
+  background:
+    radial-gradient(ellipse 80% 46% at 50% 112%,
+      color-mix(in oklab, var(--accent) 9%, transparent) 0%, transparent 58%),
+    var(--color-paper);
+}
+
+/* The orbs are retired. The class is kept inert so old markup renders nothing
+   rather than breaking. */
+.orb, .orb-violet, .orb-coral, .orb-cyan { display: none !important; }
+
+/* ============================================================================
+   Motion
+   ========================================================================= */
+
+/* A question arriving is a cut, not a fade-in-from-below. It comes in from the
+   side with a slight blur, the way a lower-third does. */
+@keyframes cut-in {
+  from { opacity: 0; transform: translate3d(18px, 0, 0); filter: blur(3px); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0);    filter: blur(0); }
+}
+.animate-cut-in { animation: cut-in var(--dur-base) var(--ease-cut) both; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-rise { animation: rise-in var(--dur-base) var(--ease-out-soft) both; }
+
+/* Results bars grow from nothing. Staggered by the component, not here. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.animate-bar {
+  transform-origin: left center;
+  animation: bar-grow var(--dur-slow) var(--ease-out-soft) both;
+}
+
+/* The last five seconds. A tightening pulse rather than a colour flash, so it
+   reads in peripheral vision without hijacking attention. */
+@keyframes timer-urgent {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+.timer-urgent { animation: timer-urgent 0.7s var(--ease-cut) infinite; }
+
+/* The lobby's "waiting for people" beat. */
+@keyframes join-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 38%, transparent); }
+  70%  { box-shadow: 0 0 0 20px color-mix(in oklab, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+.join-pulse { animation: join-pulse 2.4s var(--ease-out-soft) infinite; }
+
+/* A live session is running. One slow breath on a small dot — the only thing
+   in the interface that moves continuously. */
+@keyframes live-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.live-dot { animation: live-breathe 2s var(--ease-cut) infinite; }
+
+/* Something just changed on a scoreboard row. */
+@keyframes flash-accent {
+  from { background-color: color-mix(in oklab, var(--accent) 22%, transparent); }
+  to   { background-color: transparent; }
+}
+.animate-flash { animation: flash-accent 1.1s var(--ease-out-soft) both; }
+
+/* Correct / wrong feedback. Two different shapes of motion so the answer is
+   legible before the colour is read. */
+@keyframes pop-right {
+  0%   { transform: scale(0.9); opacity: 0; }
+  60%  { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.animate-right { animation: pop-right 340ms var(--ease-cut) both; }
+
+@keyframes shake-wrong {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px); }
+  45%      { transform: translateX(4px); }
+  70%      { transform: translateX(-2px); }
+}
+.animate-wrong { animation: shake-wrong 380ms var(--ease-cut) both; }
+
+.stagger > * { animation: rise-in var(--dur-base) var(--ease-out-soft) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 45ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 135ms; }
+.stagger > *:nth-child(5) { animation-delay: 180ms; }
+.stagger > *:nth-child(6) { animation-delay: 225ms; }
+
+/* Anybody who has asked for less motion gets none of it. Not reduced — none. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Form fields
+   ========================================================================= */
+
+.field {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  color: var(--color-ink);
+  transition: border-color var(--dur-fast) var(--ease-cut),
+              box-shadow var(--dur-fast) var(--ease-cut);
+}
+.field:focus,
+.field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 14%, transparent);
+  outline: none;
+}
+.field::placeholder { color: var(--color-faint); }
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-ink) !important;
+  caret-color: var(--color-ink);
+}
+
+/* ============================================================================
+   Scrollbar
+   ========================================================================= */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+  border: 3px solid var(--color-paper);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-faint); }
+
+.stage ::-webkit-scrollbar-thumb {
+  background: var(--color-stage-3);
+  border-color: var(--color-stage);
 }

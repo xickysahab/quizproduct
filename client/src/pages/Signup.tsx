@@ -49,7 +49,7 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-indigo-100">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans relative selection:bg-accent-wash">
       <Navbar />
 
       <main className="flex-1 pt-32 pb-24 px-6 md:px-12 flex items-center justify-center relative bg-ambient-glow">
@@ -71,7 +71,7 @@ const Signup: React.FC = () => {
               </p>
               <Link
                 to="/login"
-                className="inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-800 pt-2"
+                className="inline-block text-sm font-semibold text-accent hover:text-accent pt-2"
               >
                 Back to sign in
               </Link>
@@ -80,7 +80,7 @@ const Signup: React.FC = () => {
             <>
               <div className="text-center mb-8">
                 <Logo size={48} className="mx-auto mb-4" />
-                <span className="text-[11px] font-bold tracking-[0.2em] text-indigo-600 uppercase">
+                <span className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">
                   Create your workspace
                 </span>
                 <h2 className="font-heading text-3xl font-bold text-gray-900 mt-1">Get started</h2>
@@ -142,7 +142,7 @@ const Signup: React.FC = () => {
 
               <p className="text-center text-sm text-gray-500 mt-6">
                 Already have an account?{' '}
-                <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-800">
+                <Link to="/login" className="font-semibold text-accent hover:text-accent">
                   Sign in
                 </Link>
               </p>
@@ -163,7 +163,7 @@ const Field: React.FC<{ icon: React.ReactNode; label: string; children: React.Re
     <span className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
       {label}
     </span>
-    <span className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-gray-200 bg-gray-50 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-100 transition-all">
+    <span className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-gray-200 bg-gray-50 focus-within:bg-white focus-within:border-accent focus-within:ring-4 focus-within:ring-accent transition-all">
       <span className="text-gray-400 flex-shrink-0">{icon}</span>
       {children}
     </span>

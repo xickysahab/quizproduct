@@ -32,7 +32,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 flex-col bg-white border-r border-gray-200 pt-8 px-4 shadow-sm z-10">
           <div className="mb-8 px-2">
-            <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-indigo-800">
+            <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent">
               {title}
             </h2>
             <p className="text-sm text-gray-500 mt-1">Welcome, {user?.name}</p>
@@ -49,11 +49,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
                   to={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                      ? 'bg-accent-wash text-accent font-semibold'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-indigo-600' : ''}`} />
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-accent' : ''}`} />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               );

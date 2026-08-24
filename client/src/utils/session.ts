@@ -19,6 +19,12 @@ export const getSessionKey = (): string => {
   return key;
 };
 
-/** Display label for a participant who joined without a name. */
+/**
+ * Fallback label for a nameless participant.
+ *
+ * Anonymous joining has been removed — every new participant supplies a name.
+ * This only covers rows created before that change, so it should get rarer
+ * rather than being a path anyone can take today.
+ */
 export const displayName = (name: string | null | undefined): string =>
   name && name.trim() ? name : 'Anonymous';

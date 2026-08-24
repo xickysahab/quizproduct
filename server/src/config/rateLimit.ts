@@ -50,3 +50,15 @@ export const apiLimiter = rateLimit({
   limit: 600,
   message: { message: 'Too many requests. Please slow down.' },
 });
+
+/**
+ * Question submission. Tighter than the answer limit — a question is a
+ * deliberate act, and a flood of them is the main Q&A abuse vector.
+ */
+export const qaSubmitLimiter = rateLimit({
+  ...shared,
+  windowMs: 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => (req as ParticipantRequest).participant?.participantId ?? 'anonymous',
+  message: { message: 'You are posting questions too quickly. Please wait a moment.' },
+});

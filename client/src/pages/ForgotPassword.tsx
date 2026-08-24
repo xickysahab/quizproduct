@@ -40,7 +40,7 @@ const ForgotPassword: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-indigo-500"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-accent"
                   placeholder="you@company.com"
                 />
               </div>
@@ -49,7 +49,7 @@ const ForgotPassword: React.FC = () => {
               </button>
             </form>
           )}
-          <Link to="/login" className="text-sm text-indigo-600 font-semibold">
+          <Link to="/login" className="text-sm text-accent font-semibold">
             Back to sign in
           </Link>
         </div>

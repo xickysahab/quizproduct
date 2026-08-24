@@ -36,7 +36,7 @@ const VerifyEmail: React.FC = () => {
 
         {state === 'working' && (
           <>
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+            <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto" />
             <p className="text-sm text-gray-500">Confirming your address…</p>
           </>
         )}
@@ -64,7 +64,7 @@ const VerifyEmail: React.FC = () => {
             </div>
             <h1 className="font-heading text-2xl font-bold text-gray-900">Link didn&apos;t work</h1>
             <p className="text-sm text-gray-500">{message}</p>
-            <Link to="/signup" className="inline-block text-sm font-semibold text-indigo-600">
+            <Link to="/signup" className="inline-block text-sm font-semibold text-accent">
               Sign up again
             </Link>
           </>

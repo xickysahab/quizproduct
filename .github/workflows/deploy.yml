@@ -5,10 +5,57 @@ on:
     branches:
       - main
 
+# A second push while a deploy is running would interleave two builds on the
+# same box. Queue instead of racing.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  # Deploy only runs if this passes. Previously deploy ran independently of CI,
+  # so a red build still shipped.
+  verify:
     runs-on: ubuntu-latest
-    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Typecheck server
+        working-directory: server
+        run: npm run typecheck
+
+      - name: Test server
+        working-directory: server
+        run: npm test
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Typecheck client
+        working-directory: client
+        run: npx tsc -p tsconfig.app.json --noEmit
+
+      - name: Build client
+        working-directory: client
+        run: npm run build
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy to AWS EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -17,33 +64,44 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Navigate to project directory
+            set -euo pipefail
+
             cd ~/quizproduct
-            
-            # Pull latest changes from git
             git pull origin main
-            
-            # Setup Backend
+
             echo "Building backend..."
             cd server
-            npm install
+            npm ci
             npx prisma generate
-            npx prisma migrate deploy || npx prisma db push
+
+            # `migrate deploy` only, with no fallback. The previous
+            # `|| npx prisma db push` would force-sync the schema on any
+            # migration failure — which drops columns and tables to match, and
+            # can silently destroy production data. A failed migration must
+            # stop the deploy, not escalate to a destructive repair.
+            npx prisma migrate deploy
+
             npm run build
-            
-            # Restart backend server
+
             echo "Restarting backend with pm2..."
-            pm2 restart quizpulse-api
-            
-            # Setup Frontend
+            pm2 restart quizpulse-api --update-env
+
             echo "Building frontend..."
             cd ../client
-            npm install
+            npm ci
             npm run build
-            
-            # Deploy Frontend to Nginx
+
+            # Atomic swap. The old version stays served until the new one is
+            # fully in place, instead of `rm -rf` leaving the site 404ing for
+            # the length of a build.
             echo "Deploying frontend to Nginx..."
-            sudo rm -rf /var/www/html/*
-            sudo cp -r dist/* /var/www/html/
-            
+            RELEASE="/var/www/releases/$(date +%Y%m%d%H%M%S)"
+            sudo mkdir -p "$RELEASE"
+            sudo cp -r dist/. "$RELEASE/"
+            sudo ln -sfn "$RELEASE" /var/www/html-next
+            sudo mv -Tf /var/www/html-next /var/www/html
+
+            # Keep the last five releases so a rollback is a symlink change.
+            sudo sh -c 'ls -1dt /var/www/releases/* | tail -n +6 | xargs -r rm -rf'
+
             echo "Deployment completed successfully!"

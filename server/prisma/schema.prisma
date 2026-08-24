@@ -25,6 +25,67 @@ enum QuestionType {
   OPEN_TEXT
   WORD_CLOUD
   RATING
+  /// Participants order the options; results are a mean rank.
+  RANKING
+}
+
+/// Lifecycle of an audience-submitted question.
+/// PENDING only occurs on events with moderation switched on.
+enum AudienceQuestionStatus {
+  PENDING
+  APPROVED
+  ANSWERED
+  DISMISSED
+}
+
+/// QUIZ grades answers and can show correct/incorrect.
+/// SURVEY collects opinions only — no scoring, no answer-key reveal.
+/// Legacy grading signal, now DERIVED from `scoringEnabled` and kept in sync on
+/// every write. It is read in ~80 places across both apps; renaming it would be
+/// a large, risky refactor for no behavioural gain, and it already means exactly
+/// "is this session graded?". Treat `scoringEnabled` as authoritative and never
+/// set this by hand.
+enum SessionMode {
+  QUIZ
+  SURVEY
+}
+
+/// A named bundle of switches, not a behaviour of its own.
+/// Applying a preset writes the switches below; changing any switch afterwards
+/// moves the session to CUSTOM. This is what makes mixing possible — a mode
+/// enum alone could never express "Q&A on, scored on, podium off".
+enum SessionPreset {
+  /// Q&A led, unscored, anonymous. Meetings and town halls.
+  DISCUSSION
+  /// Scored race with speed, streak, scoreboard and podium.
+  GAME
+  /// Opinion collection. Never graded, results kept from the audience.
+  SURVEY
+  /// Any combination the host has assembled themselves.
+  CUSTOM
+}
+
+enum LeaderboardVisibility {
+  HIDDEN
+  HOST_ONLY
+  EVERYONE
+}
+
+enum ResultsReveal {
+  /// The host presses a button. Nothing is shown until they do.
+  HOST_TRIGGERED
+  /// Shown automatically once the question closes.
+  AUTO_AFTER_QUESTION
+  /// The audience never sees the distribution.
+  NEVER
+}
+
+/// Per-question override of the session's scoring switch — the mechanism that
+/// lets one session hold unscored opinion polls and scored quiz questions.
+enum ScoredOverride {
+  INHERIT
+  YES
+  NO
 }
 
 model Organization {
@@ -36,10 +97,19 @@ model Organization {
   primaryColor         String?
   stripeCustomerId     String?
   stripeSubscriptionId String?
+  razorpayCustomerId     String?
+  razorpaySubscriptionId String?
   users                User[]
   events               Event[]
   invites              Invite[]
   usageMeters          UsageMeter[]
+  invoices             Invoice[]
+  /// Buyer tax details, for GST invoicing.
+  gstin                String?
+  /// Two-digit Indian state code; decides CGST+SGST versus IGST.
+  stateCode            String?
+  billingName          String?
+  billingAddress       String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 }
@@ -85,6 +155,96 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+/// Every webhook event we have already acted on.
+/// Razorpay signs no timestamp, so this table is the replay defence: an event
+/// id can be consumed exactly once, whatever a replayed request claims.
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  provider    String
+  /// The provider's own event id.
+  externalId  String
+  type        String
+  processedAt DateTime @default(now())
+
+  @@unique([provider, externalId])
+  @@index([processedAt])
+}
+
+/// DPDP Act 2023 §6: consent must be free, specific, informed and unambiguous,
+/// and each purpose consented to separately. One row per purpose per person —
+/// not a single bundled checkbox.
+model ConsentRecord {
+  id            String    @id @default(uuid())
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  participantId String?
+  purpose       String
+  granted       Boolean
+  /// The wording shown at the time, so consent can be evidenced later.
+  policyVersion String
+  grantedAt     DateTime  @default(now())
+  withdrawnAt   DateTime?
+
+  @@index([userId, purpose])
+  @@index([participantId])
+}
+
+/// A DPDP erasure request and its outcome. Kept after the purge as the audit
+/// trail that the erasure happened — it holds no personal data itself.
+model DataDeletionRequest {
+  id          String    @id @default(uuid())
+  userId      String?
+  /// Retained as a hash so a request can be matched without storing the address.
+  emailHash   String
+  status      String    @default("PENDING")
+  requestedAt DateTime  @default(now())
+  completedAt DateTime?
+  /// Counts of what was purged, for the compliance record.
+  summary     Json?
+
+  @@index([emailHash])
+  @@index([status])
+}
+
+/// GST-compliant tax invoice. Indian finance teams reject software they cannot
+/// expense, so this is a hard requirement rather than a nicety.
+model Invoice {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Sequential, per financial year, as required for a tax invoice.
+  invoiceNumber  String       @unique
+  /// All money is stored in paise to avoid floating-point drift.
+  subtotalPaise  Int
+  cgstPaise      Int          @default(0)
+  sgstPaise      Int          @default(0)
+  igstPaise      Int          @default(0)
+  totalPaise     Int
+  currency       String       @default("INR")
+  gstin          String?
+  /// Buyer's state code, which decides CGST+SGST versus IGST.
+  placeOfSupply  String?
+  hsnSac         String       @default("998434")
+  status         String       @default("PAID")
+  provider       String?
+  providerRef    String?
+  issuedAt       DateTime     @default(now())
+
+  @@index([organizationId, issuedAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model User {
   id               String               @id @default(uuid())
   email            String               @unique
@@ -98,9 +258,14 @@ model User {
   subUsers         User[]               @relation("UserHierarchy")
   organizationId   String?
   organization     Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  /// Null until the address is confirmed. Self-serve accounts may sign in
+  /// before verifying, but cannot run a live event until they have.
+  emailVerifiedAt  DateTime?
   events           Event[]
   activityLogs     ActivityLog[]
   passwordResets   PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
+  consents         ConsentRecord[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -119,12 +284,48 @@ model Event {
   organization             Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   isLive                   Boolean        @default(false)
   isTemplate               Boolean        @default(false)
+  /// When on, correct answers score more when submitted earlier in the timer.
+  /// Ignored when sessionMode is SURVEY.
+  /// ---- Session personality ----------------------------------------------
+  /// `preset` is a label recording which bundle was applied; the switches below
+  /// are what the server actually reads.
+  preset                   SessionPreset  @default(GAME)
+  /// Authoritative. `sessionMode` is derived from this.
+  scoringEnabled           Boolean        @default(true)
+  speedBonusEnabled        Boolean        @default(false)
+  streakBonusEnabled       Boolean        @default(false)
+  leaderboardVisibility    LeaderboardVisibility @default(EVERYONE)
+  /// The full-screen standings moment between questions.
+  scoreboardBetweenQuestions Boolean      @default(false)
+  podiumAtEnd              Boolean        @default(true)
+  resultsReveal            ResultsReveal  @default(HOST_TRIGGERED)
+  /// Advance automatically when the timer runs out.
+  autoAdvance              Boolean        @default(false)
+  /// When false, phones show only the answer tiles so eyes go to the big screen.
+  phoneShowsQuestion       Boolean        @default(true)
+  soundEnabled             Boolean        @default(false)
+  /// QUIZ = scored with optional answer keys. SURVEY = opinion / feedback only.
+  sessionMode              SessionMode    @default(QUIZ)
   currentQuestionId        String?
   /// Set when the host opens a question. Used to reject answers submitted after the time limit.
   currentQuestionStartedAt DateTime?
   concludeConfig           Json?
+  /// Audience Q&A. On by default — it is the reason most people open the room.
+  qaEnabled                Boolean        @default(true)
+  /// When true, submitted questions stay PENDING until a host approves them.
+  qaModerated              Boolean        @default(false)
+  /// Participants may join without giving a name.
+  allowAnonymous           Boolean        @default(true)
+  /// Set when the room is closed to new joins, so a code stops working instead
+  /// of every code ever issued staying live forever.
+  roomCodeRetiredAt        DateTime?
+  /// Argon-free: a short passcode hashed with SHA-256. Not a password — it is a
+  /// low-entropy door code shared with a room, so it is stored hashed to avoid
+  /// leaking it from a database dump, not to resist offline cracking.
+  passcodeHash             String?
   questions                Question[]
   participants             Participant[]
+  audienceQuestions        AudienceQuestion[]
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
 
@@ -143,6 +344,8 @@ model Question {
   correctOptions Int[]        @default([])
   order          Int
   timeLimit      Int?
+  /// Overrides the session's scoring switch for this question only.
+  scored         ScoredOverride @default(INHERIT)
   responses      Response[]
 
   @@index([eventId, order])
@@ -152,12 +355,56 @@ model Participant {
   id        String     @id @default(uuid())
   eventId   String
   event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Empty for an anonymous participant; the UI shows a generated label.
   name      String
+  /// Stable per-device key so a refresh or a re-join reuses this row instead of
+  /// creating a duplicate that splits the person's score and double-counts them
+  /// against the plan's participant cap.
+  sessionKey String?
   socketId  String?
   responses Response[]
+  audienceQuestions AudienceQuestion[]
+  audienceVotes     AudienceQuestionVote[]
   joinedAt  DateTime   @default(now())
 
+  @@unique([eventId, sessionKey])
   @@index([eventId])
+}
+
+/// A question asked by the audience, not by the host.
+model AudienceQuestion {
+  id            String                 @id @default(uuid())
+  eventId       String
+  event         Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Null once the participant is removed; the question itself survives.
+  participantId String?
+  participant   Participant?           @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  /// Null means the author chose to stay anonymous.
+  authorName    String?
+  text          String
+  status        AudienceQuestionStatus @default(APPROVED)
+  /// Denormalised from votes so the list can be sorted without a join.
+  upvoteCount   Int                    @default(0)
+  answeredAt    DateTime?
+  createdAt     DateTime               @default(now())
+  votes         AudienceQuestionVote[]
+
+  @@index([eventId, status, upvoteCount])
+  @@index([eventId, createdAt])
+}
+
+model AudienceQuestionVote {
+  id                 String           @id @default(uuid())
+  audienceQuestionId String
+  audienceQuestion   AudienceQuestion @relation(fields: [audienceQuestionId], references: [id], onDelete: Cascade)
+  participantId      String
+  participant        Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now())
+
+  /// One vote per person per question, enforced by the database rather than
+  /// by application logic that a retry could slip past.
+  @@unique([audienceQuestionId, participantId])
+  @@index([participantId])
 }
 
 model Response {
@@ -169,12 +416,21 @@ model Response {
   selectedOption  Int         @default(0)
   selectedOptions Int[]       @default([])
   answerText      String?
+  /// For RANKING: the option indices in the order the participant placed them.
+  rankedOptions   Int[]       @default([])
+  /// Consecutive correct answers up to and including this one, at answer time.
+  /// Stored rather than derived so a later edit to an earlier answer cannot
+  /// retroactively rewrite a score that was already shown to somebody.
+  streak          Int         @default(0)
   score           Int         @default(0)
   isCorrect       Boolean     @default(false)
   respondedAt     DateTime    @default(now())
 
   @@unique([questionId, participantId])
   @@index([participantId])
+  /// A covering index on (participantId) INCLUDE (score, isCorrect, respondedAt)
+  /// also exists — see migration 20260823220000_leaderboard_covering_index.
+  /// Prisma cannot express INCLUDE columns, so it lives in raw SQL.
 }
 
 model ActivityLog {

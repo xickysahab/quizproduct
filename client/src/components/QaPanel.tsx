@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { socket } from '../socket/socket';
 import { displayName } from '../utils/session';
+import { useTranslation } from '../i18n/useTranslation';
 
 /**
  * Audience Q&A, participant side.
@@ -29,6 +30,7 @@ export interface AudienceQuestion {
 const MAX_LENGTH = 500;
 
 const QaPanel: React.FC = () => {
+  const { t } = useTranslation();
   const [questions, setQuestions] = useState<AudienceQuestion[]>([]);
   const [text, setText] = useState('');
   const [anonymous, setAnonymous] = useState(false);
@@ -67,12 +69,12 @@ const QaPanel: React.FC = () => {
         anonymous,
       });
       setText('');
-      toast.success(res.data.message || 'Question posted.');
+      toast.success(res.data.message || t('qa.posted'));
       await load();
     } catch (error) {
       const message =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Could not post that question. Try again.';
+        t('qa.failed');
       toast.error(message);
     } finally {
       setSending(false);
@@ -93,7 +95,7 @@ const QaPanel: React.FC = () => {
     try {
       await api.post(`/questions-from-audience/${question.id}/upvote`);
     } catch {
-      toast.error('Could not register that vote.');
+      toast.error(t('qa.voteFailed'));
       await load();
     }
   };
@@ -109,8 +111,8 @@ const QaPanel: React.FC = () => {
             onChange={(e) => setText(e.target.value)}
             maxLength={MAX_LENGTH}
             rows={2}
-            placeholder="Ask the speaker something…"
-            className="w-full px-4 py-3 pr-16 rounded-2xl border border-gray-200 bg-white text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 resize-none"
+            placeholder={t("qa.placeholder")}
+            className="w-full px-4 py-3 pr-16 rounded-2xl border border-gray-200 bg-white text-sm outline-none focus:border-accent focus:ring-4 focus:ring-accent resize-none"
             aria-label="Your question"
           />
           <span className="absolute bottom-3 right-4 text-[10px] font-mono text-gray-400 tabular-nums">
@@ -124,9 +126,9 @@ const QaPanel: React.FC = () => {
               type="checkbox"
               checked={anonymous}
               onChange={(e) => setAnonymous(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
             />
-            <span>Ask anonymously</span>
+            <span>{t('qa.anonymous')}</span>
           </label>
 
           <button
@@ -135,14 +137,14 @@ const QaPanel: React.FC = () => {
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-btn text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <MessageSquarePlus className="w-4 h-4" />
-            <span>{sending ? 'Sending…' : 'Ask'}</span>
+            <span>{sending ? t('qa.sending') : t('qa.ask')}</span>
           </button>
         </div>
       </form>
 
       {loaded && visible.length === 0 && (
         <p className="text-sm text-gray-500 text-center py-8">
-          No questions yet. Be the first to ask.
+          {t('qa.empty')}
         </p>
       )}
 
@@ -165,11 +167,11 @@ const QaPanel: React.FC = () => {
                 onClick={() => upvote(question)}
                 disabled={question.status === 'ANSWERED'}
                 aria-pressed={question.hasVoted}
-                aria-label={`Upvote: ${question.text}`}
+                aria-label={`${t('qa.upvote')}: ${question.text}`}
                 className={`flex flex-col items-center justify-center w-12 py-1.5 rounded-xl border flex-shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   question.hasVoted
-                    ? 'bg-indigo-600 border-indigo-600 text-white'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-indigo-300'
+                    ? 'bg-accent border-accent text-white'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-accent-soft'
                 }`}
               >
                 <ChevronUp className="w-4 h-4" />
@@ -180,21 +182,21 @@ const QaPanel: React.FC = () => {
                 <p className="text-sm text-gray-900 leading-snug break-words">{question.text}</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className="text-[11px] text-gray-500">
-                    {question.authorName ? displayName(question.authorName) : 'Anonymous'}
-                    {question.isMine && ' · you'}
+                    {question.authorName ? displayName(question.authorName) : t('qa.anonymousLabel')}
+                    {question.isMine && ` · ${t('qa.you')}`}
                   </span>
 
                   {question.status === 'PENDING' && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
                       <Clock className="w-3 h-3" />
-                      Awaiting review
+                      {t('qa.pending')}
                     </span>
                   )}
 
                   {question.status === 'ANSWERED' && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
                       <Check className="w-3 h-3" />
-                      Answered
+                      {t('qa.answered')}
                     </span>
                   )}
                 </div>

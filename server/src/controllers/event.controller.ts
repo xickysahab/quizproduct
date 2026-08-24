@@ -6,8 +6,21 @@ import { logActivity } from '../utils/logger';
 import { getAccessibleHostIds, canAccessEvent } from '../utils/access';
 import { parsePagination } from '../utils/validation';
 import { organizationIdForUser } from '../utils/org';
-import { assertCanCreateEvent, bumpUsage } from '../utils/usage';
+import { assertCanCreateEvent, releaseEventSlot } from '../utils/usage';
 import { slog } from '../utils/slog';
+import { hashSecret } from '../utils/mailer';
+import {
+  SWITCH_KEYS,
+  presetSwitches,
+  isKnownPreset,
+  matchPreset,
+  resolveSwitches,
+  describeQuestionRisks,
+  deriveSessionMode,
+  PRESETS,
+} from '../utils/sessionSettings';
+import type { SessionSwitches, SessionPreset } from '../utils/sessionSettings';
+import { STARTER_TEMPLATES, getStarterTemplate } from '../utils/starterTemplates';
 
 const uniqueRoomCode = async (): Promise<string> => {
   let roomCode = generateRoomCode();
@@ -17,6 +30,84 @@ const uniqueRoomCode = async (): Promise<string> => {
     existingRoom = await prisma.event.findUnique({ where: { roomCode } });
   }
   return roomCode;
+};
+
+export const listStarterTemplates = async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({
+    templates: STARTER_TEMPLATES.map(({ id, title, description, questions, sessionMode }) => ({
+      id,
+      title,
+      description,
+      questionCount: questions.length,
+      sessionMode,
+    })),
+  });
+};
+
+export const createEventFromTemplate = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const templateId = String(req.body?.templateId || '');
+    const hostId = req.user?.userId;
+    if (!hostId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const template = getStarterTemplate(templateId);
+    if (!template) {
+      res.status(404).json({ message: 'Template not found.' });
+      return;
+    }
+
+    const organizationId = await organizationIdForUser(hostId);
+    const allowed = await assertCanCreateEvent(organizationId);
+    if (!allowed.ok) {
+      res.status(402).json({ message: allowed.message });
+      return;
+    }
+
+    let event;
+    try {
+      event = await prisma.event.create({
+        data: {
+          title: template.title,
+          roomCode: await uniqueRoomCode(),
+          hostId,
+          organizationId,
+          sessionMode: template.sessionMode,
+          // Knowledge-check decks benefit from Kahoot-style speed scoring.
+          speedBonusEnabled: template.sessionMode === 'QUIZ' && templateId === 'knowledge-check',
+          questions: {
+            create: template.questions.map((question) => ({
+              type: question.type,
+              text: question.text,
+              options: question.options,
+              correctOption: question.correctOption,
+              correctOptions: question.correctOptions,
+              order: question.order,
+              timeLimit: question.timeLimit,
+            })),
+          },
+        },
+        include: { questions: { orderBy: { order: 'asc' } } },
+      });
+    } catch (creationError) {
+      await releaseEventSlot(organizationId);
+      throw creationError;
+    }
+
+    await logActivity(hostId, 'CREATE_EVENT_FROM_TEMPLATE', 'Event', event.id, {
+      templateId,
+      title: event.title,
+    });
+
+    res.status(201).json({ message: 'Quiz created from template', event });
+  } catch (error) {
+    slog('error', 'event.template_create_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -41,16 +132,25 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const event = await prisma.event.create({
-      data: {
-        title,
-        roomCode: await uniqueRoomCode(),
-        hostId,
-        organizationId,
-      },
-    });
+    let event;
+    try {
+      event = await prisma.event.create({
+        data: {
+          title,
+          roomCode: await uniqueRoomCode(),
+          hostId,
+          organizationId,
+        },
+      });
+    } catch (creationError) {
+      // The quota slot was reserved before the insert; hand it back rather
+      // than charging the org for an event that never existed.
+      await releaseEventSlot(organizationId);
+      throw creationError;
+    }
 
-    await bumpUsage(organizationId, 'eventsCreated');
+    // The slot was already reserved by assertCanCreateEvent — bumping again
+    // here would count every event twice against the monthly quota.
     await logActivity(req.user?.userId, 'CREATE_EVENT', 'Event', event.id, { title: event.title, roomCode: event.roomCode });
 
     res.status(201).json({
@@ -131,7 +231,15 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    res.status(200).json({ event });
+    // Never send the passcode hash to the browser — only whether one is set.
+    const { passcodeHash, ...safeEvent } = event;
+
+    res.status(200).json({
+      event: {
+        ...safeEvent,
+        passcodeSet: Boolean(passcodeHash),
+      },
+    });
   } catch (error) {
     console.error('Get event by ID error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -217,10 +325,12 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
     // Delete participants. Because of onDelete: Cascade in schema, this will automatically delete all Responses.
     await prisma.participant.deleteMany({ where: { eventId: id } });
 
-    // Optionally reset the current question pointer
+    // Reset the whole live-session pointer, not just the question. Leaving
+    // isLive true with a stale start time meant a re-run began mid-question
+    // with a deadline that had already expired.
     await prisma.event.update({
       where: { id },
-      data: { currentQuestionId: null }
+      data: { currentQuestionId: null, currentQuestionStartedAt: null, isLive: false },
     });
 
     await logActivity(req.user?.userId, 'CLEAR_EVENT_DATA', 'Event', id, { title: event.title });
@@ -267,6 +377,8 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
         hostId,
         organizationId,
         concludeConfig: source.concludeConfig ?? undefined,
+        speedBonusEnabled: source.speedBonusEnabled,
+        sessionMode: source.sessionMode,
         questions: {
           create: source.questions.map((question) => ({
             type: question.type,
@@ -282,7 +394,6 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
       include: { questions: true },
     });
 
-    await bumpUsage(organizationId, 'eventsCreated');
     await logActivity(hostId, 'DUPLICATE_EVENT', 'Event', copy.id, {
       sourceId: source.id,
       title: copy.title,
@@ -291,6 +402,227 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
     res.status(201).json({ message: 'Quiz duplicated', event: copy });
   } catch (error) {
     slog('error', 'event.duplicate_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Sets or clears the room passcode, and the anonymity switch.
+ *
+ * A passcode is a door code shared with a room, not a credential — it is stored
+ * hashed so a database dump does not hand out access to every live session, but
+ * it is not pretending to resist offline cracking.
+ */
+/**
+ * Reads the switches off an event row.
+ * `sessionMode` is deliberately absent — it is derived, never read.
+ */
+const switchesOf = (event: Record<string, unknown>): SessionSwitches =>
+  Object.fromEntries(SWITCH_KEYS.map((key) => [key, event[key]])) as unknown as SessionSwitches;
+
+/**
+ * The session's personality: apply a preset, or set individual switches.
+ *
+ * Presets and switches go through the same endpoint on purpose. A preset is
+ * only a bundle — applying one writes switches, and touching any switch
+ * afterwards moves the session to CUSTOM. There is no second source of truth.
+ */
+export const updateEventAccess = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { passcode, retireCode, preset, ...rest } = req.body || {};
+
+    const event = await prisma.event.findUnique({
+      where: { id },
+      include: { questions: { select: { timeLimit: true } } },
+    });
+
+    if (!event) {
+      res.status(404).json({ message: 'Event not found' });
+      return;
+    }
+
+    if (!(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+      res.status(403).json({ message: 'Forbidden: You do not have access to this event.' });
+      return;
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (passcode !== undefined) {
+      const value = typeof passcode === 'string' ? passcode.trim() : '';
+      if (value && value.length < 4) {
+        res.status(400).json({ message: 'A passcode needs at least 4 characters.' });
+        return;
+      }
+      // Lowercased before hashing so the room does not fail on capitalisation
+      // when the code is read off a slide.
+      data.passcodeHash = value ? hashSecret(value.toLowerCase()) : null;
+    }
+
+    if (typeof retireCode === 'boolean') {
+      data.roomCodeRetiredAt = retireCode ? new Date() : null;
+    }
+
+    // Start from what the session already is, then layer the preset (if one was
+    // named) and then any explicit switches on top. Order matters: an explicit
+    // switch sent alongside a preset should win.
+    let next: SessionSwitches = switchesOf(event as unknown as Record<string, unknown>);
+    let requestedPreset: SessionPreset | null = null;
+
+    if (typeof preset === 'string') {
+      if (!isKnownPreset(preset)) {
+        res.status(400).json({ message: 'Unknown preset.' });
+        return;
+      }
+      requestedPreset = preset;
+      const bundle = presetSwitches(preset);
+      if (bundle) next = bundle;
+    }
+
+    let touchedASwitch = false;
+    for (const key of SWITCH_KEYS) {
+      const value = (rest as Record<string, unknown>)[key];
+      if (value === undefined) continue;
+      // Trust the type, not the caller: a bad value is ignored rather than
+      // written, so a stale client cannot corrupt the session's personality.
+      const expected = typeof next[key];
+      if (typeof value !== expected) continue;
+      (next as unknown as Record<string, unknown>)[key] = value;
+      touchedASwitch = true;
+    }
+
+    // Impossible combinations are corrected here, not in the UI — the UI can
+    // be stale or bypassed entirely.
+    const { switches, conflicts } = resolveSwitches(next);
+
+    // A preset that was applied and then modified is no longer that preset.
+    const effectivePreset =
+      requestedPreset && !touchedASwitch ? requestedPreset : matchPreset(switches);
+
+    SWITCH_KEYS.forEach((key) => {
+      data[key] = switches[key];
+    });
+    data.preset = effectivePreset;
+    // Legacy column, kept in step so the ~80 places that read it stay correct.
+    data.sessionMode = deriveSessionMode(switches.scoringEnabled);
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ message: 'Nothing to update.' });
+      return;
+    }
+
+    const updated = await prisma.event.update({ where: { id }, data });
+
+    await logActivity(req.user?.userId, 'UPDATE_EVENT_ACCESS', 'Event', id, {
+      title: event.title,
+      preset: effectivePreset,
+      passcodeSet: Boolean(updated.passcodeHash),
+      retired: Boolean(updated.roomCodeRetiredAt),
+    });
+
+    res.json({
+      message: 'Session settings updated.',
+      preset: updated.preset,
+      // Never echo the passcode back, only whether one is set.
+      passcodeSet: Boolean(updated.passcodeHash),
+      roomCodeRetiredAt: updated.roomCodeRetiredAt,
+      sessionMode: updated.sessionMode,
+      switches,
+      // What was corrected and what merely looks odd, so the host is told
+      // rather than left wondering why a toggle moved.
+      conflicts,
+      risks: describeQuestionRisks(switches, event.questions),
+    });
+  } catch (error) {
+    slog('error', 'event.access_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/** The preset catalogue, so the host UI does not hardcode the bundles. */
+export const listPresets = async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({
+    presets: [
+      {
+        id: 'DISCUSSION',
+        label: 'Discussion',
+        blurb: 'Audience Q&A leads. Nothing is scored and nobody loses — for town halls and meetings.',
+        switches: PRESETS.DISCUSSION,
+      },
+      {
+        id: 'GAME',
+        label: 'Game',
+        blurb: 'A scored race with speed, streaks, standings between questions and a podium.',
+        switches: PRESETS.GAME,
+      },
+      {
+        id: 'SURVEY',
+        label: 'Survey',
+        blurb: 'Collect opinions. Never graded, and the room does not see the split.',
+        switches: PRESETS.SURVEY,
+      },
+      {
+        id: 'CUSTOM',
+        label: 'Custom',
+        blurb: 'Mix them. Q&A during a scored quiz, a podium without a timer — whatever the room needs.',
+        switches: null,
+      },
+    ],
+  });
+};
+
+/**
+ * Public pre-join lookup, so the join screen can ask for a passcode and show
+ * the host's branding before anybody is admitted. Deliberately minimal — it
+ * must not leak the session's content to someone who has only guessed a code.
+ */
+export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const code = String(req.params.code || '').replace(/[\s-]+/g, '').toUpperCase();
+
+    const event = await prisma.event.findUnique({
+      where: { roomCode: code },
+      select: {
+        title: true,
+        allowAnonymous: true,
+        passcodeHash: true,
+        roomCodeRetiredAt: true,
+        preset: true,
+        scoringEnabled: true,
+        qaEnabled: true,
+        sessionMode: true,
+        organization: { select: { name: true, logoUrl: true, primaryColor: true } },
+      },
+    });
+
+    if (!event || event.roomCodeRetiredAt) {
+      res.status(404).json({ message: 'That code did not match a room.' });
+      return;
+    }
+
+    res.json({
+      title: event.title,
+      // Kept in the response for older clients; always false in practice now.
+      allowAnonymous: false,
+      passcodeRequired: Boolean(event.passcodeHash),
+      // Enough for the join screen to take on the room's colour before anyone
+      // is admitted — you can see whether you are walking into a game or a
+      // discussion before you type your name.
+      preset: event.preset,
+      scoringEnabled: event.scoringEnabled,
+      qaEnabled: event.qaEnabled,
+      sessionMode: event.sessionMode,
+      branding: event.organization
+        ? {
+            name: event.organization.name,
+            logoUrl: event.organization.logoUrl,
+            primaryColor: event.organization.primaryColor,
+          }
+        : null,
+    });
+  } catch (error) {
+    slog('error', 'event.public_info_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

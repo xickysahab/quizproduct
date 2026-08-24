@@ -89,7 +89,7 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
               type="checkbox"
               checked={qaEnabled}
               onChange={(e) => updateSettings({ qaEnabled: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
             />
             <span>Accepting</span>
           </label>
@@ -99,7 +99,7 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
               type="checkbox"
               checked={qaModerated}
               onChange={(e) => updateSettings({ qaModerated: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
             />
             <span className="inline-flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -116,7 +116,7 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
             onClick={() => setFilter(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               filter === tab.key
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-accent text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -171,7 +171,7 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
                     onClick={() => setStatus(question, 'APPROVED')}
                     title="Show to the room"
                     aria-label="Approve question"
-                    className="p-2 rounded-lg bg-white border border-gray-200 text-indigo-600 hover:bg-indigo-50"
+                    className="p-2 rounded-lg bg-white border border-gray-200 text-accent hover:bg-accent-wash"
                   >
                     <Eye className="w-4 h-4" />
                   </button>

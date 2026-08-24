@@ -2,7 +2,9 @@ import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { hashPassword, comparePassword, generateToken } from '../utils/auth';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { normalizeEmail, MIN_PASSWORD_LENGTH } from '../utils/validation';
+import { normalizeEmail, MIN_PASSWORD_LENGTH, validateNewUser } from '../utils/validation';
+import { createOrganization } from '../utils/org';
+import { logActivity } from '../utils/logger';
 import { bumpTokenVersion } from '../utils/userStatus';
 import { hashSecret, publicAppUrl, randomToken, sendMail } from '../utils/mailer';
 import { slog } from '../utils/slog';
@@ -202,6 +204,106 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     res.status(200).json({ message: 'Password reset. You can sign in now.' });
   } catch (error) {
     slog('error', 'auth.reset_password_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Self-serve signup.
+ *
+ * Previously the only way to get an account was an invite from an existing
+ * admin, which rules out product-led growth entirely. A signup creates a TENANT
+ * with their own organisation, so the new account owns its events and plan.
+ */
+export const signup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsed = validateNewUser(req.body);
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
+      return;
+    }
+
+    const { name, email, password } = parsed.value;
+    const organizationName =
+      typeof req.body?.organizationName === 'string' && req.body.organizationName.trim()
+        ? req.body.organizationName.trim().slice(0, 80)
+        : name;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      // Deliberately the same response as a successful signup, so this cannot
+      // be used to enumerate which addresses are registered.
+      res.status(200).json({
+        message: 'Check your email to confirm your address.',
+        requiresVerification: true,
+      });
+      return;
+    }
+
+    const organization = await createOrganization(organizationName);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: await hashPassword(password),
+        role: 'TENANT',
+        organizationId: organization.id,
+      },
+    });
+
+    const token = randomToken();
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashSecret(token),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await sendMail({
+      to: user.email,
+      subject: 'Confirm your QuizPulse address',
+      text: `Hi ${user.name},\n\nConfirm your email to finish setting up QuizPulse (valid 24 hours):\n${publicAppUrl()}/verify-email?token=${token}\n`,
+    });
+
+    await logActivity(user.id, 'SIGNUP', 'User', user.id, { email: user.email });
+
+    res.status(201).json({
+      message: 'Check your email to confirm your address.',
+      requiresVerification: true,
+    });
+  } catch (error) {
+    slog('error', 'auth.signup_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    if (!token) {
+      res.status(400).json({ message: 'A verification token is required.' });
+      return;
+    }
+
+    const record = await prisma.emailVerificationToken.findUnique({
+      where: { tokenHash: hashSecret(token) },
+    });
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      res.status(400).json({ message: 'This confirmation link is invalid or has expired.' });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: record.userId }, data: { emailVerifiedAt: new Date() } }),
+      prisma.emailVerificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+    ]);
+
+    res.status(200).json({ message: 'Email confirmed. You can sign in now.' });
+  } catch (error) {
+    slog('error', 'auth.verify_email_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
   }
 };

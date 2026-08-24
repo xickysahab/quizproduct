@@ -8,12 +8,14 @@ interface PendingResponse {
   participantId: string;
   selectedOption: number;
   selectedOptions?: number[];
+  rankedOptions?: number[];
+  streak?: number;
   answerText?: string | null;
   isCorrect: boolean;
   score?: number;
 }
 
-const COLUMNS_PER_ROW = 8;
+const COLUMNS_PER_ROW = 10;
 const MAX_ROWS_PER_STATEMENT = Math.floor(60000 / COLUMNS_PER_ROW);
 const MAX_FLUSH_ATTEMPTS = 3;
 const REDIS_HASH_KEY = 'quiz:pending-responses';
@@ -74,20 +76,44 @@ class ResponseBatcher {
     await this.flush();
   }
 
+  /** Force a write before reading tallies (session end / reveal). */
+  public async flushNow(): Promise<void> {
+    await this.flush();
+  }
+
+  /**
+   * Removes and returns everything held in the local queue. Draining rather
+   * than copying matters: entries that landed here while Redis was unreachable
+   * would otherwise be re-flushed on every tick for the life of the process.
+   */
+  private drainLocal(): PendingResponse[] {
+    const entries = Array.from(this.queue.values());
+    this.queue.clear();
+    return entries;
+  }
+
   private async takeEntries(): Promise<PendingResponse[]> {
     const redis = getQueueRedis();
 
     if (redis) {
       try {
         const keys = await redis.hkeys(REDIS_HASH_KEY);
-        if (keys.length === 0) return Array.from(this.queue.values());
+        // An empty hash does not mean there is nothing to write — the local
+        // queue still holds anything buffered during a Redis outage.
+        if (keys.length === 0) return this.drainLocal();
 
         const raw = await redis.hmget(REDIS_HASH_KEY, ...keys);
-        if (keys.length) await redis.hdel(REDIS_HASH_KEY, ...keys);
+        await redis.hdel(REDIS_HASH_KEY, ...keys);
 
-        return raw
+        const fromRedis = raw
           .filter((value): value is string => Boolean(value))
           .map((value) => JSON.parse(value) as PendingResponse);
+
+        // Redis is the source of truth for a key it holds, so it wins over a
+        // local entry for the same question/participant pair.
+        const merged = new Map(this.drainLocal().map((entry) => [keyFor(entry), entry]));
+        fromRedis.forEach((entry) => merged.set(keyFor(entry), entry));
+        return Array.from(merged.values());
       } catch (error) {
         slog('warn', 'queue.redis.read_failed', {
           error: error instanceof Error ? error.message : String(error),
@@ -95,9 +121,7 @@ class ResponseBatcher {
       }
     }
 
-    const entries = Array.from(this.queue.values());
-    this.queue.clear();
-    return entries;
+    return this.drainLocal();
   }
 
   private restore(entries: PendingResponse[]) {
@@ -150,7 +174,7 @@ class ResponseBatcher {
             i * COLUMNS_PER_ROW + 4
           }, $${i * COLUMNS_PER_ROW + 5}, $${i * COLUMNS_PER_ROW + 6}::int[], $${i * COLUMNS_PER_ROW + 7}, $${
             i * COLUMNS_PER_ROW + 8
-          })`
+          }, $${i * COLUMNS_PER_ROW + 9}::int[], $${i * COLUMNS_PER_ROW + 10})`
       )
       .join(',');
 
@@ -163,11 +187,13 @@ class ResponseBatcher {
       `{${(e.selectedOptions ?? []).map((n) => Number(n) || 0).join(',')}}`,
       e.answerText ?? null,
       e.score ?? (e.isCorrect ? 1 : 0),
+      `{${(e.rankedOptions ?? []).map((n) => Number(n) || 0).join(',')}}`,
+      e.streak ?? 0,
     ]);
 
     await prisma.$executeRawUnsafe(
       `
-      INSERT INTO "Response" ("id", "questionId", "participantId", "selectedOption", "isCorrect", "selectedOptions", "answerText", "score")
+      INSERT INTO "Response" ("id", "questionId", "participantId", "selectedOption", "isCorrect", "selectedOptions", "answerText", "score", "rankedOptions", "streak")
       VALUES ${placeholders}
       ON CONFLICT ("questionId", "participantId")
       DO UPDATE SET
@@ -176,6 +202,8 @@ class ResponseBatcher {
         "selectedOptions" = EXCLUDED."selectedOptions",
         "answerText" = EXCLUDED."answerText",
         "score" = EXCLUDED."score",
+        "rankedOptions" = EXCLUDED."rankedOptions",
+        "streak" = EXCLUDED."streak",
         "respondedAt" = CURRENT_TIMESTAMP
     `,
       ...params

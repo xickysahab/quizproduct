@@ -36,7 +36,7 @@ const AcceptInvite: React.FC = () => {
           {done ? (
             <p className="text-sm text-gray-600">
               Account created.{' '}
-              <Link to="/login" className="text-indigo-600 font-semibold">
+              <Link to="/login" className="text-accent font-semibold">
                 Sign in
               </Link>
             </p>

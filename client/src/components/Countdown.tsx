@@ -16,9 +16,17 @@ interface Props {
   timeLimit: number | null;
   onExpire?: () => void;
   compact?: boolean;
+  /** `dark` for the projector / live stage. */
+  tone?: 'light' | 'dark';
 }
 
-const Countdown: React.FC<Props> = ({ startedAt, timeLimit, onExpire, compact = false }) => {
+const Countdown: React.FC<Props> = ({
+  startedAt,
+  timeLimit,
+  onExpire,
+  compact = false,
+  tone = 'light',
+}) => {
   const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
@@ -50,14 +58,17 @@ const Countdown: React.FC<Props> = ({ startedAt, timeLimit, onExpire, compact = 
   const fraction = Math.max(0, Math.min(1, remaining / timeLimit));
   const urgent = remaining <= 5 && remaining > 0;
   const done = remaining === 0;
+  const dark = tone === 'dark';
 
-  const colour = done ? '#9CA3AF' : urgent ? '#F43F5E' : '#6366F1';
+  const colour = done ? '#9CA3AF' : urgent ? '#FB7185' : dark ? '#A5B4FC' : '#4F46E5';
 
   if (compact) {
     return (
       <span
-        className="font-mono font-bold tabular-nums text-sm px-2.5 py-1 rounded-full border"
-        style={{ color: colour, borderColor: `${colour}55`, backgroundColor: `${colour}12` }}
+        className={`font-mono font-bold tabular-nums text-sm px-2.5 py-1 rounded-full border ${
+          urgent ? 'timer-urgent' : ''
+        }`}
+        style={{ color: colour, borderColor: `${colour}55`, backgroundColor: `${colour}18` }}
         role="timer"
         aria-live={urgent ? 'assertive' : 'off'}
       >
@@ -67,16 +78,25 @@ const Countdown: React.FC<Props> = ({ startedAt, timeLimit, onExpire, compact = 
   }
 
   return (
-    <div className="space-y-1.5" role="timer" aria-live={urgent ? 'assertive' : 'off'}>
+    <div
+      className={`space-y-2 ${urgent ? 'timer-urgent' : ''}`}
+      role="timer"
+      aria-live={urgent ? 'assertive' : 'off'}
+    >
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500">
+        <span
+          className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
+            dark ? 'text-white/50' : 'text-gray-500'
+          }`}
+        >
           {done ? "Time's up" : 'Time remaining'}
         </span>
-        <span className="font-mono font-bold tabular-nums text-lg" style={{ color: colour }}>
-          {remaining}s
+        <span className="font-heading font-bold tabular-nums text-2xl" style={{ color: colour }}>
+          {remaining}
+          <span className="text-sm font-semibold ml-0.5">s</span>
         </span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+      <div className={`h-2.5 w-full rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-gray-100'}`}>
         <div
           className="h-full rounded-full transition-[width] duration-300 ease-linear"
           style={{ width: `${fraction * 100}%`, backgroundColor: colour }}

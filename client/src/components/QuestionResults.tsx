@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { QuestionTally } from '../types/analytics';
+import { optionFills } from '../utils/optionTheme';
 
 /**
  * Renders one question's real results.
@@ -11,8 +12,8 @@ import type { QuestionTally } from '../types/analytics';
  * here comes from the question's own options.
  */
 
-/** Fallback series colours, used when no branding palette is supplied. */
-const SERIES = ['#6366F1', '#10B981', '#F59E0B', '#F43F5E', '#0EA5E9', '#8B5CF6', '#14B8A6', '#EC4899'];
+/** Same colours as the live answer tiles, so a bar matches the button people tapped. */
+const SERIES = optionFills;
 
 const colourFor = (index: number, palette?: string[]): string =>
   palette?.[index] || SERIES[index % SERIES.length] || '#6366F1';
@@ -91,8 +92,58 @@ const TextAnswers: React.FC<{ tally: QuestionTally }> = ({ tally }) => {
   );
 };
 
+const Ranking: React.FC<{ tally: QuestionTally }> = ({ tally }) => {
+  if (tally.ranking.length === 0 || tally.totalResponses === 0) {
+    return <p className="text-sm text-gray-500 italic">No responses yet.</p>;
+  }
+
+  // The scale runs from best (1) to worst (n), so the bar length is inverted:
+  // a lower average rank should read as a longer bar.
+  const worst = tally.ranking.length;
+
+  return (
+    <div className="space-y-3">
+      {tally.ranking.map((entry, position) => {
+        const share = entry.votes === 0 ? 0 : ((worst - entry.averageRank + 1) / worst) * 100;
+        const colour = colourFor(position);
+        return (
+          <div key={entry.index} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span
+                  className="w-6 h-6 rounded-md text-[11px] font-bold text-white flex items-center justify-center flex-shrink-0 tabular-nums"
+                  style={{ backgroundColor: colour }}
+                >
+                  {position + 1}
+                </span>
+                <span className="truncate text-gray-700">{entry.option}</span>
+              </div>
+              <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">
+                {entry.votes === 0 ? 'unranked' : `avg ${entry.averageRank}`}
+              </span>
+            </div>
+            <div className="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${share}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="h-full rounded-full"
+                style={{ backgroundColor: colour }}
+              />
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-[11px] text-gray-400 pt-1">
+        Ordered by mean position across everyone who ranked them. Lower is better.
+      </p>
+    </div>
+  );
+};
+
 const QuestionResults: React.FC<Props> = ({ tally, palette, revealCorrect = false, compact = false }) => {
   const isText = tally.type === 'OPEN_TEXT' || tally.type === 'WORD_CLOUD';
+  const isRanking = tally.type === 'RANKING';
 
   return (
     <div className="space-y-4">
@@ -107,10 +158,11 @@ const QuestionResults: React.FC<Props> = ({ tally, palette, revealCorrect = fals
         </div>
       )}
 
+      {isRanking && <Ranking tally={tally} />}
       {tally.type === 'WORD_CLOUD' && <WordCloud tally={tally} />}
       {tally.type === 'OPEN_TEXT' && <TextAnswers tally={tally} />}
 
-      {!isText && (
+      {!isText && !isRanking && (
         <div className="space-y-3">
           {tally.options.map((option, index) => {
             const count = tally.optionCounts[index] ?? 0;
@@ -145,11 +197,11 @@ const QuestionResults: React.FC<Props> = ({ tally, palette, revealCorrect = fals
                   </div>
                 </div>
 
-                <div className="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-3.5 w-full rounded-full bg-gray-100 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                     className="h-full rounded-full"
                     style={{ backgroundColor: colour }}
                   />

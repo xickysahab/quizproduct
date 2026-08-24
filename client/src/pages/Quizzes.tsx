@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight, CopyPlus } from 'lucide-react';
+import { Plus, Presentation, Users, Trash2, Copy, Check, Search, ArrowUpRight, CopyPlus, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -22,14 +22,24 @@ interface Event {
   };
 }
 
+interface StarterTemplate {
+  id: string;
+  title: string;
+  description: string;
+  questionCount: number;
+  sessionMode?: 'QUIZ' | 'SURVEY';
+}
+
 const Quizzes: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
+  const [templates, setTemplates] = useState<StarterTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; eventId: string | null }>({ isOpen: false, eventId: null });
   const [newEventTitle, setNewEventTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -50,6 +60,10 @@ const Quizzes: React.FC = () => {
 
   useEffect(() => {
     fetchEvents(1);
+    api
+      .get('/events/templates/starters')
+      .then((res) => setTemplates(res.data.templates || []))
+      .catch(() => undefined);
   }, []);
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -66,6 +80,19 @@ const Quizzes: React.FC = () => {
       toast.error(error.response?.data?.message || 'Failed to create quiz');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const createFromTemplate = async (templateId: string) => {
+    setCreatingTemplateId(templateId);
+    try {
+      const res = await api.post('/events/templates/starters', { templateId });
+      toast.success('Quiz created from template');
+      navigate(`/events/${res.data.event.id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not use that template');
+    } finally {
+      setCreatingTemplateId(null);
     }
   };
 
@@ -127,7 +154,7 @@ const Quizzes: React.FC = () => {
               value={newEventTitle}
               onChange={(e) => setNewEventTitle(e.target.value)}
               placeholder="E.g., Design Systems Workshop Q&A"
-              className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400"
+              className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400"
             />
             <button
               type="submit"
@@ -140,6 +167,34 @@ const Quizzes: React.FC = () => {
           </form>
         </div>
 
+        {templates.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Starter templates</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  disabled={creatingTemplateId === template.id}
+                  onClick={() => createFromTemplate(template.id)}
+                  className="text-left bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:border-accent-soft hover:shadow-md transition-all disabled:opacity-50"
+                >
+                  <h3 className="font-heading text-lg font-bold text-gray-900">{template.title}</h3>
+                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">{template.description}</p>
+                  <p className="text-[11px] font-semibold text-accent mt-3">
+                    {creatingTemplateId === template.id
+                      ? 'Creating…'
+                      : `${template.sessionMode === 'SURVEY' ? 'Survey' : 'Quiz'} · ${template.questionCount} questions · Use template`}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Search */}
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -148,7 +203,7 @@ const Quizzes: React.FC = () => {
             placeholder="Search by title, code or host..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-xs text-gray-900 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all placeholder:text-gray-400 shadow-sm"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 bg-white text-xs text-gray-900 focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm"
           />
         </div>
 
@@ -157,7 +212,7 @@ const Quizzes: React.FC = () => {
           <div className="text-center py-16 text-gray-400">Loading quizzes...</div>
         ) : filteredEvents.length === 0 ? (
           <div className="text-center bg-white rounded-2xl border border-gray-200 p-16 space-y-4 shadow-sm">
-            <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mx-auto">
+            <div className="w-14 h-14 rounded-full bg-accent-wash flex items-center justify-center text-accent mx-auto">
               <Presentation className="w-6 h-6" />
             </div>
             <h3 className="text-xl font-bold text-gray-900">No quizzes found</h3>
@@ -191,7 +246,7 @@ const Quizzes: React.FC = () => {
 
                       <button
                         onClick={() => copyRoomCode(event.roomCode)}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-900 hover:border-indigo-300 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-mono font-bold text-gray-900 hover:border-accent-soft transition-colors"
                         title="Click to copy room code"
                       >
                         <span>{event.roomCode}</span>
@@ -203,7 +258,7 @@ const Quizzes: React.FC = () => {
                       </button>
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-accent transition-colors">
                       {event.title}
                     </h3>
 
@@ -216,7 +271,7 @@ const Quizzes: React.FC = () => {
 
                     <div className="flex items-center gap-5 text-xs text-gray-500 mb-5 pt-3 border-t border-gray-100">
                       <div className="flex items-center gap-1.5">
-                        <Presentation className="w-3.5 h-3.5 text-indigo-500" />
+                        <Presentation className="w-3.5 h-3.5 text-accent" />
                         <span>{event._count?.questions || 0} Questions</span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -229,14 +284,14 @@ const Quizzes: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => navigate(`/events/${event.id}`)}
-                      className="flex-1 bg-gray-100 hover:bg-indigo-600 text-gray-700 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 bg-gray-100 hover:bg-accent text-gray-700 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                     >
                       <span>Manage & Host</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => duplicateEvent(event.id)}
-                      className="p-2.5 rounded-xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"
+                      className="p-2.5 rounded-xl text-gray-400 hover:text-accent hover:bg-accent-wash"
                       title="Duplicate quiz"
                     >
                       <CopyPlus className="w-4 h-4" />
