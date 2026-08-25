@@ -41,12 +41,34 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, sidebarItem
           <nav className="flex-1 space-y-2">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+
+              /**
+               * A landing page sits at the role's root — /superadmin, /tenant —
+               * so every other page in the section starts with its path. A plain
+               * prefix match therefore lit it up everywhere, and two items looked
+               * selected at once.
+               *
+               * Derived rather than flagged per item: whether something is a
+               * landing page is already implied by another item nesting under it,
+               * so a new section can be added to the sidebar without remembering
+               * to mark anything.
+               */
+              const isLandingPage = sidebarItems.some(
+                (other) => other.href !== item.href && other.href.startsWith(`${item.href}/`)
+              );
+
+              // Non-landing pages keep the prefix match, so a detail route like
+              // /superadmin/tenants/123 still highlights its section.
+              const isActive = isLandingPage
+                ? location.pathname === item.href
+                : location.pathname === item.href ||
+                  location.pathname.startsWith(`${item.href}/`);
               
               return (
                 <Link
                   key={item.name}
                   to={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                     isActive
                       ? 'bg-accent-wash text-accent font-semibold'
