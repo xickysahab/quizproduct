@@ -61,7 +61,10 @@ const EventDetails: React.FC = () => {
       fetchEventDetails();
     } catch (error) {
       console.error('Failed to save config', error);
-      toast.error('Failed to save configuration');
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Could not save that setting.'
+      );
     }
   };
 
