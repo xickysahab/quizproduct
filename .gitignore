@@ -20,3 +20,13 @@ npm-debug.log*
 
 # Test/scratch artefacts
 coverage/
+
+# Prisma's vendored agent-skill docs. Installed by tooling, mirrored into
+# .claude/ and .windsurf/ as symlinks, and re-fetchable at any time — 87 files
+# of reference material (including MongoDB and SQL Server guides) that no
+# import reaches. Only the skills/ subdirectory is ignored, so real project
+# config in .claude/ stays tracked.
+.agents/
+.claude/skills/
+.windsurf/skills/
+skills-lock.json
