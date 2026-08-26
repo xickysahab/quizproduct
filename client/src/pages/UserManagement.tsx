@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, UserPlus, Mail, Lock, User as UserIcon, Users, Ban, Trash2, Send } from 'lucide-react';
 import { format } from 'date-fns';
@@ -35,7 +35,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
   const [creating, setCreating] = useState(false);
   const [inviteMode, setInviteMode] = useState(false);
 
-  const fetchUsers = async () => {
+  // Memoised so the effect below can depend on it truthfully. Listing only
+  // `fetchUrl` worked, but any future prop this reads would have gone stale
+  // without a word from the linter.
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await api.get(fetchUrl);
       setUsers(response.data);
@@ -44,11 +47,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchUrl, entityLabel]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUrl]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Server, FileText, Settings, Trash2, Edit2, Play, Search } from 'lucide-react';
@@ -30,11 +30,9 @@ const ActivityLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => {
-    fetchLogs(1);
-  }, []);
-
-  const fetchLogs = async (nextPage = 1, append = false) => {
+  // Declared before the effect that runs it, and memoised so it can sit in the
+  // dependency array honestly.
+  const fetchLogs = useCallback(async (nextPage = 1, append = false) => {
     try {
       const response = await api.get('/logs', { params: { page: nextPage, limit: 100 } });
       setLogs((prev) => (append ? [...prev, ...(response.data.logs || [])] : response.data.logs || []));
@@ -48,7 +46,11 @@ const ActivityLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    void fetchLogs(1);
+  }, [fetchLogs]);
 
   const getActionIcon = (action: string) => {
     if (action.includes('CREATE') || action.includes('ADD')) return <Play className="w-4 h-4 text-accent" />;

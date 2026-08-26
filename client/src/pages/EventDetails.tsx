@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
@@ -28,11 +28,10 @@ const EventDetails: React.FC = () => {
   // Colour temperature follows the session's personality.
   const themeMode = themeFor(event);
 
-  useEffect(() => {
-    fetchEventDetails();
-  }, [id]);
-
-  const fetchEventDetails = async () => {
+  // Declared before the effect that runs it, and memoised so it can sit in the
+  // dependency array honestly. It used to be referenced by an effect written
+  // above its own declaration.
+  const fetchEventDetails = useCallback(async () => {
     try {
       const response = await api.get(`/events/${id}`);
       setEvent(response.data.event);
@@ -42,7 +41,11 @@ const EventDetails: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    void fetchEventDetails();
+  }, [fetchEventDetails]);
 
   const handleAddQuestion = async (data: any) => {
     await api.post('/questions', { ...data, eventId: id });
@@ -61,7 +64,10 @@ const EventDetails: React.FC = () => {
       fetchEventDetails();
     } catch (error) {
       console.error('Failed to save config', error);
-      toast.error('Failed to save configuration');
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Could not save that setting.'
+      );
     }
   };
 

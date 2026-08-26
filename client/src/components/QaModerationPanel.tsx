@@ -48,8 +48,10 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
     setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, status } : q)));
     try {
       await api.patch(`/questions-from-audience/${question.id}`, { status });
-    } catch {
-      toast.error('Could not update that question.');
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      toast.error(message || 'Could not update that question.');
       await load();
     }
   };
@@ -59,8 +61,10 @@ const QaModerationPanel: React.FC<Props> = ({ eventId }) => {
       const res = await api.patch(`/questions-from-audience/event/${eventId}/settings`, patch);
       setQaEnabled(res.data.qaEnabled);
       setQaModerated(res.data.qaModerated);
-    } catch {
-      toast.error('Could not update Q&A settings.');
+    } catch (error) {
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      toast.error(message || 'Could not update Q&A settings.');
     }
   };
 

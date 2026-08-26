@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Square, ChevronRight, ChevronLeft, BarChart3, Award, LogOut, QrCode, Eye, MessageSquare, Monitor, Trophy, ListOrdered } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -48,11 +48,11 @@ const HostLive: React.FC = () => {
   // Colour temperature follows the session's personality.
   const themeMode = themeFor(event);
 
-  useEffect(() => {
-    fetchEventDetails();
-  }, [id]);
-
-  const fetchEventDetails = async () => {
+  // Declared before the effect that runs it, and memoised so it can sit in the
+  // dependency array honestly. Previously the effect referenced a const that was
+  // still being initialised, and omitted it from its deps — which happens to
+  // work today only because effects run after the component body.
+  const fetchEventDetails = useCallback(async () => {
     try {
       const response = await api.get(`/events/${id}`);
       const loaded = response.data.event;
@@ -146,7 +146,11 @@ const HostLive: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    void fetchEventDetails();
+  }, [fetchEventDetails]);
 
   useEffect(() => {
     return () => {

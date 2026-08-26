@@ -93,7 +93,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
       onClose();
     } catch (error) {
       console.error('Submit error:', error);
-      toast.error('Failed to save question.');
+      // The server explains plan limits and validation failures in its own
+      // words — "Your FREE plan allows 20 questions per session" is actionable,
+      // "Failed to save question" reads like the app is broken.
+      const message = (error as { response?: { data?: { message?: string } } })
+        ?.response?.data?.message;
+      toast.error(message || 'Could not save that question.');
     } finally {
       setLoading(false);
     }
