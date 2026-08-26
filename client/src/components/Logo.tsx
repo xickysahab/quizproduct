@@ -5,40 +5,51 @@ interface LogoProps {
   className?: string;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = 36, className = '' }) => {
-  return (
-    <div
-      className={`relative flex items-center justify-center ${className}`}
-      style={{ width: size, height: size }}
+/**
+ * The mark: four bars, the way answers land on the projected screen.
+ *
+ * It replaced a lightning bolt in an indigo gradient tile — a shape that says
+ * "an app" and nothing about this one, in a blue that fought every warm ground
+ * in the product. This one is the thing a room actually looks at: a tally
+ * mid-count, one bar out in front.
+ *
+ * The heights are deliberately uneven rather than a tidy arc. A symmetric
+ * waveform reads as decoration; an uneven one reads as a reading — a real
+ * count of a real room, caught partway.
+ *
+ * Colour comes from `currentColor` via `text-accent`, so the mark takes the
+ * session's temperature with everything else: teal in a discussion, flame in a
+ * game, plum in a survey. On the dark stage `.stage .text-accent` lifts it
+ * automatically, so the same component works on paper and on the projected
+ * screen without a variant.
+ */
+const Logo: React.FC<LogoProps> = ({ size = 36, className = '' }) => (
+  <span
+    className={`inline-flex shrink-0 items-center justify-center text-accent ${className}`}
+    style={{ width: size, height: size }}
+  >
+    <svg
+      viewBox="0 0 48 48"
+      width={size}
+      height={size}
+      fill="currentColor"
+      role="img"
+      aria-label="QuizPulse"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      <svg
-        viewBox="0 0 48 48"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        width={size}
-        height={size}
-      >
-        {/* Background circle with gradient */}
-        <defs>
-          <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#4F46E5" />
-            <stop offset="100%" stopColor="#4338CA" />
-          </linearGradient>
-          <linearGradient id="boltGrad" x1="18" y1="8" x2="30" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="100%" stopColor="#E2E8F0" />
-          </linearGradient>
-        </defs>
-        <rect width="48" height="48" rx="14" fill="url(#logoGrad)" />
-        {/* Lightning bolt / pulse icon */}
-        <path
-          d="M27 8L17 26H23L21 40L31 22H25L27 8Z"
-          fill="url(#boltGrad)"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-};
+      {/* Trailing votes, still coming in.
+
+          The opacities bottom out at 0.48 rather than fading to nearly
+          nothing. At 38px a 0.3 bar reads as a soft trailing count; at the
+          20px this renders in a dense sidebar it reads as a rendering fault,
+          and the mark comes apart into three bars and a smudge. */}
+      <rect x="2" y="15" width="8" height="18" rx="4" opacity="0.48" />
+      <rect x="14" y="8" width="8" height="32" rx="4" opacity="0.72" />
+      {/* The leader. Solid, because it is the one the room is looking at. */}
+      <rect x="26" y="2" width="8" height="44" rx="4" />
+      <rect x="38" y="11" width="8" height="26" rx="4" opacity="0.58" />
+    </svg>
+  </span>
+);
 
 export default Logo;
