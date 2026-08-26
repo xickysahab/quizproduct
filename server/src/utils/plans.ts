@@ -15,13 +15,10 @@ import prisma from '../config/prisma';
  */
 
 /** A plan's `code`. Free-form now that plans are rows rather than an enum. */
-export type PlanCode = string;
-
-/** Retained under the old name; a great deal of code refers to it. */
-export type PlanName = PlanCode;
+export type PlanName = string;
 
 export interface PlanLimits {
-  code: PlanCode;
+  code: PlanName;
   label: string;
   blurb: string;
   /** Monthly price in paise, exclusive of tax. */

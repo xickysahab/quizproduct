@@ -177,7 +177,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     });
 
     await bumpUsage(event.organizationId, 'participantsJoined');
-    liveEvents.publish('participant:joined', { eventId: event.id });
+    liveEvents.emit('participant:joined', { eventId: event.id });
 
     res.status(201).json({
       message: 'Joined event successfully',
@@ -367,7 +367,7 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
 
     // Tell the socket layer a real, validated answer landed. The host's live
     // counter is derived from this rather than from a client-emitted event.
-    liveEvents.publish('response:recorded', { eventId, questionId });
+    liveEvents.emit('response:recorded', { eventId, questionId });
 
     let standing: { score: number; rank: number; totalParticipants: number } | null = null;
     if (questionIsScored) {

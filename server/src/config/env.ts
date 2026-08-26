@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { allowedOrigins } from './cors';
 import { sellerIdentityGaps, sellerStateMismatch, isGstRegistered } from './seller';
 
 /**
@@ -23,15 +24,6 @@ const readInt = (value: string | undefined, fallback: number): number => {
 
 const rawJwtSecret = process.env.JWT_SECRET?.trim();
 
-const firstFrontendOrigin = (): string => {
-  const configured = (process.env.FRONTEND_URL || '')
-    .split(',')
-    .map((value) => value.trim().replace(/\/+$/, ''))
-    .filter(Boolean)
-    .map((value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`));
-  return configured[0] || 'http://localhost:5173';
-};
-
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction,
@@ -52,7 +44,10 @@ export const env = {
   razorpayKeyId: process.env.RAZORPAY_KEY_ID?.trim() || undefined,
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET?.trim() || undefined,
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || undefined,
-  frontendOrigin: firstFrontendOrigin(),
+  // The same list CORS admits, so there is one definition of what counts as
+  // an origin. This was a second implementation of cors.ts's normalisation —
+  // identical today, and free to drift apart the moment either is touched.
+  frontendOrigin: allowedOrigins[0] ?? 'http://localhost:5173',
 } as const;
 
 /**

@@ -42,12 +42,7 @@ export interface SellerIdentity {
 }
 
 /** The configured seller, as a plain value the checks below can be run against. */
-const configured = (): SellerIdentity => ({
-  legalName: read('SELLER_LEGAL_NAME'),
-  gstin: seller.gstin,
-  address: seller.address,
-  stateCode: seller.stateCode,
-});
+const configured = (): SellerIdentity => seller;
 
 /**
  * Whether this supplier may charge GST at all.

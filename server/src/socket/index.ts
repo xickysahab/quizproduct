@@ -134,10 +134,10 @@ export const initializeSocket = (io: Server) => {
     dirtyEvents.set(eventId, entry);
   };
 
-  liveEvents.subscribe('response:recorded', ({ eventId, questionId }) =>
+  liveEvents.on('response:recorded', ({ eventId, questionId }) =>
     markDirty(eventId, { questionId })
   );
-  liveEvents.subscribe('participant:joined', ({ eventId }) =>
+  liveEvents.on('participant:joined', ({ eventId }) =>
     markDirty(eventId, { participants: true })
   );
 
@@ -151,7 +151,7 @@ export const initializeSocket = (io: Server) => {
   // Q&A changes are coalesced the same way, so a burst of upvotes becomes one
   // "refresh your list" nudge rather than one frame per vote.
   const dirtyQa = new Set<string>();
-  liveEvents.subscribe('qa:changed', ({ eventId }) => dirtyQa.add(eventId));
+  liveEvents.on('qa:changed', ({ eventId }) => dirtyQa.add(eventId));
 
   setInterval(() => {
     if (dirtyQa.size === 0) return;

@@ -21,7 +21,7 @@ export const allowedOrigins: string[] = (() => {
   return configured.length > 0 ? configured : LOCAL_DEV_ORIGINS;
 })();
 
-export const isOriginAllowed = (origin: string | undefined): boolean => {
+const isOriginAllowed = (origin: string | undefined): boolean => {
   // Requests without an Origin header (curl, health checks, server-to-server) are not browser cross-origin requests
   if (!origin) return true;
   return allowedOrigins.includes(normalizeOrigin(origin));
