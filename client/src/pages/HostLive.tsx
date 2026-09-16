@@ -450,9 +450,11 @@ const HostLive: React.FC = () => {
                     <span className="text-faint"> / {participantCount}</span>
                   </span>
                   <div className="flex-1 h-1.5 rounded-full bg-sunken overflow-hidden">
+                    {/* Same reason as the timer: a room of five hundred is five
+                        hundred reflows if this animates width. */}
                     <div
-                      className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
-                      style={{ width: `${answeredPct}%` }}
+                      className="h-full w-full rounded-full bg-accent origin-left transition-transform duration-500 ease-out"
+                      style={{ transform: `scaleX(${answeredPct / 100})` }}
                     />
                   </div>
                   <span className="text-xs text-faint whitespace-nowrap">answered</span>
@@ -521,7 +523,7 @@ const HostLive: React.FC = () => {
           Pinned, because during a live session the host's hand is already here
           and hunting for a button mid-room is how a session stumbles. */}
       {!showFinalSummary && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface/95 backdrop-blur-sm">
+        <div className="cockpit-bar fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface/95 backdrop-blur-sm">
           <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-3 flex items-center gap-2 flex-wrap">
             <button
               onClick={handleEndQuiz}

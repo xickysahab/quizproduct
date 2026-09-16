@@ -10,6 +10,7 @@ import api from '../services/api';
 import type { LeaderboardRow, LiveQuestion, QuestionTally } from '../types/analytics';
 import Countdown from '../components/Countdown';
 import QaPanel from '../components/QaPanel';
+import RankingList from '../components/RankingList';
 import QuestionResults from '../components/QuestionResults';
 import LanguagePicker from '../components/LanguagePicker';
 import { useTranslation } from '../i18n/useTranslation';
@@ -548,55 +549,13 @@ const LiveQuiz: React.FC = () => {
                       <p className="text-xs text-gray-500">
                         Put these in your preferred order — most important first.
                       </p>
-                      {ranking.map((optionIndex, position) => (
-                        <div
-                          key={optionIndex}
-                          className="w-full p-3.5 rounded-2xl border border-gray-200 bg-white flex items-center gap-3"
-                        >
-                          <span className="w-7 h-7 rounded-full bg-accent text-white text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
-                            {position + 1}
-                          </span>
-                          <span className="flex-1 text-left text-gray-800">
-                            {activeQuestion.options[optionIndex]}
-                          </span>
-                          <span className="flex flex-col gap-1">
-                            <button
-                              type="button"
-                              aria-label="Move up"
-                              disabled={position === 0}
-                              onClick={() =>
-                                setRanking((prev) => {
-                                  const next = [...prev];
-                                  const above = next[position - 1]!;
-                                  next[position - 1] = next[position]!;
-                                  next[position] = above;
-                                  return next;
-                                })
-                              }
-                              className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs disabled:opacity-30"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              aria-label="Move down"
-                              disabled={position === ranking.length - 1}
-                              onClick={() =>
-                                setRanking((prev) => {
-                                  const next = [...prev];
-                                  const below = next[position + 1]!;
-                                  next[position + 1] = next[position]!;
-                                  next[position] = below;
-                                  return next;
-                                })
-                              }
-                              className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs disabled:opacity-30"
-                            >
-                              ↓
-                            </button>
-                          </span>
-                        </div>
-                      ))}
+                      <RankingList
+                        order={ranking}
+                        options={activeQuestion.options}
+                        onChange={setRanking}
+                        disabled={expired}
+                      />
+
                       <button
                         onClick={() => submitAnswer({ rankedOptions: ranking })}
                         className="w-full gradient-btn text-white py-3 rounded-xl font-semibold"
