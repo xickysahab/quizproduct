@@ -7,6 +7,7 @@ import { ensureSuperAdmin } from './utils/bootstrap';
 import { allowedOrigins, corsOriginHandler } from './config/cors';
 import { env, configWarnings } from './config/env';
 import { expireOverdueSubscriptions } from './controllers/billing.controller';
+import { sweepRetention } from './utils/retention';
 import { attachSocketAdapter, closeRedis } from './config/redis';
 import { responseBatcher } from './utils/responseBatcher';
 import { slog } from './utils/slog';
@@ -33,6 +34,13 @@ const io = new Server(httpServer, {
  */
 const SUBSCRIPTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
+/**
+ * Erasure runs daily, not hourly: the windows it enforces are measured in
+ * hundreds of days, so a slower cadence changes nothing except how often a
+ * deletion query touches a box that is also running live sessions.
+ */
+const RETENTION_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 const sweepSubscriptions = async () => {
   try {
     const lapsed = await expireOverdueSubscriptions();
@@ -41,6 +49,18 @@ const sweepSubscriptions = async () => {
     // A failed sweep must not take the process down with it — live sessions
     // are running on this box, and enforcement is correct without it anyway.
     slog('error', 'billing.sweep_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+const sweepOldData = async () => {
+  try {
+    await sweepRetention();
+  } catch (error) {
+    // Same reasoning as the billing sweep: a failed pass is retried tomorrow,
+    // and taking the process down would end every live session on it.
+    slog('error', 'retention.sweep_failed', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -62,6 +82,9 @@ const start = async () => {
     }
     void sweepSubscriptions();
     setInterval(() => void sweepSubscriptions(), SUBSCRIPTION_SWEEP_INTERVAL_MS).unref();
+
+    void sweepOldData();
+    setInterval(() => void sweepOldData(), RETENTION_SWEEP_INTERVAL_MS).unref();
 
     void ensureSuperAdmin().catch((error) => {
       // A refusal to create a default-password administrator is fatal in
