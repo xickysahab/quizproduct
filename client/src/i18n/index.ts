@@ -94,6 +94,16 @@ const en = {
   'end.home': 'Return to Home',
 
   'lang.label': 'Language',
+
+  'hw.eyebrow': 'Homework',
+  'hw.progress': 'Question {n} of {total}',
+  'hw.due': 'Due {when}',
+  'hw.oneTry': 'One try at each question — check before you submit.',
+  'hw.rankHint': 'Use the arrows to put these in order.',
+  'hw.doneTitle': 'All done',
+  'hw.doneBody': 'Your answers are in. Your teacher will see how you did.',
+  'hw.score': 'You scored {score}.',
+  'hw.closed': 'This homework is not open right now.',
 } as const;
 
 export type TranslationKey = keyof typeof en;
@@ -166,6 +176,16 @@ const hi: Dictionary = {
   'end.home': 'होम पर लौटें',
 
   'lang.label': 'भाषा',
+
+  'hw.eyebrow': 'गृहकार्य',
+  'hw.progress': 'प्रश्न {n} / {total}',
+  'hw.due': 'अंतिम समय {when}',
+  'hw.oneTry': 'हर प्रश्न के लिए एक ही मौका — जमा करने से पहले जाँच लें।',
+  'hw.rankHint': 'तीरों से इन्हें सही क्रम में लगाएँ।',
+  'hw.doneTitle': 'सब पूरा हुआ',
+  'hw.doneBody': 'आपके उत्तर जमा हो गए। आपके शिक्षक देख पाएँगे कि आपने कैसा किया।',
+  'hw.score': 'आपके {score} अंक आए।',
+  'hw.closed': 'यह गृहकार्य अभी खुला नहीं है।',
 };
 
 const mr: Dictionary = {

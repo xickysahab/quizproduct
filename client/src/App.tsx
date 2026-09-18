@@ -16,6 +16,7 @@ const Quizzes = lazy(() => import('./pages/Quizzes'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const EventDetails = lazy(() => import('./pages/EventDetails'));
 const ParticipantReport = lazy(() => import('./pages/ParticipantReport'));
+const Homework = lazy(() => import('./pages/Homework'));
 const HostLive = lazy(() => import('./pages/HostLive'));
 const AudienceDisplay = lazy(() => import('./pages/AudienceDisplay'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
@@ -80,6 +81,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Join />} />
         <Route path="/live/:roomCode" element={<LiveQuiz />} />
+        <Route path="/homework/:roomCode" element={<Homework />} />
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
         <Route path="/verify-email" element={<VerifyEmail />} />

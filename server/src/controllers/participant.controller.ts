@@ -15,6 +15,7 @@ import { getLeaderboard, getParticipantStanding } from '../utils/leaderboard';
 import { isQuestionScored } from '../utils/sessionSettings';
 import { tallyQuestion } from '../utils/tally';
 import { maskProfanity } from '../utils/profanity';
+import { windowProblem } from '../utils/homework';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
@@ -84,6 +85,9 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         sessionMode: true,
         roomCodeRetiredAt: true,
         passcodeHash: true,
+        selfPaced: true,
+        opensAt: true,
+        closesAt: true,
         organization: { select: { name: true, logoUrl: true, primaryColor: true } },
       },
     });
@@ -97,6 +101,15 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     if (event.roomCodeRetiredAt) {
       res.status(410).json({ message: 'This session has closed.' });
       return;
+    }
+
+    // Homework only admits people while it is open.
+    if (event.selfPaced) {
+      const problem = windowProblem(event);
+      if (problem) {
+        res.status(403).json({ message: problem, opensAt: event.opensAt, closesAt: event.closesAt });
+        return;
+      }
     }
 
     // A passcode is a door code shared with a room, not a password. Compared in
@@ -149,6 +162,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
             phoneShowsQuestion: event.phoneShowsQuestion,
             scoringEnabled: event.scoringEnabled,
             sessionMode: event.sessionMode,
+        selfPaced: event.selfPaced,
           },
           branding: event.organization
             ? {
@@ -197,6 +211,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         phoneShowsQuestion: event.phoneShowsQuestion,
         scoringEnabled: event.scoringEnabled,
         sessionMode: event.sessionMode,
+            selfPaced: event.selfPaced,
       },
       branding: event.organization
         ? {
@@ -235,6 +250,9 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
             sessionMode: true,
             scoringEnabled: true,
             streakBonusEnabled: true,
+            selfPaced: true,
+            opensAt: true,
+            closesAt: true,
           },
         },
       },
@@ -250,18 +268,35 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       return;
     }
 
-    if (!question.event.isLive || question.event.currentQuestionId !== questionId) {
+    const selfPaced = question.event.selfPaced;
+    if (selfPaced) {
+      // Homework: any question, while the window is open, once.
+      const problem = windowProblem(question.event);
+      if (problem) {
+        res.status(400).json({ message: problem });
+        return;
+      }
+      await responseBatcher.flushNow();
+      const already = await prisma.response.findUnique({
+        where: { questionId_participantId: { questionId, participantId } },
+        select: { id: true },
+      });
+      if (already) {
+        res.status(409).json({ message: 'You have already answered this question.' });
+        return;
+      }
+    } else if (!question.event.isLive || question.event.currentQuestionId !== questionId) {
       res.status(400).json({ message: 'This question is no longer active.' });
       return;
     }
 
     let elapsedSeconds = 0;
-    if (question.event.currentQuestionStartedAt) {
+    if (!selfPaced && question.event.currentQuestionStartedAt) {
       elapsedSeconds =
         (Date.now() - question.event.currentQuestionStartedAt.getTime()) / 1000;
     }
 
-    if (question.timeLimit && question.event.currentQuestionStartedAt) {
+    if (!selfPaced && question.timeLimit && question.event.currentQuestionStartedAt) {
       if (elapsedSeconds > question.timeLimit + env.answerGracePeriodSeconds) {
         res.status(400).json({ message: 'Time is up for this question.' });
         return;
@@ -334,7 +369,9 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
         streak = (await previousStreak(participantId, question.eventId, question.order)) + 1;
       }
 
-      if (isCorrect && question.event.speedBonusEnabled && question.timeLimit && question.timeLimit > 0) {
+      // ponytail: no speed bonus in homework — nobody is racing at home, and a
+      // per-participant start time would need recording. Add it if asked.
+      if (isCorrect && !selfPaced && question.event.speedBonusEnabled && question.timeLimit && question.timeLimit > 0) {
         // Correct answers earn more when submitted earlier. Base stays 1 when
         // the toggle is off so existing leaderboards keep the same scale.
         const remainingRatio = Math.max(0, Math.min(1, 1 - elapsedSeconds / question.timeLimit));

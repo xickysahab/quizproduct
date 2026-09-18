@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Edit2, Trash2, Play, Clock, Download, CheckCircle, Hel
 import QuestionForm from '../components/QuestionForm';
 import { DraftList } from '../components/AiDraftModal';
 import QuestionTools from '../components/QuestionTools';
+import HomeworkPanel from '../components/HomeworkPanel';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
 import SessionSettingsPanel from '../components/SessionSettingsPanel';
 import type { SessionSwitches } from '../components/SessionSettingsPanel';
@@ -214,6 +215,15 @@ const EventDetails: React.FC = () => {
             </button>
           </div>
         </div>
+
+        <HomeworkPanel
+          eventId={id!}
+          roomCode={event.roomCode}
+          selfPaced={Boolean(event.selfPaced)}
+          opensAt={event.opensAt}
+          closesAt={event.closesAt}
+          onSaved={fetchEventDetails}
+        />
 
         <SessionSettingsPanel
           eventId={id!}

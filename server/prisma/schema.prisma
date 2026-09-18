@@ -405,6 +405,11 @@ model Event {
   qaEnabled                Boolean        @default(true)
   /// When true, submitted questions stay PENDING until a host approves them.
   qaModerated              Boolean        @default(false)
+  /// Homework: participants work through the questions on their own, any time
+  /// between opensAt and closesAt, with no host in the room.
+  selfPaced                Boolean        @default(false)
+  opensAt                  DateTime?
+  closesAt                 DateTime?
   /// Set when the room is closed to new joins, so a code stops working instead
   /// of every code ever issued staying live forever.
   roomCodeRetiredAt        DateTime?

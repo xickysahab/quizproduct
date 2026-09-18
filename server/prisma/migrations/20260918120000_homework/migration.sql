@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN "selfPaced" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "opensAt" TIMESTAMP(3),
+ADD COLUMN "closesAt" TIMESTAMP(3);

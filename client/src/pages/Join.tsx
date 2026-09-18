@@ -103,7 +103,8 @@ const Join: React.FC = () => {
       );
       writeRoomBranding(response.data.branding);
 
-      navigate(`/live/${code}`);
+      // Homework has no host driving it; the participant works through it alone.
+      navigate(response.data.event.selfPaced ? `/homework/${code}` : `/live/${code}`);
     } catch (err: any) {
       if (err.response?.data?.passcodeRequired) setPasscodeRequired(true);
       setError(err.response?.data?.message || t('join.errorGeneric'));
