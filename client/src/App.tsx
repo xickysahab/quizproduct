@@ -15,6 +15,7 @@ const UserManagement = lazy(() => import('./pages/UserManagement'));
 const Quizzes = lazy(() => import('./pages/Quizzes'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const EventDetails = lazy(() => import('./pages/EventDetails'));
+const ParticipantReport = lazy(() => import('./pages/ParticipantReport'));
 const HostLive = lazy(() => import('./pages/HostLive'));
 const AudienceDisplay = lazy(() => import('./pages/AudienceDisplay'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
@@ -196,6 +197,9 @@ function AppRoutes() {
         } />
         <Route path="/events/:id" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><EventDetails /></ProtectedRoute>
+        } />
+        <Route path="/events/:id/participants/:pid" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><ParticipantReport /></ProtectedRoute>
         } />
         <Route path="/host/live/:id" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><HostLive /></ProtectedRoute>

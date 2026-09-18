@@ -4,7 +4,8 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { Parser } from '@json2csv/plainjs';
 import { canAccessEvent } from '../utils/access';
 import { collectiveTally, tallyQuestion } from '../utils/tally';
-import { getLeaderboard, countParticipants } from '../utils/leaderboard';
+import { getLeaderboard, countParticipants, getParticipantStanding } from '../utils/leaderboard';
+import { maskProfanity } from '../utils/profanity';
 import { parsePagination } from '../utils/validation';
 
 export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -269,4 +270,68 @@ export const getEventParticipants = async (req: AuthRequest, res: Response): Pro
     console.error('Participant breakdown error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+};
+
+/**
+ * One participant's session: score, rank, and every question with what they
+ * chose next to what was right. The data was always here — one Response row
+ * per answer — it just had no page a teacher could read.
+ */
+export const getParticipantReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  const eventId = req.params.id as string;
+  const participantId = req.params.pid as string;
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: {
+      hostId: true,
+      title: true,
+      sessionMode: true,
+      questions: {
+        orderBy: { order: 'asc' },
+        select: {
+          id: true, order: true, type: true, text: true, options: true, imageUrl: true,
+          correctOption: true, correctOptions: true,
+        },
+      },
+    },
+  });
+  if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+    res.status(403).json({ message: 'Forbidden or not found' });
+    return;
+  }
+
+  const participant = await prisma.participant.findFirst({
+    where: { id: participantId, eventId },
+    select: { id: true, name: true, joinedAt: true, responses: true },
+  });
+  if (!participant) {
+    res.status(404).json({ message: 'That participant is not in this session.' });
+    return;
+  }
+
+  const standing = await getParticipantStanding(eventId, participantId);
+  const byQuestion = new Map(participant.responses.map((r) => [r.questionId, r]));
+
+  res.status(200).json({
+    event: { id: eventId, title: event.title, sessionMode: event.sessionMode },
+    participant: { id: participant.id, name: participant.name, joinedAt: participant.joinedAt },
+    ...standing,
+    questions: event.questions.map((q) => {
+      const r = byQuestion.get(q.id);
+      return {
+        ...q,
+        answer: r
+          ? {
+              selectedOption: r.selectedOption,
+              selectedOptions: r.selectedOptions,
+              answerText: r.answerText ? maskProfanity(r.answerText).text : null,
+              isCorrect: r.isCorrect,
+              score: r.score,
+              respondedAt: r.respondedAt,
+            }
+          : null,
+      };
+    }),
+  });
 };

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -462,21 +462,20 @@ const EventReports: React.FC<{ eventId: string }> = ({ eventId }) => {
       )}
       {participants.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-          <h3 className="font-bold text-gray-900">Participant breakdown</h3>
-          {participants.map((p) => (
-            <details key={p.id} className="border border-gray-100 rounded-xl p-3">
-              <summary className="cursor-pointer font-medium text-sm">
-                {p.name} · {p.score} pts
-              </summary>
-              <ul className="mt-2 text-xs text-gray-600 space-y-1">
-                {p.answers.map((a: any) => (
-                  <li key={a.questionId}>
-                    {a.text}: {a.answer ?? '—'} {a.isCorrect ? '(correct)' : ''}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ))}
+          <h3 className="font-bold text-gray-900">Each participant</h3>
+          <ul className="divide-y divide-gray-100">
+            {participants.map((p) => (
+              <li key={p.id}>
+                <Link
+                  to={`/events/${eventId}/participants/${p.id}`}
+                  className="flex items-center justify-between py-2.5 text-sm hover:text-accent"
+                >
+                  <span className="font-medium">{p.name || 'Anonymous'}</span>
+                  <span className="text-gray-500 tabular">{p.score} pts · report →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
