@@ -14,9 +14,10 @@ import tailwindcss from '@tailwindcss/vite'
  * localStorage, which any injected script can read. A CSP is what stops an
  * injected script from running in the first place.
  *
- * Ideally this lives in the nginx config alongside `frame-ancestors`, which a
- * meta tag cannot express. The server already sends X-Frame-Options, which
- * covers the same ground for framing.
+ * `frame-ancestors`, which a meta tag cannot express, is sent as a header by
+ * vercel.json along with X-Frame-Options and HSTS — the API's own headers do
+ * not protect the pages Vercel serves. Keep this the one full policy: two
+ * copies of it drift.
  */
 const cspPlugin = (): Plugin => ({
   name: 'inject-csp',
@@ -36,9 +37,9 @@ const cspPlugin = (): Plugin => ({
       // attribute, and Google Fonts serves a stylesheet.
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      // Organisation logos are arbitrary https URLs supplied by tenants; the
-      // server rejects anything that is not https.
-      "img-src 'self' data: https:",
+      // Uploaded images are served by the API. Logos saved before uploads
+      // existed may still be any https URL; the server rejects anything else.
+      `img-src 'self' data: blob: https: ${api}`,
       `connect-src 'self' ${api} ${socket} https://api.razorpay.com https://lumberjack.razorpay.com`,
       // The Razorpay payment sheet is an iframe.
       "frame-src https://api.razorpay.com https://checkout.razorpay.com",
