@@ -7,6 +7,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import BillingPanel from '../components/BillingPanel';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
 import { uploadImage, imageSrc } from '../utils/uploadImage';
+import ConfirmModal from '../components/ConfirmModal';
 
 const SettingsPage: React.FC = () => {
   const { user, login } = useAuth();
@@ -14,6 +15,18 @@ const SettingsPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+
+  // Voids every other copy of this login; this device gets a fresh token.
+  const signOutOthers = async () => {
+    try {
+      const res = await api.post('/auth/sign-out-others');
+      if (res.data.token && user) login(user, res.data.token);
+      toast.success('Signed out of every other device.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not sign out other devices.');
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +83,26 @@ const SettingsPage: React.FC = () => {
               </span>
             </div>
           </div>
+          <div className="mt-5 pt-5 border-t border-line flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">Left yourself signed in on a shared or school computer?</p>
+            <button
+              onClick={() => setConfirmSignOut(true)}
+              className="px-4 h-9 rounded-full bg-gray-100 text-ink text-sm font-semibold hover:bg-gray-200"
+            >
+              Sign out of other devices
+            </button>
+          </div>
         </div>
+
+        <ConfirmModal
+          isOpen={confirmSignOut}
+          title="Sign out of other devices?"
+          message="Every other browser signed in to this account is signed out. You stay signed in here."
+          confirmText="Sign out"
+          onConfirm={signOutOthers}
+          onCancel={() => setConfirmSignOut(false)}
+          isDestructive
+        />
 
         {/* Change password */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">

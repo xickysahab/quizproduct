@@ -307,3 +307,22 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+/**
+ * Signs out every other device. Tokens carry the account's token version, so
+ * bumping it voids every copy in circulation — a laptop left signed in at
+ * school, a token copied off a shared machine — and this device gets a fresh
+ * one so it stays signed in.
+ */
+export const signOutOtherDevices = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: { id: true, email: true, role: true },
+  });
+  if (!user) {
+    res.status(404).json({ message: 'User not found.' });
+    return;
+  }
+  const tokenVersion = await bumpTokenVersion(user.id);
+  res.json({ message: 'Signed out of every other device.', token: generateToken(user.id, user.email, user.role, tokenVersion) });
+};

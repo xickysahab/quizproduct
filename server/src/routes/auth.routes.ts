@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, getMe, changePassword, forgotPassword, resetPassword, signup, verifyEmail } from '../controllers/auth.controller';
+import { login, getMe, changePassword, signOutOtherDevices, forgotPassword, resetPassword, signup, verifyEmail } from '../controllers/auth.controller';
 import { acceptInvite } from '../controllers/invite.controller';
 import { authenticateHost } from '../middleware/auth.middleware';
 import { loginLimiter, signupLimiter, passwordResetLimiter } from '../config/rateLimit';
@@ -14,5 +14,6 @@ router.post('/reset-password', loginLimiter, resetPassword);
 router.post('/accept-invite', loginLimiter, acceptInvite);
 router.get('/me', authenticateHost, getMe);
 router.put('/password', authenticateHost, changePassword);
+router.post('/sign-out-others', authenticateHost, signOutOtherDevices);
 
 export default router;
