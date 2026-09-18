@@ -127,7 +127,13 @@ const Privacy: React.FC = () => {
             <strong>Resend</strong> — sends account email such as invitations and password resets.
           </li>
           <li>
-            <strong>Amazon Web Services</strong> — hosts the service and its database.
+            <strong>Render</strong> — runs the servers that handle sessions and answers.
+          </li>
+          <li>
+            <strong>Vercel</strong> — serves the web pages you load.
+          </li>
+          <li>
+            <strong>Neon</strong> — hosts the database where accounts, quizzes and answers are kept.
           </li>
         </ul>
         <p>
