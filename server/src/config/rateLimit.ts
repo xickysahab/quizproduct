@@ -1,10 +1,49 @@
 import rateLimit, { ipKeyGenerator, Options } from 'express-rate-limit';
 import { ParticipantRequest } from '../middleware/participant.middleware';
 import { verifyParticipantToken } from '../utils/participantToken';
+import Redis from 'ioredis';
+import { RedisStore, type RedisReply } from 'rate-limit-redis';
+import { env } from './env';
+
+/**
+ * Where the counts live. In memory on one process; in Redis once REDIS_URL is
+ * set, because with two processes behind a load balancer each kept its own
+ * count, so every limit — the login brute-force limit included — was
+ * silently doubled.
+ *
+ * Its own connection, not the socket adapter's: the limiters are built as this
+ * module loads, before that one connects. Until this one is up, requests pass
+ * unlimited rather than wait.
+ */
+// enableOfflineQueue is off so that with Redis unreachable a command fails at
+// once and passOnStoreError lets the request through. With the queue on, a
+// Redis outage held every request open until it timed out — worse than having
+// no limit at all.
+const limiterRedis = env.redisUrl
+  ? new Redis(env.redisUrl, { maxRetriesPerRequest: 1, enableOfflineQueue: false, connectTimeout: 2000 })
+  : null;
+
+export const closeLimiterRedis = async (): Promise<void> => {
+  await limiterRedis?.quit().catch(() => undefined);
+};
+
+const storeFor = (name: string): Partial<Options> =>
+  limiterRedis
+    ? {
+        store: new RedisStore({
+          prefix: `rl:${name}:`,
+          sendCommand: (command: string, ...args: string[]) =>
+            limiterRedis.call(command, ...args) as Promise<RedisReply>,
+        }),
+      }
+    : {};
 
 const shared: Partial<Options> = {
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  // If Redis is unreachable, let the request through rather than fail it: a
+  // rate limit is not worth stopping a classroom mid-quiz.
+  passOnStoreError: true,
 };
 
 /**
@@ -15,6 +54,7 @@ const shared: Partial<Options> = {
  */
 export const loginLimiter = rateLimit({
   ...shared,
+  ...storeFor('login'),
   windowMs: 15 * 60 * 1000,
   limit: 10,
   skipSuccessfulRequests: true,
@@ -44,6 +84,7 @@ export const loginLimiter = rateLimit({
  */
 export const signupLimiter = rateLimit({
   ...shared,
+  ...storeFor('signup'),
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: { message: 'Too many accounts created from this network. Please try again later.' },
@@ -58,6 +99,7 @@ export const signupLimiter = rateLimit({
  */
 export const passwordResetLimiter = rateLimit({
   ...shared,
+  ...storeFor('reset'),
   windowMs: 60 * 60 * 1000,
   limit: 5,
   message: { message: 'Too many reset requests. Please try again in an hour.' },
@@ -76,6 +118,7 @@ export const passwordResetLimiter = rateLimit({
  */
 export const joinLimiter = rateLimit({
   ...shared,
+  ...storeFor('join'),
   windowMs: 5 * 60 * 1000,
   limit: 200,
   skipSuccessfulRequests: true,
@@ -89,6 +132,7 @@ export const joinLimiter = rateLimit({
  */
 export const responseLimiter = rateLimit({
   ...shared,
+  ...storeFor('response'),
   windowMs: 60 * 1000,
   limit: 120,
   keyGenerator: (req) => (req as ParticipantRequest).participant?.participantId ?? 'anonymous',
@@ -103,6 +147,7 @@ export const responseLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   ...shared,
+  ...storeFor('api'),
   windowMs: 60 * 1000,
   limit: 600,
   keyGenerator: (req) => {
@@ -124,6 +169,7 @@ export const apiLimiter = rateLimit({
  */
 export const qaSubmitLimiter = rateLimit({
   ...shared,
+  ...storeFor('qa'),
   windowMs: 60 * 1000,
   limit: 10,
   keyGenerator: (req) => (req as ParticipantRequest).participant?.participantId ?? 'anonymous',

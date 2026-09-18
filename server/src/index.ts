@@ -10,6 +10,7 @@ import { expireOverdueSubscriptions } from './controllers/billing.controller';
 import { sweepRetention } from './utils/retention';
 import { endAbandonedSessions } from './utils/liveSessions';
 import { attachSocketAdapter, closeRedis } from './config/redis';
+import { closeLimiterRedis } from './config/rateLimit';
 import { responseBatcher } from './utils/responseBatcher';
 import { slog } from './utils/slog';
 import { report, alertingConfigured } from './utils/errorReporter';
@@ -107,6 +108,7 @@ const shutdown = async (signal: string) => {
   try {
     await responseBatcher.shutdown();
     await closeRedis();
+    await closeLimiterRedis();
   } catch (error) {
     console.error('Error during shutdown:', error);
   }
