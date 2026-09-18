@@ -112,13 +112,24 @@ export const createEventFromTemplate = async (req: AuthRequest, res: Response): 
 
 export const createEvent = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { title } = req.body;
+    const { title, preset } = req.body;
     const hostId = req.user?.userId;
 
     if (!title) {
       res.status(400).json({ message: 'Event title is required.' });
       return;
     }
+
+    // The host chooses this when they create the session, because it decides
+    // whether the session is graded — and a graded answer is final, while a
+    // survey vote can be changed. Too consequential to leave to a default that
+    // nobody was asked about. Omitting it still means GAME, as before.
+    if (preset !== undefined && (!isKnownPreset(preset) || preset === 'CUSTOM')) {
+      res.status(400).json({ message: 'Unknown preset.' });
+      return;
+    }
+
+    const switches = PRESETS[(preset as Exclude<SessionPreset, 'CUSTOM'>) ?? 'GAME'];
 
     if (!hostId) {
       res.status(401).json({ message: 'Unauthorized' });
@@ -140,6 +151,9 @@ export const createEvent = async (req: AuthRequest, res: Response): Promise<void
           roomCode: await uniqueRoomCode(),
           hostId,
           organizationId,
+          preset: preset ?? 'GAME',
+          ...switches,
+          sessionMode: deriveSessionMode(switches.scoringEnabled),
         },
       });
     } catch (creationError) {
@@ -433,6 +447,18 @@ export const updateEventAccess = async (req: AuthRequest, res: Response): Promis
   try {
     const id = req.params.id as string;
     const { passcode, retireCode, preset, ...rest } = req.body || {};
+
+    // A 200 for a field we silently ignored teaches callers that the wrong name
+    // works, and hides the typo until someone notices the setting never applied.
+    const unknown = Object.keys(rest).filter(
+      (key) => !(SWITCH_KEYS as readonly string[]).includes(key)
+    );
+    if (unknown.length) {
+      res.status(400).json({
+        message: `Unknown setting${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}.`,
+      });
+      return;
+    }
 
     const event = await prisma.event.findUnique({
       where: { id },

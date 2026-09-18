@@ -38,6 +38,16 @@ export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Pro
   }
 };
 
+/**
+ * Excel and Sheets execute any cell starting = + - @ or a control character,
+ * and `=cmd|'/C calc'!A0` is the command-execution form. Names and free-text
+ * answers come from anyone holding a room code, so they arrive here unvetted.
+ * A leading apostrophe is the standard defusal — stripped on display, never
+ * evaluated.
+ */
+export const csvSafe = (value: string): string =>
+  /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+
 export const exportEventAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const eventId = req.params.id as string;
@@ -91,19 +101,23 @@ export const exportEventAnalytics = async (req: AuthRequest, res: Response): Pro
 
       const rows = participants.map((p) => {
         const row: Record<string, string | number> = {
-          ParticipantName: p.name || 'Anonymous',
+          ParticipantName: csvSafe(p.name || 'Anonymous'),
           JoinedAt: p.joinedAt.toISOString(),
           TotalScore: p.responses.reduce((sum, r) => sum + (r.score || (r.isCorrect ? 1 : 0)), 0),
         };
 
         event.questions.forEach((q, index) => {
           const response = p.responses.find((r) => r.questionId === q.id);
-          row[`Q${index + 1} (${q.text})`] = response
-            ? response.answerText ||
-              (response.selectedOptions?.length
-                ? response.selectedOptions.map((i) => q.options[i] ?? i).join('; ')
-                : q.options[response.selectedOption] ?? response.selectedOption)
-            : 'No Answer';
+          row[`Q${index + 1} (${q.text})`] = csvSafe(
+            response
+              ? String(
+                  response.answerText ||
+                    (response.selectedOptions?.length
+                      ? response.selectedOptions.map((i) => q.options[i] ?? i).join('; ')
+                      : q.options[response.selectedOption] ?? response.selectedOption)
+                )
+              : 'No Answer'
+          );
           row[`Q${index + 1} Score`] = response?.score ?? 0;
         });
 

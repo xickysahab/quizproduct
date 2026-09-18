@@ -296,6 +296,14 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       return;
     }
 
+    // Whether THIS question is graded — the session switch, unless the question
+    // overrides it. This is what lets one session hold unscored opinion polls
+    // and scored quiz questions side by side.
+    const questionIsScored = isQuestionScored(
+      question.event.scoringEnabled,
+      question.scored
+    );
+
     let elapsedSeconds = 0;
     if (!selfPaced && question.event.currentQuestionStartedAt) {
       elapsedSeconds =
@@ -354,15 +362,30 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       }
     }
 
-    let { isCorrect, score } = scoreAnswer(question, optionIndex, optionList);
+    // A graded answer is final: the response says whether it was right, so
+    // without this someone submits each option in turn until the server confirms
+    // one. Claimed atomically first, so parallel submissions cannot all slip
+    // past the check; then the queue and the database, for an answer already
+    // recorded. A survey answer reveals nothing, so it stays changeable — the
+    // write upserts, so a changed vote replaces the old one.
+    let claimed = false;
+    if (questionIsScored) {
+      claimed = await responseBatcher.claim(questionId, participantId);
+      const alreadyAnswered =
+        !claimed ||
+        (await responseBatcher.has(questionId, participantId)) ||
+        (await prisma.response.findUnique({
+          where: { questionId_participantId: { questionId, participantId } },
+          select: { id: true },
+        })) !== null;
 
-    // Whether THIS question is graded — the session switch, unless the question
-    // overrides it. This is what lets one session hold unscored opinion polls
-    // and scored quiz questions side by side.
-    const questionIsScored = isQuestionScored(
-      question.event.scoringEnabled,
-      question.scored
-    );
+      if (alreadyAnswered) {
+        res.status(409).json({ message: 'Your answer to this question is already locked in.' });
+        return;
+      }
+    }
+
+    let { isCorrect, score } = scoreAnswer(question, optionIndex, optionList);
 
     let streak = 0;
 
@@ -399,17 +422,23 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
           Array.isArray(question.correctOptions) &&
           question.correctOptions.length > 0));
 
-    await responseBatcher.addResponse({
-      questionId,
-      participantId,
-      selectedOption: optionIndex,
-      selectedOptions: optionList,
-      rankedOptions: ranked,
-      answerText: text,
-      isCorrect,
-      score,
-      streak,
-    });
+    try {
+      await responseBatcher.addResponse({
+        questionId,
+        participantId,
+        selectedOption: optionIndex,
+        selectedOptions: optionList,
+        rankedOptions: ranked,
+        answerText: text,
+        isCorrect,
+        score,
+        streak,
+      });
+    } catch (error) {
+      // Nothing was recorded, so the one answer they are allowed is still theirs.
+      if (claimed) await responseBatcher.release(questionId, participantId);
+      throw error;
+    }
 
     // Tell the socket layer a real, validated answer landed. The host's live
     // counter is derived from this rather than from a client-emitted event.

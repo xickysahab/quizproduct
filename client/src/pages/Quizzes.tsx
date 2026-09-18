@@ -39,6 +39,9 @@ const Quizzes: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; eventId: string | null }>({ isOpen: false, eventId: null });
   const [newEventTitle, setNewEventTitle] = useState('');
+  // Asked, not defaulted: it decides whether answers are graded, and a graded
+  // answer is final.
+  const [newEventKind, setNewEventKind] = useState<'GAME' | 'SURVEY'>('GAME');
   const [creating, setCreating] = useState(false);
   const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -73,8 +76,8 @@ const Quizzes: React.FC = () => {
 
     setCreating(true);
     try {
-      await api.post('/events', { title: newEventTitle.trim() });
-      toast.success('Quiz created!');
+      await api.post('/events', { title: newEventTitle.trim(), preset: newEventKind });
+      toast.success(newEventKind === 'SURVEY' ? 'Survey created!' : 'Quiz created!');
       setNewEventTitle('');
       fetchEvents(1);
     } catch (error: any) {
@@ -149,22 +152,59 @@ const Quizzes: React.FC = () => {
 
         {/* Create Quiz inline form */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          <form onSubmit={handleCreateEvent} className="flex flex-col sm:flex-row gap-4">
-            <input
-              type="text"
-              value={newEventTitle}
-              onChange={(e) => setNewEventTitle(e.target.value)}
-              placeholder="E.g., Design Systems Workshop Q&A"
-              className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400"
-            />
-            <button
-              type="submit"
-              disabled={creating || !newEventTitle.trim()}
-              className="gradient-btn text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{creating ? 'Creating...' : 'Create Quiz'}</span>
-            </button>
+          <form onSubmit={handleCreateEvent} className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <input
+                type="text"
+                value={newEventTitle}
+                onChange={(e) => setNewEventTitle(e.target.value)}
+                placeholder="E.g., Design Systems Workshop Q&A"
+                className="flex-1 px-5 py-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-900 text-sm focus:bg-white focus:ring-4 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400"
+              />
+              <button
+                type="submit"
+                disabled={creating || !newEventTitle.trim()}
+                className="gradient-btn text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{creating ? 'Creating...' : newEventKind === 'SURVEY' ? 'Create Survey' : 'Create Quiz'}</span>
+              </button>
+            </div>
+
+            {/* Named by what it changes for the room, not by the preset written. */}
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                What kind of session is this?
+              </legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {([
+                  { value: 'GAME', title: 'Quiz', blurb: 'Answers are scored, and final once submitted.' },
+                  { value: 'SURVEY', title: 'Survey', blurb: 'Nothing is scored, and people can change their answer.' },
+                ] as const).map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex gap-3 items-start p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                      newEventKind === option.value
+                        ? 'border-accent bg-accent-wash'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="session-kind"
+                      value={option.value}
+                      checked={newEventKind === option.value}
+                      onChange={() => setNewEventKind(option.value)}
+                      className="mt-0.5 accent-accent"
+                    />
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-sm font-semibold text-gray-900">{option.title}</span>
+                      <span className="text-xs text-gray-500">{option.blurb}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </form>
         </div>
 

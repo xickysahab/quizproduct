@@ -8,14 +8,23 @@ const shared: Partial<Options> = {
 };
 
 /**
- * Brute-force protection. Deliberately counts only failures so a busy office
- * signing in normally is never locked out.
+ * Brute-force protection. Counts only failures, and keys on the account as well
+ * as the network: a venue shares one public IP, so an IP-only key let ten wrong
+ * passwords for one account lock out everyone behind it — the same reasoning the
+ * response limiter below applies per participant.
  */
 export const loginLimiter = rateLimit({
   ...shared,
   windowMs: 15 * 60 * 1000,
   limit: 10,
   skipSuccessfulRequests: true,
+  // ipKeyGenerator normalises IPv6 to a /56, so a client cannot walk its own
+  // address space for a fresh budget.
+  keyGenerator: (req) => {
+    const email =
+      typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return `${ipKeyGenerator(req.ip ?? '')}:${email}`;
+  },
   message: { message: 'Too many failed sign-in attempts. Please try again in 15 minutes.' },
 });
 

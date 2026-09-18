@@ -55,6 +55,76 @@ class ResponseBatcher {
     return this.queue.size;
   }
 
+  /** Claims taken on this process, with when, so the set can be pruned. */
+  private claims = new Map<string, number>();
+
+  /**
+   * Atomically reserves the one answer a participant gets to a graded question.
+   * The check-then-write in the controller has awaits in between, so four
+   * options sent in parallel all passed a plain check and each came back with
+   * isCorrect. The local set is claimed synchronously — no await before it —
+   * and Redis SET NX makes the claim hold across processes. Returns false if
+   * someone already holds it.
+   */
+  public async claim(questionId: string, participantId: string): Promise<boolean> {
+    const key = `${questionId}_${participantId}`;
+    if (this.claims.has(key)) return false;
+    this.claims.set(key, Date.now());
+
+    // Answers land in the database within seconds; after that the database
+    // check is what refuses a second answer, so old claims can go.
+    if (this.claims.size > 10_000) {
+      const cutoff = Date.now() - 10 * 60_000;
+      for (const [k, at] of this.claims) if (at < cutoff) this.claims.delete(k);
+    }
+
+    const redis = getQueueRedis();
+    if (redis) {
+      try {
+        const ok = await redis.set(`quiz:answer-claim:${key}`, '1', 'EX', 3600, 'NX');
+        if (ok !== 'OK') return false;
+      } catch (error) {
+        slog('warn', 'queue.redis.claim_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return true;
+  }
+
+  /** Hands a claim back when the answer it reserved was never recorded. */
+  public async release(questionId: string, participantId: string): Promise<void> {
+    const key = `${questionId}_${participantId}`;
+    this.claims.delete(key);
+    await getQueueRedis()?.del(`quiz:answer-claim:${key}`).catch(() => undefined);
+  }
+
+  /**
+   * True if an answer for this (question, participant) is already queued. A
+   * write sits here for up to flushIntervalMs before it lands, which is exactly
+   * the window a double-submit arrives in, so callers check this and the
+   * database.
+   */
+  public async has(questionId: string, participantId: string): Promise<boolean> {
+    const key = `${questionId}_${participantId}`;
+    if (this.queue.has(key)) return true;
+
+    const redis = getQueueRedis();
+    if (redis) {
+      try {
+        return (await redis.hexists(REDIS_HASH_KEY, key)) === 1;
+      } catch (error) {
+        // The caller's database check is the backstop; a read outage must not
+        // stop the room answering.
+        slog('warn', 'queue.redis.read_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return false;
+  }
+
   private start() {
     if (this.timer) clearInterval(this.timer);
     this.timer = setInterval(() => {
