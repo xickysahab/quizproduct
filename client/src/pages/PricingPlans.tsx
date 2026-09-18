@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import DashboardLayout from '../components/DashboardLayout';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
 import { formatRupees } from '../utils/money';
+import { isUnlimitedSessions, UNLIMITED_SESSIONS } from '../utils/limits';
 
 /**
  * Pricing, as the platform owner sets it.
@@ -177,7 +178,7 @@ const PlanForm: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Field label="Sessions / month">
+        <Field label="Sessions / month" hint={`${UNLIMITED_SESSIONS.toLocaleString('en-IN')} means unlimited.`}>
           <input
             type="number"
             min={1}
@@ -406,7 +407,9 @@ const PricingPlans: React.FC = () => {
                   <dt className="text-xs font-bold uppercase tracking-wider text-faint mb-1">
                     Sessions / mo
                   </dt>
-                  <dd className="font-medium text-ink tabular">{plan.eventsPerMonth.toLocaleString('en-IN')}</dd>
+                  <dd className="font-medium text-ink tabular">
+                    {isUnlimitedSessions(plan.eventsPerMonth) ? 'Unlimited' : plan.eventsPerMonth.toLocaleString('en-IN')}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wider text-faint mb-1">
