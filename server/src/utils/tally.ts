@@ -50,7 +50,7 @@ export interface QuestionTally {
 }
 
 /** Question types that collect free text instead of an option index. */
-export const isTextType = (type: string): boolean =>
+const isTextType = (type: string): boolean =>
   type === 'OPEN_TEXT' || type === 'WORD_CLOUD';
 
 /**

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import { formatRupees, formatRupeesShort } from '../utils/money';
 import { openRazorpayCheckout } from '../utils/razorpayCheckout';
+import { isUnlimitedSessions } from '../utils/limits';
 import type { CheckoutSession } from '../utils/razorpayCheckout';
 
 /**
@@ -278,7 +279,9 @@ const BillingPanel: React.FC = () => {
             <dt className="text-xs font-bold uppercase tracking-wider text-faint mb-1">Sessions this month</dt>
             <dd className="font-medium text-ink tabular">
               {subscription.usage.eventsCreated}
-              <span className="text-muted"> / {subscription.limits.eventsPerMonth}</span>
+              {!isUnlimitedSessions(subscription.limits.eventsPerMonth) && (
+                <span className="text-muted"> / {subscription.limits.eventsPerMonth}</span>
+              )}
             </dd>
           </div>
           <div>
@@ -459,7 +462,11 @@ const BillingPanel: React.FC = () => {
                 <p className="text-sm text-muted mb-4 flex-1">{plan.blurb}</p>
 
                 <ul className="text-xs text-muted space-y-1 mb-4">
-                  <li className="tabular">{plan.eventsPerMonth} sessions / month</li>
+                  <li className="tabular">
+                    {isUnlimitedSessions(plan.eventsPerMonth)
+                      ? 'Unlimited sessions'
+                      : `${plan.eventsPerMonth} sessions / month`}
+                  </li>
                   <li className="tabular">{plan.participantsPerEvent} participants / session</li>
                   <li className="tabular">{plan.questionsPerEvent} questions / session</li>
                   {plan.branding && <li>Custom branding</li>}

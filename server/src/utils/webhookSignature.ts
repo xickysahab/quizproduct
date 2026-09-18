@@ -11,7 +11,7 @@ import crypto from 'crypto';
  */
 
 /** Default replay window. Stripe's own recommendation is five minutes. */
-export const DEFAULT_TOLERANCE_SECONDS = 300;
+const DEFAULT_TOLERANCE_SECONDS = 300;
 
 /** Constant-time compare that does not leak length either. */
 export const safeEquals = (a: string, b: string): boolean => {

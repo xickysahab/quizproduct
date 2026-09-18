@@ -167,7 +167,7 @@ export interface GstState {
   deprecated?: boolean;
 }
 
-export const GST_STATES: GstState[] = [
+const GST_STATES: GstState[] = [
   { code: '01', name: 'Jammu and Kashmir' },
   { code: '02', name: 'Himachal Pradesh' },
   { code: '03', name: 'Punjab' },
@@ -231,5 +231,3 @@ export const formatInvoiceNumber = (sequence: number, date = new Date()): string
   `QP/${financialYear(date)}/${String(sequence).padStart(5, '0')}`;
 
 /** Paise → a rupee string for display. */
-export const formatRupees = (paise: number): string =>
-  `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

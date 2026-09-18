@@ -169,9 +169,18 @@
   h1, h2, h3, h4, .font-heading {
     font-family: var(--font-display);
     font-weight: 600;
-    letter-spacing: -0.022em;
     text-wrap: balance;
   }
+
+  /* Tracking is a function of size, not a single value. Letters read further
+     apart as they grow, so large text is tightened and small headings sit
+     near zero — one value across the whole scale is wrong at one end. */
+  h1 { letter-spacing: -0.028em; }
+  /* .font-heading lands on everything from text-sm to text-5xl, so it takes a
+     middle value rather than h1's tightest. */
+  h2, .font-heading { letter-spacing: -0.022em; }
+  h3 { letter-spacing: -0.014em; }
+  h4 { letter-spacing: -0.006em; }
 
   /* Numbers that represent a fact — a score, a code, a countdown — line up and
      never reflow as they change. */
@@ -293,6 +302,16 @@
 .gradient-btn:active:not(:disabled) {
   transform: translateY(1px) scale(0.995);
   filter: brightness(0.97);
+}
+
+/* None of the cockpit's controls acknowledged a press — feedback waited for a
+   socket round trip, which on a stage reads as a dead button. Scoped to the bar
+   so later controls get it too. */
+.cockpit-bar button:not(:disabled) {
+  transition: transform 100ms var(--ease-cut);
+}
+.cockpit-bar button:not(:disabled):active {
+  transform: scale(0.96);
 }
 
 .btn-quiet {
@@ -474,7 +493,9 @@
 .stagger > *:nth-child(5) { animation-delay: 180ms; }
 .stagger > *:nth-child(6) { animation-delay: 225ms; }
 
-/* Anybody who has asked for less motion gets none of it. Not reduced — none. */
+/* Anybody who has asked for less motion gets none of it. Not reduced — none.
+   Press feedback survives: `:active` transforms still apply, just instantly,
+   which is more responsive rather than less. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -482,6 +503,19 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Glass panels honoured reduced-motion and ignored these two, so anyone who
+   had asked for less transparency still got a 14px blur. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .glass-panel {
+    background: var(--color-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .glass-panel { border-color: var(--color-ink); }
 }
 
 /* ============================================================================

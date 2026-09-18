@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { Parser } from 'json2csv';
+import { Parser } from '@json2csv/plainjs';
 import { canAccessEvent } from '../utils/access';
 import { collectiveTally, tallyQuestion } from '../utils/tally';
 import { getLeaderboard, countParticipants } from '../utils/leaderboard';

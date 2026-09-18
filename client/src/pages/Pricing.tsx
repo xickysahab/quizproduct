@@ -4,6 +4,7 @@ import { Check, ArrowLeft } from 'lucide-react';
 import api from '../services/api';
 import { formatRupees, formatRupeesShort } from '../utils/money';
 import Footer from '../components/Footer';
+import { isUnlimitedSessions } from '../utils/limits';
 
 /**
  * Public pricing.
@@ -42,7 +43,9 @@ const Pricing: React.FC = () => {
   }, []);
 
   const rows = (plan: PlanCard) => [
-    `${plan.eventsPerMonth.toLocaleString('en-IN')} sessions a month`,
+    isUnlimitedSessions(plan.eventsPerMonth)
+      ? 'Unlimited sessions'
+      : `${plan.eventsPerMonth.toLocaleString('en-IN')} sessions a month`,
     `${plan.participantsPerEvent.toLocaleString('en-IN')} participants in a session`,
     `${plan.questionsPerEvent} questions in a session`,
     'Quizzes, polls, word clouds, ratings, rankings',
