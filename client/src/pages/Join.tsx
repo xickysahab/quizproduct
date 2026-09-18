@@ -204,36 +204,13 @@ const Join: React.FC = () => {
                   maxLength={9}
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  autoFocus
+                  // Arriving by link, the code is already filled in and the
+                  // next thing to type is a name.
+                  autoFocus={!new URLSearchParams(location.search).get('code')}
                   placeholder="123 4567"
                   className="field code-display w-full px-5 py-5 text-center text-[2rem] md:text-[2.4rem] leading-none bg-sunken"
                 />
               </div>
-
-              {/* Only asked for once the room says it wants one. */}
-              {teams.length > 0 && (
-                <div className="animate-rise">
-                  <label
-                    htmlFor="room-team"
-                    className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
-                  >
-                    Team
-                  </label>
-                  <select
-                    id="room-team"
-                    value={teamId}
-                    onChange={(e) => setTeamId(e.target.value)}
-                    className="field w-full px-4 py-3.5 text-base"
-                  >
-                    <option value="">Put me in a team</option>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {passcodeRequired && (
                 <div className="animate-rise">
@@ -270,10 +247,37 @@ const Join: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={40}
+                  autoComplete="name"
+                  autoFocus={Boolean(new URLSearchParams(location.search).get('code'))}
                   placeholder={t('join.nameRequiredPlaceholder')}
                   className="field w-full px-4 py-3.5 text-base"
                 />
               </div>
+
+              {/* Only asked for once the room says it wants one. */}
+              {teams.length > 0 && (
+                <div className="animate-rise">
+                  <label
+                    htmlFor="room-team"
+                    className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
+                  >
+                    Team
+                  </label>
+                  <select
+                    id="room-team"
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                    className="field w-full px-4 py-3.5 text-base"
+                  >
+                    <option value="">Put me in a team</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <button
                 type="submit"

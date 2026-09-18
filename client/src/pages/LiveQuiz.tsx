@@ -226,6 +226,10 @@ const LiveQuiz: React.FC = () => {
       // The host's counter is driven by the server from accepted responses —
       // the client no longer nudges it, because that was spammable.
       setSubmitted(true);
+      // Felt on the same frame the verdict appears, and only for a verdict:
+      // one tap for right, a double knock for wrong. Phones without the
+      // Vibration API (iOS Safari) simply skip it.
+      if (res.data?.scored) navigator.vibrate?.(res.data?.isCorrect ? 18 : [28, 60, 28]);
       setFeedback({
         scored: Boolean(res.data?.scored),
         isCorrect: res.data?.isCorrect ?? null,
@@ -355,52 +359,43 @@ const LiveQuiz: React.FC = () => {
 
 
   return (
-    <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex flex-col items-center justify-center p-4 md:p-6 font-sans relative">
-      {/* Participant Top Header */}
-      <div className="fixed top-4 left-4 right-4 max-w-xl mx-auto z-20">
-        <BrandedHeader
-          branding={branding}
-          tone="stage"
-          trailing={
-            <>
+    <div data-mode={themeMode} className="min-h-screen bg-live-stage text-white flex flex-col font-sans relative">
+      {/* Two quiet lines, pinned: the room, and who you are in it. Content
+          scrolls beneath the translucent bar rather than being centred, so
+          nothing shifts when a question arrives. */}
+      <header className="sticky top-0 z-20 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-2.5 bg-[color:var(--color-stage)]/72 backdrop-blur-xl backdrop-saturate-150 border-b border-white/[0.06]">
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
+          <BrandedHeader
+            branding={branding}
+            tone="stage"
+            className="!p-0 !bg-transparent !border-0 !backdrop-blur-none min-w-0 flex-1"
+            trailing={
               <span
-                className="flex items-center gap-1.5 text-white/60"
+                className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}
                 title={connected ? t('live.connected') : t('live.reconnecting')}
-              >
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    connected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span className="sr-only">{connected ? t('live.connected') : t('live.reconnecting')}</span>
+                role="status"
+                aria-label={connected ? t('live.connected') : t('live.reconnecting')}
+              />
+            }
+          />
+          <div className="flex items-center gap-2 shrink-0 text-xs">
+            {sessionMode === 'QUIZ' && standing && (
+              <span className="px-2.5 py-1 rounded-full bg-amber-400 text-amber-950 font-bold tabular-nums">
+                #{standing.rank}
               </span>
-              {queued > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tabular-nums">
-                  {queued} queued
-                </span>
-              )}
-              <LanguagePicker compact tone="dark" />
-              {localStorage.getItem('teamName') && (
-                <span className="px-2.5 py-1 rounded-full bg-white/10 text-white text-xs font-semibold">
-                  {localStorage.getItem('teamName')}
-                </span>
-              )}
-              <span className="text-white/50 hidden sm:inline">
-                {t('live.player')}: <strong className="text-white">{participantName}</strong>
-              </span>
-              {sessionMode === 'QUIZ' && standing && (
-                <span className="px-2.5 py-1 rounded-full bg-amber-400 text-amber-950 font-heading font-bold tabular-nums">
-                  #{standing.rank}
-                </span>
-              )}
-              <span className="px-2.5 py-1 rounded-full bg-white/10 text-white font-heading font-bold tracking-widest border border-white/15">
-                {roomCode}
-              </span>
-            </>
-          }
-        />
-      </div>
+            )}
+            <span className="px-2.5 py-1 rounded-full bg-white/10 font-mono font-semibold tracking-wider">{roomCode}</span>
+          </div>
+        </div>
+        <div className="max-w-xl mx-auto mt-1.5 flex items-center justify-between gap-3 text-[13px] text-white/55">
+          <span className="truncate">
+            {participantName}
+            {localStorage.getItem('teamName') ? ` · ${localStorage.getItem('teamName')}` : ''}
+            {queued > 0 && <span className="ml-2 text-amber-300 tabular-nums">· {queued} queued</span>}
+          </span>
+          <LanguagePicker compact tone="dark" />
+        </div>
+      </header>
 
       {showPodium && sessionMode === 'QUIZ' && (
         <div className="fixed inset-0 z-30 bg-black/70 backdrop-blur-sm flex items-center justify-center p-5">
@@ -427,18 +422,23 @@ const LiveQuiz: React.FC = () => {
         </div>
       )}
 
-      <main className="max-w-xl w-full pt-16 relative z-10">
+      <main className="max-w-xl w-full mx-auto px-4 pt-5 pb-10 relative z-10">
         {qaEnabled && (
-          <div className="flex gap-1.5 mb-4 p-1 bg-white/8 backdrop-blur rounded-2xl border border-white/10">
+          <div role="tablist" className="flex mb-5 p-0.5 bg-white/8 rounded-[11px]">
             {(['poll', 'qa'] as const).map((key) => (
               <button
                 key={key}
+                role="tab"
+                aria-selected={tab === key}
                 onClick={() => setTab(key)}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                  tab === key ? 'bg-white text-slate-950' : 'text-white/70 hover:bg-white/8'
+                className={`relative flex-1 py-2 rounded-[9px] text-[14px] font-semibold ${
+                  tab === key ? 'text-slate-950' : 'text-white/70'
                 }`}
               >
-                {key === 'poll' ? t('live.tabPoll') : t('live.tabQa')}
+                {tab === key && (
+                  <motion.span layoutId="live-tab" className="absolute inset-0 rounded-[9px] bg-white shadow-sm" aria-hidden />
+                )}
+                <span className="relative">{key === 'poll' ? t('live.tabPoll') : t('live.tabQa')}</span>
               </button>
             ))}
           </div>
@@ -449,13 +449,13 @@ const LiveQuiz: React.FC = () => {
             <QaPanel />
           </div>
         ) : (
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout" initial={false}>
             {results ? (
               <motion.div
                 key="results"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="bg-white text-gray-900 rounded-[2rem] p-8 md:p-10 shadow-2xl space-y-5"
               >
                 <span className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">
@@ -468,7 +468,7 @@ const LiveQuiz: React.FC = () => {
                 key="waiting"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="bg-white/8 border border-white/12 rounded-[2rem] p-10 text-center space-y-6 backdrop-blur-md"
               >
                 <div className="w-20 h-20 rounded-full bg-white text-slate-950 flex items-center justify-center mx-auto join-pulse">
@@ -491,7 +491,7 @@ const LiveQuiz: React.FC = () => {
                 key={activeQuestion.id}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="space-y-5"
               >
                 <div className="bg-white/8 border border-white/10 rounded-[1.6rem] p-6 md:p-7">
