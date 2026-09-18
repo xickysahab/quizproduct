@@ -419,6 +419,7 @@ model Event {
   passcodeHash             String?
   questions                Question[]
   participants             Participant[]
+  teams                    Team[]
   audienceQuestions        AudienceQuestion[]
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt
@@ -457,6 +458,9 @@ model Participant {
   /// creating a duplicate that splits the person's score and double-counts them
   /// against the plan's participant cap.
   sessionKey String?
+  /// Null when the session has no teams.
+  teamId    String?
+  team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
   socketId  String?
   responses Response[]
   audienceQuestions AudienceQuestion[]
@@ -464,6 +468,19 @@ model Participant {
   joinedAt  DateTime   @default(now())
 
   @@unique([eventId, sessionKey])
+  @@index([eventId])
+}
+
+/// A side in a team quiz. Ranked by its members' average score, so a team of
+/// eight does not beat a team of four on headcount.
+model Team {
+  id           String        @id @default(uuid())
+  eventId      String
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime      @default(now())
+  participants Participant[]
+
   @@index([eventId])
 }
 

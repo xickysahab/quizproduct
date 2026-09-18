@@ -11,6 +11,7 @@ import type { LeaderboardRow } from '../utils/leaderboard';
 import { liveEvents } from '../utils/liveEvents';
 import { slog } from '../utils/slog';
 import { responseBatcher } from '../utils/responseBatcher';
+import { getTeamStandings, teamPodiumRows } from '../utils/teams';
 
 interface SocketUser {
   userId: string;
@@ -508,8 +509,9 @@ export const initializeSocket = (io: Server) => {
       if (!event?.scoringEnabled || !event.podiumAtEnd) return;
 
       await responseBatcher.flushNow();
-      const leaderboard = await getLeaderboard(eventId, 8, 0);
-      const payload = { leaderboard, spotlight: true };
+      const [leaderboard, teams] = await Promise.all([getLeaderboard(eventId, 8, 0), getTeamStandings(eventId)]);
+      // A team quiz ends on the team podium, in the shape the podium draws.
+      const payload = { leaderboard, teams: teamPodiumRows(teams), spotlight: true };
       io.to(`host-${eventId}`).emit('host:podium', payload);
       io.to(`event-${eventId}`).emit('participant:podium', payload);
     });

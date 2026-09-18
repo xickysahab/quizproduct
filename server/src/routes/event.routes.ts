@@ -3,6 +3,7 @@ import { createEvent, getHostEvents, getEventById, deleteEvent, updateEventConfi
 import { authenticateHost } from '../middleware/auth.middleware';
 import { joinLimiter } from '../config/rateLimit';
 import { setHomework } from '../controllers/homework.controller';
+import { setTeams } from '../controllers/teams.controller';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.delete('/:id', deleteEvent);
 router.put('/:id/config', updateEventConfig);
 router.patch('/:id/access', updateEventAccess);
 router.patch('/:id/homework', setHomework);
+router.put('/:id/teams', setTeams);
 router.delete('/:id/clear-data', clearEventData);
 
 export default router;

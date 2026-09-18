@@ -214,6 +214,7 @@ export const getEventById = async (req: AuthRequest, res: Response): Promise<voi
         questions: {
           orderBy: { order: 'asc' },
         },
+        teams: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true } },
         _count: {
           select: { participants: true },
         },
@@ -592,6 +593,7 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
         scoringEnabled: true,
         qaEnabled: true,
         sessionMode: true,
+        teams: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true } },
         organization: { select: { name: true, logoUrl: true, primaryColor: true } },
       },
     });
@@ -611,6 +613,8 @@ export const getPublicEventInfo = async (req: AuthRequest, res: Response): Promi
       scoringEnabled: event.scoringEnabled,
       qaEnabled: event.qaEnabled,
       sessionMode: event.sessionMode,
+      // The join screen offers these to pick from.
+      teams: event.teams,
       branding: event.organization
         ? {
             name: event.organization.name,

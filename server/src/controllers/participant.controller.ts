@@ -16,6 +16,7 @@ import { isQuestionScored } from '../utils/sessionSettings';
 import { tallyQuestion } from '../utils/tally';
 import { maskProfanity } from '../utils/profanity';
 import { windowProblem } from '../utils/homework';
+import { teamForJoin } from '../utils/teams';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
@@ -55,7 +56,7 @@ const previousStreak = async (
 
 export const joinEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { roomCode, name, sessionKey, passcode } = req.body;
+    const { roomCode, name, sessionKey, passcode, teamId } = req.body;
 
     if (typeof roomCode !== 'string') {
       res.status(400).json({ message: 'A room code is required.' });
@@ -138,6 +139,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     if (key) {
       const existing = await prisma.participant.findUnique({
         where: { eventId_sessionKey: { eventId: event.id, sessionKey: key } },
+        include: { team: { select: { name: true } } },
       });
 
       if (existing) {
@@ -149,7 +151,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
           message: 'Welcome back',
           rejoined: true,
-          participant: { id: participant.id, name: participant.name },
+          participant: { id: participant.id, name: participant.name, team: existing.team?.name ?? null },
           participantToken: generateParticipantToken(participant.id, event.id),
           event: {
             id: event.id,
@@ -184,11 +186,15 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    const team = await teamForJoin(event.id, teamId);
     const participant = await prisma.participant.create({
       data: {
         eventId: event.id,
         name: trimmedName,
         sessionKey: key,
+        // A rejoin keeps its team; a new participant gets the one they picked,
+        // or the smallest.
+        teamId: team?.id ?? null,
       },
     });
 
@@ -198,7 +204,7 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     res.status(201).json({
       message: 'Joined event successfully',
       rejoined: false,
-      participant: { id: participant.id, name: participant.name },
+      participant: { id: participant.id, name: participant.name, team: team?.name ?? null },
       participantToken: generateParticipantToken(participant.id, event.id),
       event: {
         id: event.id,

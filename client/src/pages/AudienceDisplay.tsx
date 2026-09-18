@@ -36,6 +36,7 @@ const AudienceDisplay: React.FC = () => {
   const [ended, setEnded] = useState(false);
   const [finalResults, setFinalResults] = useState<QuestionTally[]>([]);
   const [podiumOpen, setPodiumOpen] = useState(false);
+  const [teamPodium, setTeamPodium] = useState(false);
   // The between-question beat. Null means it is not currently on screen.
   const [scoreboard, setScoreboard] = useState<ScoreboardRow[] | null>(null);
 
@@ -105,9 +106,11 @@ const AudienceDisplay: React.FC = () => {
 
         socket.on('host:scoreboardClosed', () => setScoreboard(null));
 
-        socket.on('host:podium', (data: { leaderboard?: LeaderboardRow[] }) => {
+        socket.on('host:podium', (data: { leaderboard?: LeaderboardRow[]; teams?: LeaderboardRow[] }) => {
           setScoreboard(null);
-          setLeaderboard(data.leaderboard || []);
+          // A team quiz ends on the team podium; the individual board is in the report.
+          setTeamPodium(Boolean(data.teams?.length));
+          setLeaderboard(data.teams?.length ? data.teams : data.leaderboard || []);
           setPodiumOpen(true);
         });
 
@@ -303,7 +306,7 @@ const AudienceDisplay: React.FC = () => {
         {/* 1. Podium ------------------------------------------------------ */}
         {podiumOpen && !ended ? (
           <div className="w-full max-w-5xl animate-rise">
-            <p className="eyebrow text-center mb-6">Final standings</p>
+            <p className="eyebrow text-center mb-6">{teamPodium ? 'Team standings · by average score' : 'Final standings'}</p>
             <LivePodium rows={leaderboard} tone="dark" size="stage" />
           </div>
 

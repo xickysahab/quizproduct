@@ -380,6 +380,11 @@ const LiveQuiz: React.FC = () => {
                 </span>
               )}
               <LanguagePicker compact tone="dark" />
+              {localStorage.getItem('teamName') && (
+                <span className="px-2.5 py-1 rounded-full bg-white/10 text-white text-xs font-semibold">
+                  {localStorage.getItem('teamName')}
+                </span>
+              )}
               <span className="text-white/50 hidden sm:inline">
                 {t('live.player')}: <strong className="text-white">{participantName}</strong>
               </span>

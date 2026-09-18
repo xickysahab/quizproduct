@@ -8,6 +8,7 @@ import QuestionForm from '../components/QuestionForm';
 import { DraftList } from '../components/AiDraftModal';
 import QuestionTools from '../components/QuestionTools';
 import HomeworkPanel from '../components/HomeworkPanel';
+import TeamsPanel from '../components/TeamsPanel';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
 import SessionSettingsPanel from '../components/SessionSettingsPanel';
 import type { SessionSwitches } from '../components/SessionSettingsPanel';
@@ -224,6 +225,8 @@ const EventDetails: React.FC = () => {
           closesAt={event.closesAt}
           onSaved={fetchEventDetails}
         />
+
+        <TeamsPanel eventId={id!} teams={event.teams || []} onSaved={fetchEventDetails} />
 
         <SessionSettingsPanel
           eventId={id!}

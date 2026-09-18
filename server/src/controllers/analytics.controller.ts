@@ -7,6 +7,7 @@ import { collectiveTally, tallyQuestion } from '../utils/tally';
 import { getLeaderboard, countParticipants, getParticipantStanding } from '../utils/leaderboard';
 import { maskProfanity } from '../utils/profanity';
 import { parsePagination } from '../utils/validation';
+import { getTeamStandings } from '../utils/teams';
 
 export const getQuestionAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -189,15 +190,17 @@ export const getEventLeaderboard = async (req: AuthRequest, res: Response): Prom
       maxLimit: 200,
     });
 
-    const [leaderboard, total] = await Promise.all([
+    const [leaderboard, total, teams] = await Promise.all([
       getLeaderboard(eventId, take, skip),
       countParticipants(eventId),
+      getTeamStandings(eventId),
     ]);
 
     res.status(200).json({
       eventId,
       title: event.title,
       leaderboard,
+      teams,
       pagination: { page, limit, total, hasMore: skip + leaderboard.length < total },
     });
   } catch (error) {

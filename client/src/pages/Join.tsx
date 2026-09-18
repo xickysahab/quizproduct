@@ -23,6 +23,8 @@ const Join: React.FC = () => {
   const [roomTitle, setRoomTitle] = useState<string | null>(null);
   const [roomTheme, setRoomTheme] = useState<ThemeMode>('discussion');
   const [branding, setBranding] = useState<RoomBranding | null>(null);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teamId, setTeamId] = useState('');
   const navigate = useNavigate();
   const { t } = useTranslation();
   const location = useLocation();
@@ -41,6 +43,7 @@ const Join: React.FC = () => {
       const res = await api.get(`/events/public/${code}`);
       setRoomTitle(res.data.title || null);
       setPasscodeRequired(Boolean(res.data.passcodeRequired));
+      setTeams(res.data.teams || []);
       setBranding(res.data.branding || null);
       setRoomTheme(themeFor(res.data));
       writeRoomBranding(res.data.branding);
@@ -84,10 +87,12 @@ const Join: React.FC = () => {
         name: name.trim(),
         sessionKey: getSessionKey(),
         passcode: passcode.trim() || undefined,
+        teamId: teamId || undefined,
       });
 
       localStorage.setItem('participantId', response.data.participant.id);
       localStorage.setItem('participantName', response.data.participant.name || '');
+      localStorage.setItem('teamName', response.data.participant.team || '');
       localStorage.setItem('eventId', response.data.event.id);
       localStorage.setItem('participantToken', response.data.participantToken);
       localStorage.setItem('qaEnabled', String(response.data.event.qaEnabled !== false));
@@ -205,6 +210,30 @@ const Join: React.FC = () => {
               </div>
 
               {/* Only asked for once the room says it wants one. */}
+              {teams.length > 0 && (
+                <div className="animate-rise">
+                  <label
+                    htmlFor="room-team"
+                    className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-faint mb-2"
+                  >
+                    Team
+                  </label>
+                  <select
+                    id="room-team"
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                    className="field w-full px-4 py-3.5 text-base"
+                  >
+                    <option value="">Put me in a team</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {passcodeRequired && (
                 <div className="animate-rise">
                   <label

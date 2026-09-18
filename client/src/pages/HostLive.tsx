@@ -115,8 +115,8 @@ const HostLive: React.FC = () => {
         setLeaderboard(data.leaderboard || []);
       });
 
-      socket.on('host:podium', (data: { leaderboard?: LeaderboardRow[] }) => {
-        setLeaderboard(data.leaderboard || []);
+      socket.on('host:podium', (data: { leaderboard?: LeaderboardRow[]; teams?: LeaderboardRow[] }) => {
+        setLeaderboard(data.teams?.length ? data.teams : data.leaderboard || []);
         setPodiumOpen(true);
       });
 

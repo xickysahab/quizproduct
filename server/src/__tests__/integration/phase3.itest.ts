@@ -123,3 +123,64 @@ describe('homework mode', () => {
       .expect(400);
   });
 });
+
+describe('team mode', () => {
+  it('ranks teams of different sizes by average, not headcount', async () => {
+    const { token, eventId, roomCode, ids } = await hostWithQuiz();
+    const set = await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['Red', 'Blue', 'Green'] }).expect(200);
+    const team = Object.fromEntries(set.body.teams.map((t: { id: string; name: string }) => [t.name, t.id]));
+
+    const joinTeam = async (name: string, teamName: string) =>
+      (await request(app).post('/participants/join').set('X-Forwarded-For', nextIp()).send({ roomCode, name, teamId: team[teamName] })).body;
+
+    // Red: one person, 3 points. Blue: four people, 2 points each — the
+    // biggest total, but a lower average. Green: two people, 3 and 1.
+    const plan: [string, number][] = [['Red', 3], ['Blue', 2], ['Blue', 2], ['Blue', 2], ['Blue', 2], ['Green', 3], ['Green', 1]];
+    for (const [i, [teamName, points]] of plan.entries()) {
+      const joined = await joinTeam(`P${i}`, teamName);
+      expect(joined.participant.team).toBe(teamName);
+      await prisma.response.createMany({
+        data: ids.slice(0, points).map((questionId) => ({ questionId, participantId: joined.participant.id, isCorrect: true, score: 1 })),
+      });
+    }
+
+    const board = await request(app).get(`/analytics/events/${eventId}/leaderboard`).set(auth(token)).expect(200);
+    expect(
+      board.body.teams.map((t: { name: string; average: number; members: number; rank: number }) => [t.rank, t.name, t.average, t.members])
+    ).toEqual([
+      [1, 'Red', 3, 1],
+      // Level on average, so level on rank, whatever their size.
+      [2, 'Blue', 2, 4],
+      [2, 'Green', 2, 2],
+    ]);
+  });
+
+  it('balances people who do not pick, and locks the teams once anyone joins', async () => {
+    const { token, eventId, roomCode } = await hostWithQuiz();
+    await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['A', 'B', 'C'] }).expect(200);
+
+    const teams: string[] = [];
+    for (let i = 0; i < 6; i += 1) teams.push((await joinAs(roomCode, `S${i}`)).body.participant.team);
+    expect(teams.filter((t) => t === 'A')).toHaveLength(2);
+    expect(teams.filter((t) => t === 'B')).toHaveLength(2);
+    expect(teams.filter((t) => t === 'C')).toHaveLength(2);
+
+    await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['X', 'Y'] }).expect(409);
+  });
+
+  it('refuses one team, duplicates, and a stranger’s team id', async () => {
+    const { token, eventId, roomCode } = await hostWithQuiz();
+    await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['Solo'] }).expect(400);
+    await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['Red', 'red'] }).expect(400);
+
+    const other = await hostWithQuiz();
+    const theirs = await request(app).put(`/events/${other.eventId}/teams`).set(auth(other.token)).send({ names: ['Theirs', 'Also'] });
+    await request(app).put(`/events/${eventId}/teams`).set(auth(token)).send({ names: ['Mine', 'Ours'] }).expect(200);
+
+    const joined = await request(app)
+      .post('/participants/join')
+      .set('X-Forwarded-For', nextIp())
+      .send({ roomCode, name: 'Sneaky', teamId: theirs.body.teams[0].id });
+    expect(['Mine', 'Ours']).toContain(joined.body.participant.team);
+  });
+});
