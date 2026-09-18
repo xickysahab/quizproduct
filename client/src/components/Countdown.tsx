@@ -96,10 +96,13 @@ const Countdown: React.FC<Props> = ({
           <span className="text-sm font-semibold ml-0.5">s</span>
         </span>
       </div>
+      {/* Scale, not width — this runs the whole question and `width` is layout.
+          Duration matches the 250ms tick; at 300ms each one was cut off by the
+          next and the bar never settled. */}
       <div className={`h-2.5 w-full rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-gray-100'}`}>
         <div
-          className="h-full rounded-full transition-[width] duration-300 ease-linear"
-          style={{ width: `${fraction * 100}%`, backgroundColor: colour }}
+          className="h-full w-full rounded-full origin-left transition-transform duration-[250ms] ease-linear"
+          style={{ transform: `scaleX(${fraction})`, backgroundColor: colour }}
         />
       </div>
     </div>

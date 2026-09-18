@@ -284,7 +284,7 @@ const Join: React.FC = () => {
                   {
                     icon: <ShieldCheck className="w-4 h-4" />,
                     title: 'Join without an account',
-                    body: 'A code is enough. Names are optional, so people say what they actually think.',
+                    body: 'A code and a first name. No sign-up, no password, no email.',
                   },
                 ].map((feature) => (
                   <div key={feature.title} className="card p-5 hover-card">

@@ -58,7 +58,9 @@ const OptionTile: React.FC<OptionTileProps> = ({
   const stage = size === 'stage';
 
   const className = [
-    'w-full text-left font-semibold transition-all duration-150 flex items-center justify-between gap-3 border-2 option-tile',
+    // `transition-all` swept in background-color, border-color and box-shadow
+    // for the sake of a transform. Six of these render on a phone.
+    'w-full text-left font-semibold transition-[transform,opacity] duration-150 flex items-center justify-between gap-3 border-2',
     stage ? 'p-5 md:p-6 rounded-3xl text-lg md:text-xl' : 'p-4 md:p-[1.15rem] rounded-2xl text-base',
     selected ? 'text-white scale-[1.015] shadow-lg' : 'text-white/95',
     dimmed && !selected ? 'opacity-45' : '',

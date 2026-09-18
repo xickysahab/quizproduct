@@ -39,11 +39,6 @@ export const getUserAuthState = async (
   return { isActive: user.isActive, tokenVersion: user.tokenVersion };
 };
 
-export const isUserActive = async (userId: string): Promise<boolean> => {
-  const state = await getUserAuthState(userId);
-  return state?.isActive ?? false;
-};
-
 export const invalidateUserStatus = (userId: string): void => {
   cache.delete(userId);
 };

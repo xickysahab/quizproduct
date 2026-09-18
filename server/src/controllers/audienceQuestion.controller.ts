@@ -118,7 +118,7 @@ export const submitQuestion = async (req: ParticipantRequest, res: Response): Pr
       },
     });
 
-    liveEvents.publish('qa:changed', { eventId });
+    liveEvents.emit('qa:changed', { eventId });
 
     res.status(201).json({
       message: event.qaModerated ? 'Sent to the host for review.' : 'Question posted.',
@@ -174,7 +174,7 @@ export const toggleUpvote = async (req: ParticipantRequest, res: Response): Prom
           }),
         ]);
 
-    liveEvents.publish('qa:changed', { eventId });
+    liveEvents.emit('qa:changed', { eventId });
 
     res.json({ upvoteCount: updated.upvoteCount, hasVoted: !existing });
   } catch (error) {
@@ -251,7 +251,7 @@ export const moderateQuestion = async (req: AuthRequest, res: Response): Promise
       data: { status, answeredAt: status === 'ANSWERED' ? new Date() : null },
     });
 
-    liveEvents.publish('qa:changed', { eventId: question.eventId });
+    liveEvents.emit('qa:changed', { eventId: question.eventId });
 
     res.json({ message: 'Question updated.', question: present(updated, { host: true }) });
   } catch (error) {
@@ -279,7 +279,7 @@ export const updateQaSettings = async (req: AuthRequest, res: Response): Promise
     }
 
     const event = await prisma.event.update({ where: { id: eventId }, data });
-    liveEvents.publish('qa:changed', { eventId });
+    liveEvents.emit('qa:changed', { eventId });
 
     res.json({
       message: 'Q&A settings updated.',

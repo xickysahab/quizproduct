@@ -27,7 +27,7 @@ export const alertingConfigured = (): boolean => Boolean(WEBHOOK_URL);
  * that mattered and, on a free webhook tier, gets the integration throttled
  * off entirely — so the one time it needed to work, it does not.
  */
-export const ALERT_COOLDOWN_MS = 5 * 60 * 1000;
+const ALERT_COOLDOWN_MS = 5 * 60 * 1000;
 const MAX_TRACKED_KEYS = 500;
 
 /**

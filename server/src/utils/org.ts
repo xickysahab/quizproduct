@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import prisma from '../config/prisma';
 
-export const makeOrgSlug = (name: string): string => {
+const makeOrgSlug = (name: string): string => {
   const base =
     name
       .toLowerCase()
