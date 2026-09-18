@@ -8,6 +8,7 @@ import { allowedOrigins, corsOriginHandler } from './config/cors';
 import { env, configWarnings } from './config/env';
 import { expireOverdueSubscriptions } from './controllers/billing.controller';
 import { sweepRetention } from './utils/retention';
+import { endAbandonedSessions } from './utils/liveSessions';
 import { attachSocketAdapter, closeRedis } from './config/redis';
 import { responseBatcher } from './utils/responseBatcher';
 import { slog } from './utils/slog';
@@ -42,6 +43,12 @@ const SUBSCRIPTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 const RETENTION_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const sweepSubscriptions = async () => {
+  try {
+    const ended = await endAbandonedSessions();
+    if (ended > 0) slog('info', 'sessions.abandoned_ended', { ended });
+  } catch (error) {
+    slog('error', 'sessions.sweep_failed', { error: error instanceof Error ? error.message : String(error) });
+  }
   try {
     const lapsed = await expireOverdueSubscriptions();
     if (lapsed > 0) slog('info', 'billing.sweep_completed', { lapsed });
