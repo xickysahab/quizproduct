@@ -84,6 +84,8 @@ export const createApp = () => {
   // Parsed here, ahead of the global parser, which then skips the body — and
   // only after the login is checked, so a stranger cannot make us buffer 21 MB.
   app.post('/questions/event/:id/draft', apiLimiter, authenticateHost, express.json({ limit: '21mb' }));
+  // A 500-row question bank runs past the global 200 KB.
+  app.post('/questions/event/:id/import', apiLimiter, authenticateHost, express.json({ limit: '2mb' }));
   // The image itself is the body. Limited like any other API call — this route
   // sits ahead of the global limiter, and every upload is a stored row.
   app.post('/images', apiLimiter, authenticateHost, express.raw({ type: () => true, limit: MAX_IMAGE_BYTES }), uploadImage);

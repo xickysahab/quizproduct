@@ -7,6 +7,7 @@ import { normalizeQuestionInput } from '../utils/questionTypes';
 import { assertCanAddQuestion, assertCanDraft, releaseAiDraft } from '../utils/usage';
 import { DRAFT_LANGUAGES, DRAFT_TYPES, DraftError, MAX_DRAFTS, MAX_PDF_BYTES, draftQuestions } from '../utils/aiDrafts';
 import { QuestionType } from '../utils/questionTypes';
+import { MAX_IMPORT_ROWS, parseImport } from '../utils/questionImport';
 import { slog } from '../utils/slog';
 
 export const addQuestion = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -278,4 +279,56 @@ export const draftFromPdf = async (req: AuthRequest, res: Response): Promise<voi
     slog('error', 'question.draft_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Could not draft questions. Try again.' });
   }
+};
+
+/**
+ * Imports a question bank from a spreadsheet. All or nothing: one bad row and
+ * nothing is saved, and every bad row comes back with its row number, so the
+ * host fixes the sheet once rather than discovering problems one at a time.
+ */
+export const importQuestions = async (req: AuthRequest, res: Response): Promise<void> => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    res.status(400).json({ message: 'The sheet has no question rows.' });
+    return;
+  }
+  if (rows.length > MAX_IMPORT_ROWS) {
+    res.status(400).json({ message: `Import at most ${MAX_IMPORT_ROWS} questions at a time.` });
+    return;
+  }
+
+  const eventId = req.params.id as string;
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+    res.status(403).json({ message: 'Forbidden. You do not have access to this event.' });
+    return;
+  }
+
+  const parsed = parseImport(rows);
+  if ('errors' in parsed) {
+    res.status(400).json({ message: `${parsed.errors.length} rows need fixing. Nothing was imported.`, errors: parsed.errors });
+    return;
+  }
+
+  const existing = await prisma.question.count({ where: { eventId } });
+  // The guard asks whether one more fits; the last of these rows is that one.
+  const quota = await assertCanAddQuestion(event.organizationId, existing + parsed.questions.length - 1);
+  if (!quota.ok) {
+    res.status(402).json({ message: quota.message });
+    return;
+  }
+
+  const last = await prisma.question.findFirst({
+    where: { eventId },
+    orderBy: { order: 'desc' },
+    select: { order: true },
+  });
+  const start = (last?.order ?? 0) + 1;
+
+  await prisma.question.createMany({
+    data: parsed.questions.map((q, i) => ({ ...q, eventId, order: start + i })),
+  });
+
+  await logActivity(req.user?.userId, 'IMPORT_QUESTIONS', 'Event', eventId, { count: parsed.questions.length });
+  res.status(201).json({ message: `${parsed.questions.length} questions imported.`, count: parsed.questions.length });
 };

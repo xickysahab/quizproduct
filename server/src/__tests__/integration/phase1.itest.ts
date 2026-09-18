@@ -7,9 +7,9 @@ import { invalidatePlanCache } from '../../utils/plans';
 import { truncateAll, seedPlans, testDatabaseUrl } from './setup';
 
 /**
- * Question images and the AI-draft allowance, through the real stack: the
- * route order in app.ts (raw parser, limiter, auth) is what these depend on,
- * and none of it is visible to a unit test.
+ * Phase 1 — images, the AI-draft allowance and question-bank import — through
+ * the real stack: the route order in app.ts (per-route body parsers, limiter,
+ * auth) is what these depend on, and none of it is visible to a unit test.
  */
 
 const app = createApp();
@@ -109,5 +109,38 @@ describe('AI draft allowance', () => {
       .send({ pdfBase64: Buffer.from('%PDF-1.7 test').toString('base64'), language: 'hi', count: 10, types: ['MCQ'] })
       .expect(402);
     expect(res.body.message).toMatch(/does not include AI drafts/);
+  });
+});
+
+describe('question bank import', () => {
+  const row = (n: number) => ({ type: 'MCQ', question: `Question ${n}`, options: ['a', 'b', 'c', 'd'], correct: '2' });
+
+  it('imports 100 rows in one step, in sheet order', async () => {
+    const { token, eventId } = await hostWithEvent();
+    await db.query(`UPDATE "PricingPlan" SET "questionsPerEvent" = 200`);
+    invalidatePlanCache();
+
+    const rows = Array.from({ length: 100 }, (_, i) => row(i + 1));
+    await request(app).post(`/questions/event/${eventId}/import`).set(auth(token)).send({ rows }).expect(201);
+
+    const saved = await prisma.question.findMany({ where: { eventId }, orderBy: { order: 'asc' } });
+    expect(saved).toHaveLength(100);
+    expect(saved[99]).toMatchObject({ text: 'Question 100', correctOption: 1, order: 100 });
+  });
+
+  it('names three bad rows and saves nothing', async () => {
+    const { token, eventId } = await hostWithEvent();
+    const rows = [row(1), { ...row(2), question: '' }, row(3), { ...row(4), correct: '7' }, { ...row(5), type: 'essay' }];
+
+    const res = await request(app).post(`/questions/event/${eventId}/import`).set(auth(token)).send({ rows }).expect(400);
+    expect(res.body.errors.map((e: { row: number }) => e.row)).toEqual([3, 5, 6]);
+    expect(await prisma.question.count({ where: { eventId } })).toBe(0);
+  });
+
+  it('refuses a sheet that would go past the plan', async () => {
+    const { token, eventId } = await hostWithEvent();
+    const rows = Array.from({ length: 21 }, (_, i) => row(i + 1));
+    await request(app).post(`/questions/event/${eventId}/import`).set(auth(token)).send({ rows }).expect(402);
+    expect(await prisma.question.count({ where: { eventId } })).toBe(0);
   });
 });

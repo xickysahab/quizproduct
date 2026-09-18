@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { ArrowLeft, Plus, Sparkles, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
 import QuestionForm from '../components/QuestionForm';
-import AiDraftModal, { DraftList } from '../components/AiDraftModal';
+import { DraftList } from '../components/AiDraftModal';
+import QuestionTools from '../components/QuestionTools';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
 import SessionSettingsPanel from '../components/SessionSettingsPanel';
 import type { SessionSwitches } from '../components/SessionSettingsPanel';
@@ -25,7 +26,6 @@ const EventDetails: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
   const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, questionId: string | null}>({ isOpen: false, questionId: null });
   const [clearDataModal, setClearDataModal] = useState(false);
-  const [draftModal, setDraftModal] = useState(false);
   const [drafts, setDrafts] = useState<any[]>([]);
 
   // Colour temperature follows the session's personality.
@@ -249,13 +249,7 @@ const EventDetails: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap gap-2 justify-end">
-            <button
-              onClick={() => setDraftModal(true)}
-              className="bg-white text-accent border border-accent-soft px-5 py-3 rounded-2xl font-semibold text-sm flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Draft from PDF</span>
-            </button>
+            <QuestionTools eventId={id!} onDrafts={setDrafts} onImported={fetchEventDetails} />
             <button
               onClick={openAddModal}
               className="gradient-btn text-white px-5 py-3 rounded-2xl font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
@@ -388,16 +382,6 @@ const EventDetails: React.FC = () => {
           surveyMode={event.sessionMode === 'SURVEY'}
           onClose={() => setIsModalOpen(false)}
           onSubmit={editingQuestion?.id ? handleEditQuestion : handleAddQuestion}
-        />
-      )}
-
-      {draftModal && (
-        <AiDraftModal
-          eventId={id!}
-          onClose={() => setDraftModal(false)}
-          onDrafts={(list) =>
-            setDrafts(list.map((d, i) => ({ ...d, draftKey: `${Date.now()}-${i}` })))
-          }
         />
       )}
 
