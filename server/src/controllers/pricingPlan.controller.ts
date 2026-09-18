@@ -39,6 +39,7 @@ interface PlanInput {
   eventsPerMonth?: unknown;
   participantsPerEvent?: unknown;
   questionsPerEvent?: unknown;
+  aiDraftsPerMonth?: unknown;
   branding?: unknown;
   sortOrder?: unknown;
 }
@@ -52,6 +53,7 @@ interface PlanFields {
   eventsPerMonth: number;
   participantsPerEvent: number;
   questionsPerEvent: number;
+  aiDraftsPerMonth: number;
   branding: boolean;
   sortOrder: number;
 }
@@ -104,13 +106,14 @@ const parsePlanFields = (
     ['eventsPerMonth', 'Sessions per month', { min: 1, max: 1_000_000 }],
     ['participantsPerEvent', 'Participants per session', { min: 1, max: 100_000 }],
     ['questionsPerEvent', 'Questions per session', { min: 1, max: 1_000 }],
+    ['aiDraftsPerMonth', 'AI drafts per month', { min: 0, max: 100_000 }],
     ['sortOrder', 'Display order', { min: 0, max: 999 }],
   ];
 
   for (const [key, field, range] of numbers) {
     const raw = body[key];
     if (raw === undefined) {
-      if (partial || key === 'sortOrder') continue;
+      if (partial || key === 'sortOrder' || key === 'aiDraftsPerMonth') continue;
       return { ok: false, message: `${field} is required.` };
     }
     const parsed = readInt(raw, field, range);

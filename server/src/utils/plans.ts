@@ -26,6 +26,7 @@ export interface PlanLimits {
   eventsPerMonth: number;
   participantsPerEvent: number;
   questionsPerEvent: number;
+  aiDraftsPerMonth: number;
   branding: boolean;
   isActive: boolean;
   isDefault: boolean;
@@ -48,6 +49,7 @@ const FALLBACK: PlanLimits = {
   eventsPerMonth: 5,
   participantsPerEvent: 50,
   questionsPerEvent: 20,
+  aiDraftsPerMonth: 0,
   branding: false,
   isActive: true,
   isDefault: true,

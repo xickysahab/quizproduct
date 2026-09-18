@@ -4,7 +4,9 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { logActivity } from '../utils/logger';
 import { canAccessEvent } from '../utils/access';
 import { normalizeQuestionInput } from '../utils/questionTypes';
-import { assertCanAddQuestion } from '../utils/usage';
+import { assertCanAddQuestion, assertCanDraft, releaseAiDraft } from '../utils/usage';
+import { DRAFT_LANGUAGES, DRAFT_TYPES, DraftError, MAX_DRAFTS, MAX_PDF_BYTES, draftQuestions } from '../utils/aiDrafts';
+import { QuestionType } from '../utils/questionTypes';
 import { slog } from '../utils/slog';
 
 export const addQuestion = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -202,5 +204,76 @@ export const deleteQuestion = async (req: AuthRequest, res: Response): Promise<v
   } catch (error) {
     slog('error', 'question.delete_failed', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Drafts questions from a chapter PDF. Nothing is saved: the drafts go back to
+ * the host, who edits and accepts them through the ordinary add path.
+ */
+export const draftFromPdf = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { pdfBase64, language, count, types } = req.body || {};
+
+  if (typeof pdfBase64 !== 'string' || !pdfBase64) {
+    res.status(400).json({ message: 'Attach a PDF.' });
+    return;
+  }
+  // base64 is 4 bytes per 3; checked before decoding anything.
+  if ((pdfBase64.length * 3) / 4 > MAX_PDF_BYTES) {
+    res.status(413).json({ message: `The PDF must be under ${MAX_PDF_BYTES / 1024 / 1024} MB.` });
+    return;
+  }
+  if (!Buffer.from(pdfBase64.slice(0, 8), 'base64').toString('latin1').startsWith('%PDF')) {
+    res.status(400).json({ message: 'That file is not a PDF.' });
+    return;
+  }
+  if (typeof language !== 'string' || !(language in DRAFT_LANGUAGES)) {
+    res.status(400).json({ message: 'Choose one of the supported languages.' });
+    return;
+  }
+  const howMany = Number(count);
+  if (!Number.isInteger(howMany) || howMany < 1 || howMany > MAX_DRAFTS) {
+    res.status(400).json({ message: `Ask for between 1 and ${MAX_DRAFTS} questions.` });
+    return;
+  }
+  const wanted = (Array.isArray(types) ? types : ['MCQ']).filter((t): t is QuestionType =>
+    DRAFT_TYPES.includes(t)
+  );
+  if (wanted.length === 0) {
+    res.status(400).json({ message: 'Choose at least one question type.' });
+    return;
+  }
+
+  const event = await prisma.event.findUnique({ where: { id: req.params.id as string } });
+  if (!event || !(await canAccessEvent(req.user!.userId, req.user!.role, event.hostId))) {
+    res.status(403).json({ message: 'Forbidden. You do not have access to this event.' });
+    return;
+  }
+
+  const quota = await assertCanDraft(event.organizationId);
+  if (!quota.ok) {
+    res.status(402).json({ message: quota.message });
+    return;
+  }
+
+  try {
+    const drafts = await draftQuestions({ pdfBase64, language, count: howMany, types: wanted });
+    if (drafts.length === 0) throw new DraftError('No usable questions came back. Try again.', 502);
+
+    await logActivity(req.user?.userId, 'DRAFT_QUESTIONS', 'Event', event.id, {
+      language,
+      requested: howMany,
+      drafted: drafts.length,
+    });
+    res.status(200).json({ drafts });
+  } catch (error) {
+    // A failed draft should not cost the workspace one of its allowance.
+    await releaseAiDraft(event.organizationId);
+    if (error instanceof DraftError) {
+      res.status(error.status).json({ message: error.message });
+      return;
+    }
+    slog('error', 'question.draft_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Could not draft questions. Try again.' });
   }
 };

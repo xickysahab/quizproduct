@@ -120,6 +120,10 @@ const Privacy: React.FC = () => {
             Razorpay's own form and never reach us.
           </li>
           <li>
+            <strong>Anthropic</strong> — writes question drafts when a host asks for them from a
+            PDF. The PDF is sent for that one request and we do not keep it.
+          </li>
+          <li>
             <strong>Resend</strong> — sends account email such as invitations and password resets.
           </li>
           <li>

@@ -18,6 +18,7 @@ import billingRoutes from './routes/billing.routes';
 import audienceQuestionRoutes from './routes/audienceQuestion.routes';
 import privacyRoutes from './routes/privacy.routes';
 import legalRoutes from './routes/legal.routes';
+import { authenticateHost } from './middleware/auth.middleware';
 import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { corsOriginHandler } from './config/cors';
 import { apiLimiter } from './config/rateLimit';
@@ -77,6 +78,10 @@ export const createApp = () => {
   // Stripe signs the raw bytes; parsing JSON first would break verification.
   app.post('/billing/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
   app.post('/billing/razorpay-webhook', express.raw({ type: 'application/json' }), razorpayWebhook);
+  // A chapter PDF travels base64-encoded in JSON; only this route gets the room.
+  // Parsed here, ahead of the global parser, which then skips the body — and
+  // only after the login is checked, so a stranger cannot make us buffer 21 MB.
+  app.post('/questions/event/:id/draft', apiLimiter, authenticateHost, express.json({ limit: '21mb' }));
   app.use(express.json({ limit: '200kb' }));
 
   /**

@@ -118,7 +118,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
               Question Builder
             </span>
             <h2 className="font-heading text-3xl font-bold text-gray-900">
-              {initialData ? 'Edit Question' : 'Craft New Question'}
+              {initialData?.id ? 'Edit Question' : initialData ? 'Review Draft' : 'Craft New Question'}
             </h2>
           </div>
           <button onClick={onClose} className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-400 rounded-full border border-gray-200">

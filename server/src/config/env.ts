@@ -37,6 +37,7 @@ export const env = {
   answerGracePeriodSeconds: readInt(process.env.ANSWER_GRACE_PERIOD_SECONDS, 3),
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   resendApiKey: process.env.RESEND_API_KEY?.trim() || undefined,
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || undefined,
   mailFrom: process.env.MAIL_FROM?.trim() || 'QuizPulse <noreply@quizpulse.app>',
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || undefined,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined,
@@ -112,6 +113,10 @@ export const configWarnings = (): string[] => {
     warnings.push(
       'RAZORPAY_KEY_ID is not set — Indian customers cannot pay. Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET to enable checkout.'
     );
+  }
+
+  if (!env.anthropicApiKey) {
+    warnings.push('ANTHROPIC_API_KEY is not set — hosts cannot draft questions from a PDF.');
   }
 
   if (!env.resendApiKey) {

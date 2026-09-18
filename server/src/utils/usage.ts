@@ -123,6 +123,49 @@ export const assertCanAddQuestion = async (
   return { ok: true };
 };
 
+/**
+ * Reserves one AI draft against this month's allowance. Reserved before the
+ * model call, so two concurrent drafts cannot both squeeze under the limit;
+ * call `releaseAiDraft` if the call then fails.
+ */
+export const assertCanDraft = async (organizationId: string | null | undefined): Promise<Guard> => {
+  if (isPlatformAccount(organizationId)) return { ok: true };
+
+  const plan = await enforceablePlan(organizationId!);
+  const limits = await limitsFor(plan);
+  if (limits.aiDraftsPerMonth <= 0) {
+    return { ok: false, message: `Your ${plan} plan does not include AI drafts. Upgrade to draft questions from a PDF.` };
+  }
+
+  const period = currentPeriod();
+  const meter = await prisma.usageMeter.upsert({
+    where: { organizationId_period: { organizationId: organizationId!, period } },
+    create: { organizationId: organizationId!, period, aiDrafts: 1 },
+    update: { aiDrafts: { increment: 1 } },
+  });
+
+  if (meter.aiDrafts > limits.aiDraftsPerMonth) {
+    await releaseAiDraft(organizationId);
+    return {
+      ok: false,
+      message: `Your ${plan} plan covers ${limits.aiDraftsPerMonth} AI drafts a month, and this month's are used up.`,
+    };
+  }
+
+  return { ok: true };
+};
+
+export const releaseAiDraft = async (organizationId: string | null | undefined): Promise<void> => {
+  if (isPlatformAccount(organizationId)) return;
+
+  await prisma.usageMeter
+    .update({
+      where: { organizationId_period: { organizationId: organizationId!, period: currentPeriod() } },
+      data: { aiDrafts: { decrement: 1 } },
+    })
+    .catch(() => undefined);
+};
+
 /** Releases a reserved event slot when creation fails after the reservation. */
 export const releaseEventSlot = async (
   organizationId: string | null | undefined

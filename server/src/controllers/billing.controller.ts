@@ -124,6 +124,7 @@ export const listPlans = async (_req: Request, res: Response): Promise<void> => 
         eventsPerMonth: plan.eventsPerMonth,
         participantsPerEvent: plan.participantsPerEvent,
         questionsPerEvent: plan.questionsPerEvent,
+        aiDraftsPerMonth: plan.aiDraftsPerMonth,
         branding: plan.branding,
       };
     }),

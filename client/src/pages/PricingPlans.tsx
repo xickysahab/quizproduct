@@ -33,6 +33,7 @@ interface Plan {
   eventsPerMonth: number;
   participantsPerEvent: number;
   questionsPerEvent: number;
+  aiDraftsPerMonth: number;
   branding: boolean;
   isActive: boolean;
   isDefault: boolean;
@@ -52,6 +53,7 @@ interface DraftFields {
   eventsPerMonth: string;
   participantsPerEvent: string;
   questionsPerEvent: string;
+  aiDraftsPerMonth: string;
   branding: boolean;
   sortOrder: string;
 }
@@ -64,6 +66,7 @@ const blankDraft = (): DraftFields => ({
   eventsPerMonth: '',
   participantsPerEvent: '',
   questionsPerEvent: '',
+  aiDraftsPerMonth: '0',
   branding: true,
   sortOrder: '10',
 });
@@ -76,6 +79,7 @@ const draftFrom = (plan: Plan): DraftFields => ({
   eventsPerMonth: String(plan.eventsPerMonth),
   participantsPerEvent: String(plan.participantsPerEvent),
   questionsPerEvent: String(plan.questionsPerEvent),
+  aiDraftsPerMonth: String(plan.aiDraftsPerMonth ?? 0),
   branding: plan.branding,
   sortOrder: String(plan.sortOrder),
 });
@@ -177,7 +181,7 @@ const PlanForm: React.FC<{
         </Field>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Sessions / month" hint={`${UNLIMITED_SESSIONS.toLocaleString('en-IN')} means unlimited.`}>
           <input
             type="number"
@@ -202,6 +206,15 @@ const PlanForm: React.FC<{
             min={1}
             value={draft.questionsPerEvent}
             onChange={(e) => set('questionsPerEvent', e.target.value)}
+            className={`${inputClass} tabular`}
+          />
+        </Field>
+        <Field label="AI drafts / month" hint="PDF-to-questions drafts. Each is a paid model call; 0 turns it off.">
+          <input
+            type="number"
+            min={0}
+            value={draft.aiDraftsPerMonth}
+            onChange={(e) => set('aiDraftsPerMonth', e.target.value)}
             className={`${inputClass} tabular`}
           />
         </Field>
@@ -263,6 +276,7 @@ const PricingPlans: React.FC = () => {
     eventsPerMonth: Number(fields.eventsPerMonth),
     participantsPerEvent: Number(fields.participantsPerEvent),
     questionsPerEvent: Number(fields.questionsPerEvent),
+    aiDraftsPerMonth: Number(fields.aiDraftsPerMonth || '0'),
     branding: fields.branding,
     sortOrder: Number(fields.sortOrder || '0'),
   });

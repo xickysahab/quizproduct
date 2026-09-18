@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { ArrowLeft, Plus, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Edit2, Trash2, Play, Clock, Download, CheckCircle, HelpCircle, Settings, Eraser } from 'lucide-react';
 import QuestionForm from '../components/QuestionForm';
+import AiDraftModal, { DraftList } from '../components/AiDraftModal';
 import ConcludeSettingsModal from '../components/ConcludeSettingsModal';
 import SessionSettingsPanel from '../components/SessionSettingsPanel';
 import type { SessionSwitches } from '../components/SessionSettingsPanel';
@@ -24,6 +25,8 @@ const EventDetails: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
   const [deleteModal, setDeleteModal] = useState<{isOpen: boolean, questionId: string | null}>({ isOpen: false, questionId: null });
   const [clearDataModal, setClearDataModal] = useState(false);
+  const [draftModal, setDraftModal] = useState(false);
+  const [drafts, setDrafts] = useState<any[]>([]);
 
   // Colour temperature follows the session's personality.
   const themeMode = themeFor(event);
@@ -49,6 +52,8 @@ const EventDetails: React.FC = () => {
 
   const handleAddQuestion = async (data: any) => {
     await api.post('/questions', { ...data, eventId: id });
+    // An accepted draft leaves the review list.
+    if (editingQuestion?.draftKey) setDrafts((d) => d.filter((x) => x.draftKey !== editingQuestion.draftKey));
     fetchEventDetails();
   };
 
@@ -243,14 +248,34 @@ const EventDetails: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={openAddModal}
-            className="gradient-btn text-white px-5 py-3 rounded-2xl font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Question</span>
-          </button>
+          <div className="flex flex-wrap gap-2 justify-end">
+            <button
+              onClick={() => setDraftModal(true)}
+              className="bg-white text-accent border border-accent-soft px-5 py-3 rounded-2xl font-semibold text-sm flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Draft from PDF</span>
+            </button>
+            <button
+              onClick={openAddModal}
+              className="gradient-btn text-white px-5 py-3 rounded-2xl font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Question</span>
+            </button>
+          </div>
         </div>
+
+        {drafts.length > 0 && (
+          <DraftList
+            eventId={id!}
+            survey={event.sessionMode === 'SURVEY'}
+            drafts={drafts}
+            setDrafts={setDrafts}
+            onReview={openEditModal}
+            onAdded={fetchEventDetails}
+          />
+        )}
 
         {/* Questions List */}
         {event.questions.length === 0 ? (
@@ -362,7 +387,17 @@ const EventDetails: React.FC = () => {
           initialData={editingQuestion}
           surveyMode={event.sessionMode === 'SURVEY'}
           onClose={() => setIsModalOpen(false)}
-          onSubmit={editingQuestion ? handleEditQuestion : handleAddQuestion}
+          onSubmit={editingQuestion?.id ? handleEditQuestion : handleAddQuestion}
+        />
+      )}
+
+      {draftModal && (
+        <AiDraftModal
+          eventId={id!}
+          onClose={() => setDraftModal(false)}
+          onDrafts={(list) =>
+            setDrafts(list.map((d, i) => ({ ...d, draftKey: `${Date.now()}-${i}` })))
+          }
         />
       )}
 

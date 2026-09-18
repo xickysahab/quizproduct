@@ -175,6 +175,9 @@ model PricingPlan {
   eventsPerMonth       Int
   participantsPerEvent Int
   questionsPerEvent    Int
+  /// PDF-to-questions drafts a workspace may request each month. Zero turns
+  /// the feature off for the plan — every draft is a paid model call.
+  aiDraftsPerMonth     Int      @default(0)
   branding             Boolean  @default(false)
   /// Withdrawn plans stay here and keep working for whoever is on them; they
   /// simply stop being offered. Deleting one would strand those workspaces.
@@ -197,6 +200,7 @@ model UsageMeter {
   period             String
   eventsCreated      Int          @default(0)
   participantsJoined Int          @default(0)
+  aiDrafts           Int          @default(0)
 
   @@unique([organizationId, period])
   @@index([period])
@@ -531,3 +535,4 @@ model ActivityLog {
   @@index([userId, createdAt])
   @@index([createdAt])
 }
+

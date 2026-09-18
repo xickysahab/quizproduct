@@ -24,6 +24,7 @@ interface PlanCard {
   eventsPerMonth: number;
   participantsPerEvent: number;
   questionsPerEvent: number;
+  aiDraftsPerMonth: number;
   branding: boolean;
 }
 
@@ -48,6 +49,9 @@ const Pricing: React.FC = () => {
       : `${plan.eventsPerMonth.toLocaleString('en-IN')} sessions a month`,
     `${plan.participantsPerEvent.toLocaleString('en-IN')} participants in a session`,
     `${plan.questionsPerEvent} questions in a session`,
+    ...(plan.aiDraftsPerMonth > 0
+      ? [`Draft questions from a chapter PDF, ${plan.aiDraftsPerMonth} a month, in 8 languages`]
+      : []),
     'Quizzes, polls, word clouds, ratings, rankings',
     'Audience Q&A with upvotes and moderation',
     ...(plan.branding ? ['Your logo and colours on the join screen'] : []),
