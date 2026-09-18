@@ -27,6 +27,8 @@ coverage/
 # import reaches. Only the skills/ subdirectory is ignored, so real project
 # config in .claude/ stays tracked.
 .agents/
-.claude/skills/
+.claude/skills/*
+# Shared with the team: the design guidance the UI follows.
+!.claude/skills/apple-design/
 .windsurf/skills/
 skills-lock.json
