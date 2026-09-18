@@ -175,3 +175,15 @@ export const qaSubmitLimiter = rateLimit({
   keyGenerator: (req) => (req as ParticipantRequest).participant?.participantId ?? 'anonymous',
   message: { message: 'You are posting questions too quickly. Please wait a moment.' },
 });
+
+/**
+ * Browser crash reports. Unauthenticated by necessity, so kept tight: a real
+ * crash sends a handful; anything past that is noise or abuse.
+ */
+export const clientErrorLimiter = rateLimit({
+  ...shared,
+  ...storeFor('client-error'),
+  windowMs: 60 * 1000,
+  limit: 20,
+  message: { message: 'Too many reports.' },
+});

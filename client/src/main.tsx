@@ -4,6 +4,9 @@ import './index.css'
 import { MotionConfig } from 'framer-motion'
 import App from './App.tsx'
 import { spring } from './utils/motion'
+import { listenForUncaughtErrors } from './utils/reportError'
+
+listenForUncaughtErrors()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

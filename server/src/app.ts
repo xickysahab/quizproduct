@@ -20,6 +20,8 @@ import privacyRoutes from './routes/privacy.routes';
 import legalRoutes from './routes/legal.routes';
 import { authenticateHost } from './middleware/auth.middleware';
 import { serveImage, uploadImage } from './controllers/image.controller';
+import { receiveClientError } from './controllers/clientError.controller';
+import { clientErrorLimiter } from './config/rateLimit';
 import { MAX_IMAGE_BYTES } from './utils/images';
 import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { corsOriginHandler } from './config/cors';
@@ -131,6 +133,8 @@ export const createApp = () => {
   // Ahead of the limiter: a whole classroom, often behind one school IP, asks
   // for the same picture the moment a question goes live. Served from memory.
   app.get('/images/:id', serveImage);
+  // A crash report arrives as a beacon (text/plain), so it is parsed here.
+  app.post('/client-errors', clientErrorLimiter, express.json({ type: () => true, limit: '16kb' }), receiveClientError);
   app.use(apiLimiter);
 
   app.use('/auth', authRoutes);

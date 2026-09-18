@@ -142,3 +142,21 @@ describe('what a plan promises', () => {
     expect(enterprise.participantsPerEvent).toBe(1000);
   });
 });
+
+describe('browser error reports', () => {
+  const send = (body: string, ip = '203.0.120.1') =>
+    request(app).post('/client-errors').set('X-Forwarded-For', ip).set('Content-Type', 'text/plain').send(body);
+
+  it('accepts a beacon, and quietly ignores one with nothing in it', async () => {
+    await send(JSON.stringify({ kind: 'render', message: 'x is undefined', path: '/live/1234567' })).expect(204);
+    await send('{}').expect(204);
+  });
+
+  it('refuses an oversized report and a flood from one address', async () => {
+    await send(JSON.stringify({ message: 'x'.repeat(20_000) }), '203.0.120.2').expect(413);
+    const codes: number[] = [];
+    for (let i = 0; i < 22; i += 1) codes.push((await send(JSON.stringify({ message: `e${i}` }), '203.0.120.3')).status);
+    expect(codes.slice(0, 20).every((c) => c === 204)).toBe(true);
+    expect(codes.slice(20)).toEqual([429, 429]);
+  });
+});
