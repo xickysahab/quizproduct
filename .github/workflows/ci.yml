@@ -63,3 +63,56 @@ jobs:
       - run: npm ci
       - run: npx tsc -p tsconfig.app.json --noEmit
       - run: npm run build
+
+  # The core loop in a real browser: a host builds and presents a quiz, a
+  # participant joins from a phone and answers. Unit and integration suites
+  # never render a page, so this is the only check the client actually works.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quizpulse_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quizpulse_e2e
+      VITE_API_URL: http://localhost:5001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start the API
+        working-directory: server
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          nohup npx tsx src/index.ts > ../api.log 2>&1 &
+          npx --yes wait-on -t 60000 http://localhost:5001/health
+      - name: Serve the client build
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+          nohup npx vite preview --port 4173 --strictPort > ../web.log 2>&1 &
+          npx --yes wait-on -t 60000 http://localhost:4173
+      - name: End-to-end
+        working-directory: client
+        # GitHub's Ubuntu runners ship Chrome; the config uses it, so no browser download.
+        run: npx playwright test
+        env:
+          CI: 'true'
+          E2E_BASE_URL: http://localhost:4173
+      - name: Logs on failure
+        if: failure()
+        run: tail -n 100 api.log web.log

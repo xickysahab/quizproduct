@@ -260,6 +260,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
                       {!surveyMode && type !== 'RATING' && (
                         <button
                           type="button"
+                          aria-label={`Mark option ${idx + 1} as ${type === 'RANKING' ? 'next in the answer order' : 'correct'}`}
+                          aria-pressed={isSelected}
                           onClick={() => {
                             if (type === 'MULTI_SELECT') {
                               setCorrectOptions((prev) =>
