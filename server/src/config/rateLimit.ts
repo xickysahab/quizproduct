@@ -1,5 +1,6 @@
-import rateLimit, { Options } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, Options } from 'express-rate-limit';
 import { ParticipantRequest } from '../middleware/participant.middleware';
+import { verifyParticipantToken } from '../utils/participantToken';
 
 const shared: Partial<Options> = {
   standardHeaders: 'draft-7',
@@ -54,14 +55,21 @@ export const passwordResetLimiter = rateLimit({
 });
 
 /**
- * Joins are limited generously: a lecture hall or office shares one public IP,
- * so the real flood protection is the per-event participant cap. This only
- * blunts scripted signup loops.
+ * Counts failed joins only. A lecture hall shares one public IP, and a load
+ * test showed a 500-seat room stopping at 200 when successes counted too. The
+ * abuse this exists for — guessing room codes, guessing a passcode — is made
+ * of failures, and the per-event participant cap bounds the rest.
+ *
+ * ponytail: a request is counted on arrival and forgiven when it succeeds, so
+ * more than 200 joins in flight at the same instant from one IP still trips
+ * it. A room joining over a few seconds never does (2,000 held in the load
+ * test); key successes separately if a venue ever shows otherwise.
  */
 export const joinLimiter = rateLimit({
   ...shared,
   windowMs: 5 * 60 * 1000,
   limit: 200,
+  skipSuccessfulRequests: true,
   message: { message: 'Too many join attempts from this network. Please wait a moment.' },
 });
 
@@ -78,11 +86,26 @@ export const responseLimiter = rateLimit({
   message: { message: 'Too many answers submitted. Please slow down.' },
 });
 
-/** Backstop for the authenticated dashboard API. */
+/**
+ * Backstop for the whole API. A participant is counted as themselves, by their
+ * verified room token, not by IP: keyed on IP, one school hall answering a
+ * question hit the ceiling after its hundredth answer. A forged token fails
+ * verification and is counted by IP like anything else.
+ */
 export const apiLimiter = rateLimit({
   ...shared,
   windowMs: 60 * 1000,
   limit: 600,
+  keyGenerator: (req) => {
+    const token = req.headers['x-participant-token'];
+    const participant = typeof token === 'string' ? verifyParticipantToken(token) : null;
+    return participant ? `participant:${participant.participantId}` : ipKeyGenerator(req.ip ?? '');
+  },
+  // Joining has its own limiter (joinLimiter). Counted here as well, by IP, a
+  // hall of a thousand behind one NAT stops joining at six hundred.
+  skip: (req) =>
+    (req.method === 'POST' && req.path === '/participants/join') ||
+    (req.method === 'GET' && req.path.startsWith('/events/public/')),
   message: { message: 'Too many requests. Please slow down.' },
 });
 

@@ -93,3 +93,43 @@ describe('a report for each student', () => {
     await request(app).get(`/analytics/events/${mine.eventId}/participants/${student}`).set(auth(mine.token)).expect(404);
   });
 });
+
+describe('a full hall behind one school IP', () => {
+  it('lets 250 phones on one address join', async () => {
+    const { roomCode } = await hostWithEvent();
+    await db.query(`UPDATE "PricingPlan" SET "participantsPerEvent" = 300`);
+    invalidatePlanCache();
+
+    // In waves, as a room joins over a few seconds. (All 250 in flight at the
+    // same instant would hit the limiter, which counts a request on arrival and
+    // forgives it once it succeeds — see joinLimiter.)
+    const statuses: number[] = [];
+    for (let wave = 0; wave < 250; wave += 25) {
+      statuses.push(
+        ...(await Promise.all(
+          Array.from({ length: 25 }, (_, k) =>
+            request(app)
+              .post('/participants/join')
+              .set('X-Forwarded-For', '198.51.100.7')
+              .send({ roomCode, name: `Student ${wave + k}`, sessionKey: `hall-${wave + k}` })
+              .then((res) => res.status)
+          )
+        ))
+      );
+    }
+    expect(statuses.filter((s) => s === 201)).toHaveLength(250);
+  });
+
+  it('still stops someone guessing room codes', async () => {
+    const guesses = await Promise.all(
+      Array.from({ length: 205 }, (_, i) =>
+        request(app)
+          .post('/participants/join')
+          .set('X-Forwarded-For', '198.51.100.8')
+          .send({ roomCode: String(1000000 + i), name: 'x' })
+          .then((res) => res.status)
+      )
+    );
+    expect(guesses).toContain(429);
+  });
+});
