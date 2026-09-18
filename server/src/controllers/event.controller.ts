@@ -406,6 +406,7 @@ export const duplicateEvent = async (req: AuthRequest, res: Response): Promise<v
             order: question.order,
             timeLimit: question.timeLimit,
             imageUrl: question.imageUrl,
+            imageAlt: question.imageAlt,
           })),
         },
       },

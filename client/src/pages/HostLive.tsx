@@ -456,7 +456,7 @@ const HostLive: React.FC = () => {
                 {activeQuestion.imageUrl && (
                   <img
                     src={imageSrc(activeQuestion.imageUrl)}
-                    alt=""
+                    alt={activeQuestion.imageAlt || ''}
                     className="mb-5 max-h-56 max-w-full object-contain rounded-2xl"
                   />
                 )}

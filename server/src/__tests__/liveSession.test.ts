@@ -39,6 +39,7 @@ describe('participant question projection (BUG-01)', () => {
       order: 1,
       timeLimit: 30,
       imageUrl: null,
+      imageAlt: null,
     });
   });
 });

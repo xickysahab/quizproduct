@@ -417,7 +417,7 @@ const AudienceDisplay: React.FC = () => {
             {activeQuestion.imageUrl && (
               <img
                 src={imageSrc(activeQuestion.imageUrl)}
-                alt=""
+                alt={activeQuestion.imageAlt || ''}
                 className="block mx-auto mb-10 max-h-[38vh] max-w-full object-contain rounded-2xl"
               />
             )}

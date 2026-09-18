@@ -507,7 +507,7 @@ const LiveQuiz: React.FC = () => {
                       {activeQuestion.imageUrl && (
                         <img
                           src={imageSrc(activeQuestion.imageUrl)}
-                          alt=""
+                          alt={activeQuestion.imageAlt || ''}
                           className="mt-4 w-full max-h-72 object-contain rounded-2xl bg-white/5"
                         />
                       )}

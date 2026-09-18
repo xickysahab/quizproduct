@@ -174,7 +174,7 @@ const Homework: React.FC = () => {
               </span>
               <h2 className="font-heading text-2xl font-bold leading-snug">{question.text}</h2>
               {question.imageUrl && (
-                <img src={imageSrc(question.imageUrl)} alt="" className="w-full max-h-72 object-contain rounded-2xl" />
+                <img src={imageSrc(question.imageUrl)} alt={question.imageAlt || ''} className="w-full max-h-72 object-contain rounded-2xl" />
               )}
             </div>
 

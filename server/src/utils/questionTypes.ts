@@ -16,6 +16,7 @@ export interface NormalizedQuestion {
   /** Overrides the session's scoring switch for this question only. */
   scored: ScoredOverride;
   imageUrl: string | null;
+  imageAlt: string | null;
 }
 
 const asType = (value: unknown): QuestionType =>
@@ -68,6 +69,8 @@ export const normalizeQuestionInput = (
     return { error: 'Upload the image here rather than linking to one elsewhere.' };
   }
   const imageUrl = rawImage || null;
+  // Only meaningful alongside an image; capped so it stays a description.
+  const imageAlt = imageUrl && typeof body.imageAlt === 'string' ? body.imageAlt.trim().slice(0, 250) || null : null;
 
   if (type === 'OPEN_TEXT' || type === 'WORD_CLOUD') {
     return {
@@ -80,6 +83,7 @@ export const normalizeQuestionInput = (
         timeLimit,
         scored,
         imageUrl,
+        imageAlt,
       },
     };
   }
@@ -120,6 +124,7 @@ export const normalizeQuestionInput = (
       timeLimit,
       scored,
       imageUrl,
+      imageAlt,
     },
   };
 };
@@ -133,6 +138,7 @@ export interface ParticipantSafeQuestion {
   order: number;
   timeLimit: number | null;
   imageUrl: string | null;
+  imageAlt: string | null;
 }
 
 /**
@@ -152,6 +158,7 @@ export const toParticipantQuestion = (question: {
   order: number;
   timeLimit: number | null;
   imageUrl?: string | null;
+  imageAlt?: string | null;
 }): ParticipantSafeQuestion => ({
   id: question.id,
   eventId: question.eventId,
@@ -161,6 +168,7 @@ export const toParticipantQuestion = (question: {
   order: question.order,
   timeLimit: question.timeLimit,
   imageUrl: question.imageUrl ?? null,
+  imageAlt: question.imageAlt ?? null,
 });
 
 export const scoreAnswer = (

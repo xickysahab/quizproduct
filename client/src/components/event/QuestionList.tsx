@@ -21,6 +21,7 @@ interface Question {
   correctOptions?: number[];
   timeLimit?: number | null;
   imageUrl?: string | null;
+  imageAlt?: string | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -109,7 +110,7 @@ const Row: React.FC<{
               )}
             </div>
             {q.imageUrl && (
-              <img src={imageSrc(q.imageUrl)} alt="" className="hidden sm:block w-16 h-16 rounded-xl object-cover shrink-0" />
+              <img src={imageSrc(q.imageUrl)} alt={q.imageAlt || ''} className="hidden sm:block w-16 h-16 rounded-xl object-cover shrink-0" />
             )}
           </div>
         </div>

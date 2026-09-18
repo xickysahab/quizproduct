@@ -23,6 +23,7 @@ interface ReportQuestion {
   text: string;
   options: string[];
   imageUrl: string | null;
+  imageAlt?: string | null;
   correctOption: number | null;
   correctOptions: number[];
   answer: Answer | null;
@@ -116,7 +117,7 @@ const ParticipantReport: React.FC = () => {
                   <span className="text-sm font-bold text-faint tabular pt-0.5">{q.order}</span>
                   <div className="flex-1 space-y-2">
                     <p className="font-semibold text-ink">{q.text}</p>
-                    {q.imageUrl && <img src={imageSrc(q.imageUrl)} alt="" className="max-h-40 object-contain rounded-xl" />}
+                    {q.imageUrl && <img src={imageSrc(q.imageUrl)} alt={q.imageAlt || ''} className="max-h-40 object-contain rounded-xl" />}
                     <p className="text-sm">
                       <span className="text-muted">Answered: </span>
                       <span className={scored ? (ok ? 'text-[color:var(--color-correct)] font-semibold' : 'text-wrong font-semibold') : 'text-ink'}>

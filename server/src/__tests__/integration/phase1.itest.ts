@@ -89,8 +89,16 @@ describe('image uploads', () => {
     const { body } = await request(app).post('/images').set(auth(token)).set('Content-Type', 'image/png').send(PNG);
 
     const base = { eventId, type: 'OPEN_TEXT', text: 'What is shown?' };
-    const saved = await request(app).post('/questions').set(auth(token)).send({ ...base, imageUrl: body.url }).expect(201);
-    expect(saved.body.question.imageUrl).toBe(body.url);
+    const saved = await request(app)
+      .post('/questions')
+      .set(auth(token))
+      .send({ ...base, imageUrl: body.url, imageAlt: '  A labelled plant cell  ' })
+      .expect(201);
+    expect(saved.body.question).toMatchObject({ imageUrl: body.url, imageAlt: 'A labelled plant cell' });
+
+    // A description without an image is dropped, not stored against nothing.
+    const bare = await request(app).post('/questions').set(auth(token)).send({ ...base, imageAlt: 'orphan' }).expect(201);
+    expect(bare.body.question.imageAlt).toBeNull();
 
     await request(app)
       .post('/questions')

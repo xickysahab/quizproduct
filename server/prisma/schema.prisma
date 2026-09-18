@@ -448,6 +448,8 @@ model Question {
   revealedAt     DateTime?
   /// `/images/<id>` — an Image row. Hotlinked URLs are refused; see utils/images.ts.
   imageUrl       String?
+  /// What the image shows, read aloud to anyone who cannot see it.
+  imageAlt       String?
   responses      Response[]
 
   @@index([eventId, order])

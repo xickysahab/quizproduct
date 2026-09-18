@@ -31,6 +31,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
   const [timeLimit, setTimeLimit] = useState<number>(30);
   const [scored, setScored] = useState<'INHERIT' | 'YES' | 'NO'>('INHERIT');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageAlt, setImageAlt] = useState('');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -48,6 +49,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
     setTimeLimit(initialData ? initialData.timeLimit || 0 : 30);
     setScored(initialData?.scored === 'YES' || initialData?.scored === 'NO' ? initialData.scored : 'INHERIT');
     setImageUrl(initialData?.imageUrl || null);
+    setImageAlt(initialData?.imageAlt || '');
   }, [open, initialData]);
 
   const handleOptionChange = (index: number, value: string) => {
@@ -108,6 +110,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
         timeLimit,
         scored,
         imageUrl,
+        imageAlt: imageUrl ? imageAlt : null,
       });
       onClose();
     } catch (error) {
@@ -178,7 +181,20 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
           <div>
             {imageUrl ? (
               <div className="flex items-start gap-3">
-                <img src={imageSrc(imageUrl)} alt="" className="max-h-40 max-w-full object-contain rounded-2xl border border-gray-200" />
+                <div className="space-y-2">
+                  <img src={imageSrc(imageUrl)} alt={imageAlt} className="max-h-40 max-w-full object-contain rounded-2xl border border-gray-200" />
+                  <label className="block">
+                    <span className="block text-[13px] text-muted mb-1">Describe the image, for anyone who cannot see it</span>
+                    <input
+                      type="text"
+                      value={imageAlt}
+                      onChange={(e) => setImageAlt(e.target.value)}
+                      maxLength={250}
+                      placeholder="A labelled diagram of a plant cell"
+                      className="field w-full px-3 h-10 text-[15px]"
+                    />
+                  </label>
+                </div>
                 <button type="button" onClick={() => setImageUrl(null)} className="text-xs font-semibold text-gray-500">
                   Remove image
                 </button>

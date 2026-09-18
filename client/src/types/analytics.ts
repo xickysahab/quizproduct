@@ -77,6 +77,8 @@ export interface LiveQuestion {
   order: number;
   timeLimit: number | null;
   imageUrl?: string | null;
+  /** What the image shows, for screen readers. */
+  imageAlt?: string | null;
 }
 
 /** A question as the host receives it, answer key included. */
