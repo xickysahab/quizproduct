@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
 import { useAuth } from '../context/AuthContext';
+import RecentQuizzes from '../components/RecentQuizzes';
 
 interface TenantStats {
   staff: number;
@@ -33,42 +33,27 @@ const TenantDashboard = () => {
   }, []);
 
   const statCards = [
-    { label: 'Total Staff', value: stats?.staff },
-    { label: 'Total Quizzes', value: stats?.events },
-    { label: 'Live Right Now', value: stats?.liveEvents },
-    { label: 'Total Participants', value: stats?.participants },
+    { label: 'Quizzes', value: stats?.events },
+    { label: 'Live now', value: stats?.liveEvents },
+    { label: 'Participants', value: stats?.participants },
+    { label: 'Staff', value: stats?.staff },
   ];
 
   return (
     <DashboardLayout title={dashboardTitleForRole(user?.role)} sidebarItems={sidebarForRole(user?.role)} showCreateQuiz={true}>
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Organization Dashboard
-        </h1>
+      <div className="space-y-8">
+        <h1 className="text-[34px] font-bold text-ink">Overview</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           {statCards.map((stat) => (
-            <div key={stat.label} className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm hover-card">
-              <p className="text-gray-500 text-sm font-medium">{stat.label}</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">
-                {loading ? '…' : stat.value ?? 0}
-              </p>
+            <div key={stat.label} className="bg-surface border border-line px-5 py-4 rounded-2xl">
+              <p className="text-[13px] text-muted">{stat.label}</p>
+              <p className="text-[28px] font-bold text-ink tabular mt-0.5">{loading ? '–' : stat.value ?? 0}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Quick Actions</h2>
-          <p className="text-gray-500 text-sm mb-4">Manage your staff and quizzes.</p>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/tenant/staff" className="px-4 py-2.5 bg-accent-wash text-accent border border-accent-soft rounded-xl text-sm font-semibold hover:bg-accent-wash transition-all">
-              Manage Staff
-            </Link>
-            <Link to="/tenant/quizzes" className="px-4 py-2.5 bg-accent-wash text-accent border border-accent-soft rounded-xl text-sm font-semibold hover:bg-accent-wash transition-all">
-              View Quizzes
-            </Link>
-          </div>
-        </div>
+        <RecentQuizzes allHref="/tenant/quizzes" />
       </div>
     </DashboardLayout>
   );

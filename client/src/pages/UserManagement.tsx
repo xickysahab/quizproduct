@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, UserPlus, Mail, Lock, User as UserIcon, Users, Ban, Trash2, Send } from 'lucide-react';
+import Sheet from '../components/Sheet';
+import { UserPlus, Mail, Lock, User as UserIcon, Users, Ban, Trash2, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -191,38 +191,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
         </div>
       </div>
 
-      {/* Create user modal */}
-      <AnimatePresence>
-        {modalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-              onClick={() => setModalOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-xl relative z-10 border border-gray-200"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-accent-wash flex items-center justify-center text-accent shadow-sm">
-                    <UserPlus className="w-5 h-5" />
-                  </div>
-                  <h2 className="font-heading text-2xl font-bold text-gray-900">Add {entityLabel}</h2>
-                </div>
-                <button
-                  onClick={() => setModalOpen(false)}
-                  className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
+      {/* Create user */}
+      <Sheet open={modalOpen} onClose={() => setModalOpen(false)} title={`Add ${entityLabel}`} size="sm">
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Name</label>
@@ -288,10 +258,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                   {creating ? 'Saving...' : inviteMode ? `Send ${entityLabel} invite` : `Create ${entityLabel}`}
                 </button>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Sheet>
     </DashboardLayout>
   );
 };
