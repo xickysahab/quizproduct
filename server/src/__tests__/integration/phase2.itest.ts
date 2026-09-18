@@ -133,3 +133,12 @@ describe('a full hall behind one school IP', () => {
     expect(guesses).toContain(429);
   });
 });
+
+describe('what a plan promises', () => {
+  it('never shows more participants than the server will admit', async () => {
+    const res = await request(app).get('/billing/plans').expect(200);
+    const enterprise = res.body.plans.find((p: { id: string }) => p.id === 'ENTERPRISE');
+    // Seeded at 5,000; the server stops at MAX_PARTICIPANTS_PER_EVENT (1,000 by default).
+    expect(enterprise.participantsPerEvent).toBe(1000);
+  });
+});

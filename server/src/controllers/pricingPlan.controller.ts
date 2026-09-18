@@ -6,6 +6,7 @@ import { computeGst } from '../utils/gst';
 import { seller, isGstRegistered } from '../config/seller';
 import { logActivity } from '../utils/logger';
 import { slog } from '../utils/slog';
+import { env } from '../config/env';
 
 /**
  * The plan catalogue, as a SuperAdmin edits it.
@@ -162,6 +163,8 @@ export const listPlansForAdmin = async (_req: AuthRequest, res: Response): Promi
         ...withTax(plan),
         organizationCount: byCode.get(plan.code) ?? 0,
       })),
+      // So the plan editor can say when a number is above what the server admits.
+      serverParticipantCap: env.maxParticipantsPerEvent,
     });
   } catch (error) {
     slog('error', 'plans.list_failed', { error: error instanceof Error ? error.message : String(error) });

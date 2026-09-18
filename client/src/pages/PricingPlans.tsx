@@ -112,7 +112,9 @@ const PlanForm: React.FC<{
   saving: boolean;
   onSubmit: () => void;
   onCancel: () => void;
-}> = ({ draft, setDraft, isNew, saving, onSubmit, onCancel }) => {
+  /** The server's own ceiling; a plan number above it is never reached. */
+  participantCap: number | null;
+}> = ({ draft, setDraft, isNew, saving, onSubmit, onCancel, participantCap }) => {
   const set = <K extends keyof DraftFields>(key: K, value: DraftFields[K]) =>
     setDraft({ ...draft, [key]: value });
 
@@ -195,7 +197,14 @@ const PlanForm: React.FC<{
             className={`${inputClass} tabular`}
           />
         </Field>
-        <Field label="Participants / session">
+        <Field
+          label="Participants / session"
+          hint={
+            participantCap && Number(draft.participantsPerEvent) > participantCap
+              ? `Above this server's limit of ${participantCap.toLocaleString('en-IN')} — customers are shown ${participantCap.toLocaleString('en-IN')}. Raise MAX_PARTICIPANTS_PER_EVENT once a load test passes at the higher number.`
+              : undefined
+          }
+        >
           <input
             type="number"
             min={1}
@@ -252,6 +261,7 @@ const PlanForm: React.FC<{
 const PricingPlans: React.FC = () => {
   const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [participantCap, setParticipantCap] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -262,6 +272,7 @@ const PricingPlans: React.FC = () => {
     try {
       const response = await api.get('/superadmin/plans');
       setPlans(response.data.plans);
+      setParticipantCap(response.data.serverParticipantCap ?? null);
     } catch {
       toast.error('Could not load the plan catalogue.');
     } finally {
@@ -368,6 +379,7 @@ const PricingPlans: React.FC = () => {
               saving={saving}
               onSubmit={save}
               onCancel={() => setCreating(false)}
+              participantCap={participantCap}
             />
           </div>
         )}
@@ -435,6 +447,11 @@ const PricingPlans: React.FC = () => {
                   </dt>
                   <dd className="font-medium text-ink tabular">
                     {plan.participantsPerEvent.toLocaleString('en-IN')}
+                    {participantCap && plan.participantsPerEvent > participantCap && (
+                      <span className="block text-xs text-caution font-normal">
+                        server admits {participantCap.toLocaleString('en-IN')}
+                      </span>
+                    )}
                   </dd>
                 </div>
                 <div>
@@ -512,6 +529,7 @@ const PricingPlans: React.FC = () => {
                   saving={saving}
                   onSubmit={save}
                   onCancel={() => setEditingId(null)}
+                  participantCap={participantCap}
                 />
               )}
             </div>

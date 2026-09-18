@@ -122,7 +122,10 @@ export const listPlans = async (_req: Request, res: Response): Promise<void> => 
           treatment
         ).totalPaise,
         eventsPerMonth: plan.eventsPerMonth,
-        participantsPerEvent: plan.participantsPerEvent,
+        // What a session will actually admit: the plan's number, but never past
+        // the server's own ceiling. Selling 5,000 on a server that stops at 1,000
+        // would charge for seats nobody can take.
+        participantsPerEvent: Math.min(plan.participantsPerEvent, env.maxParticipantsPerEvent),
         questionsPerEvent: plan.questionsPerEvent,
         aiDraftsPerMonth: plan.aiDraftsPerMonth,
         branding: plan.branding,
@@ -877,7 +880,10 @@ export const getSubscription = async (req: AuthRequest, res: Response): Promise<
       subscription: {
         ...state,
         startedAt: organization.planStartedAt,
-        limits: await limitsFor(state.effectivePlan),
+        limits: await (async () => {
+          const limits = await limitsFor(state.effectivePlan);
+          return { ...limits, participantsPerEvent: Math.min(limits.participantsPerEvent, env.maxParticipantsPerEvent) };
+        })(),
         usage: {
           period,
           eventsCreated: meter?.eventsCreated ?? 0,
