@@ -6,14 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="QuizPulse — Real-time live quizzes, polls, and audience engagement. Zero friction, instant sync." />
     <title>QuizPulse — Live Interactive Quizzes & Audience Engagement</title>
-    <!-- Google Fonts Preconnect & Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Latin faces only. The Indic scripts are pulled in on demand by
-         loadScriptFont() when a participant picks that language, so a Hindi
-         room pays for Devanagari and nobody pays for all six. -->
-    <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <meta name="theme-color" content="#14100E">
+    <!-- No web fonts: the system face (SF Pro, Roboto, Segoe) is already on the
+         device. Indic faces are fetched on demand by loadScriptFont(). -->
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   </head>
   <body class="antialiased">
     <div id="root"></div>

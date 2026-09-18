@@ -137,7 +137,7 @@ const Homework: React.FC = () => {
     }`;
 
   return (
-    <div className="min-h-screen bg-[color:var(--color-stage)] text-white px-5 py-8">
+    <div data-stage className="min-h-screen bg-[color:var(--color-stage)] text-white px-5 py-8">
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-[0.22em] uppercase text-accent-lift">{t('hw.eyebrow')}</span>

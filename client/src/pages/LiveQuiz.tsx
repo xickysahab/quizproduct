@@ -19,6 +19,7 @@ import { enqueue, flushQueue, onQueueChange, pendingCount, startAutoFlush } from
 import { readRoomBranding, brandTint, type RoomBranding } from '../utils/branding';
 import { motion, AnimatePresence } from 'framer-motion';
 import { imageSrc } from '../utils/uploadImage';
+import { spring } from '../utils/motion';
 
 const LiveQuiz: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -273,7 +274,7 @@ const LiveQuiz: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={spring}
           className={`w-full bg-white text-gray-900 rounded-[2rem] p-8 md:p-10 text-center shadow-2xl space-y-6 relative z-10 ${
             sessionResults?.questions?.length ? 'max-w-2xl' : 'max-w-md'
           }`}

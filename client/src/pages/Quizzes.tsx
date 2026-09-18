@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import DashboardLayout from '../components/DashboardLayout';
 import ConfirmModal from '../components/ConfirmModal';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
+import { springSnappy } from '../utils/motion';
 
 interface Event {
   id: string;
@@ -231,7 +232,7 @@ const Quizzes: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   whileHover={{ y: -4 }}
-                  transition={{ duration: 0.25 }}
+                  transition={springSnappy}
                   className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
                 >
                   <div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { QuestionTally } from '../types/analytics';
 import { optionFills } from '../utils/optionTheme';
+import { spring } from '../utils/motion';
 
 /**
  * Renders one question's real results.
@@ -126,7 +127,7 @@ const Ranking: React.FC<{ tally: QuestionTally }> = ({ tally }) => {
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${share}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+                transition={spring}
                 className="h-full rounded-full"
                 style={{ backgroundColor: colour }}
               />
@@ -201,7 +202,7 @@ const QuestionResults: React.FC<Props> = ({ tally, palette, revealCorrect = fals
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    transition={spring}
                     className="h-full rounded-full"
                     style={{ backgroundColor: colour }}
                   />

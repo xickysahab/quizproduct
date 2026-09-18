@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { ArrowRight, Lock, Mail } from 'lucide-react';
 import Logo from '../components/Logo';
 import { motion } from 'framer-motion';
+import { spring } from '../utils/motion';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -45,7 +46,7 @@ const Login: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={spring}
           className="max-w-md w-full bg-white rounded-3xl p-8 md:p-10 shadow-xl border border-gray-100 relative hover-card z-10"
         >
           {/* Header */}

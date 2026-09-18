@@ -12,6 +12,7 @@ import Footer from '../components/Footer';
 import { ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { imageSrc } from '../utils/uploadImage';
+import { spring } from '../utils/motion';
 
 const Join: React.FC = () => {
   const [roomCode, setRoomCode] = useState('');
@@ -139,7 +140,7 @@ const Join: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 0.82, 0.24, 1] }}
+            transition={spring}
             className="w-full max-w-[460px]"
           >
             {/* The room announces itself the moment the code resolves — the

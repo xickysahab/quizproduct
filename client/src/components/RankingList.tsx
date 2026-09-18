@@ -1,6 +1,7 @@
 import React from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
+import { springMomentum } from '../utils/motion';
 
 /**
  * Drag to rank.
@@ -56,7 +57,7 @@ const Row: React.FC<{
       dragControls={controls}
       // Momentum-driven, so a little overshoot is right here — the row was
       // thrown, and stopping dead would read as hitting a wall.
-      transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+      transition={springMomentum}
       whileDrag={{
         scale: 1.03,
         boxShadow: '0 18px 40px -12px rgba(26, 22, 20, 0.28)',
