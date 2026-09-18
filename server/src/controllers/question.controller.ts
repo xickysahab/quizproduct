@@ -57,6 +57,7 @@ export const addQuestion = async (req: AuthRequest, res: Response): Promise<void
         order: (last?.order ?? 0) + 1,
         timeLimit: parsed.value.timeLimit,
         scored: parsed.value.scored,
+        imageUrl: parsed.value.imageUrl,
       },
     });
 
@@ -95,6 +96,7 @@ export const updateQuestion = async (req: AuthRequest, res: Response): Promise<v
       correctOptions: req.body?.correctOptions ?? existingQuestion.correctOptions,
       timeLimit: req.body?.timeLimit === undefined ? existingQuestion.timeLimit : req.body.timeLimit,
       scored: req.body?.scored === undefined ? existingQuestion.scored : req.body.scored,
+      imageUrl: req.body?.imageUrl === undefined ? existingQuestion.imageUrl : req.body.imageUrl,
     });
 
     if ('error' in parsed) {

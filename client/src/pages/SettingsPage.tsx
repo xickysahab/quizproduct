@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import DashboardLayout from '../components/DashboardLayout';
 import BillingPanel from '../components/BillingPanel';
 import { sidebarForRole, dashboardTitleForRole } from '../config/sidebar';
+import { uploadImage, imageSrc } from '../utils/uploadImage';
 
 const SettingsPage: React.FC = () => {
   const { user, login } = useAuth();
@@ -147,6 +148,7 @@ const OrganizationSettings: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     api.get('/org/me').then((res) => {
@@ -178,19 +180,43 @@ const OrganizationSettings: React.FC = () => {
         Shown to participants on the join screen. Plan and usage live in Plan &amp; billing below.
       </p>
       <form onSubmit={save} className="space-y-3">
-        <input
-          value={logoUrl}
-          onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="Logo URL"
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
-        />
+        <div className="flex items-center gap-3">
+          {logoUrl && <img src={imageSrc(logoUrl)} alt="" className="w-12 h-12 object-contain rounded-lg border border-gray-200" />}
+          <label className="text-sm font-semibold text-accent cursor-pointer">
+            {uploading ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo (PNG, JPEG or WebP)'}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              disabled={uploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                setUploading(true);
+                try {
+                  setLogoUrl(await uploadImage(file, 'logo'));
+                } catch (error) {
+                  toast.error((error as Error).message);
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          </label>
+          {logoUrl && (
+            <button type="button" onClick={() => setLogoUrl('')} className="text-xs font-semibold text-gray-500">
+              Remove
+            </button>
+          )}
+        </div>
         <input
           value={primaryColor}
           onChange={(e) => setPrimaryColor(e.target.value)}
           placeholder="Primary color (#4F46E5)"
           className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
         />
-        <button type="submit" disabled={saving} className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50">
+        <button type="submit" disabled={saving || uploading} className="gradient-btn text-white font-semibold px-6 py-3 rounded-xl disabled:opacity-50">
           Save branding
         </button>
       </form>

@@ -19,6 +19,8 @@ import audienceQuestionRoutes from './routes/audienceQuestion.routes';
 import privacyRoutes from './routes/privacy.routes';
 import legalRoutes from './routes/legal.routes';
 import { authenticateHost } from './middleware/auth.middleware';
+import { serveImage, uploadImage } from './controllers/image.controller';
+import { MAX_IMAGE_BYTES } from './utils/images';
 import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { corsOriginHandler } from './config/cors';
 import { apiLimiter } from './config/rateLimit';
@@ -82,6 +84,9 @@ export const createApp = () => {
   // Parsed here, ahead of the global parser, which then skips the body — and
   // only after the login is checked, so a stranger cannot make us buffer 21 MB.
   app.post('/questions/event/:id/draft', apiLimiter, authenticateHost, express.json({ limit: '21mb' }));
+  // The image itself is the body. Limited like any other API call — this route
+  // sits ahead of the global limiter, and every upload is a stored row.
+  app.post('/images', apiLimiter, authenticateHost, express.raw({ type: () => true, limit: MAX_IMAGE_BYTES }), uploadImage);
   app.use(express.json({ limit: '200kb' }));
 
   /**
@@ -121,6 +126,9 @@ export const createApp = () => {
     });
   });
 
+  // Ahead of the limiter: a whole classroom, often behind one school IP, asks
+  // for the same picture the moment a question goes live. Served from memory.
+  app.get('/images/:id', serveImage);
   app.use(apiLimiter);
 
   app.use('/auth', authRoutes);
@@ -150,6 +158,14 @@ export const createApp = () => {
   app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
     // Was a bare console.error, which is invisible to anything aggregating logs
     // and reaches nobody. The path and method are what make a 500 findable.
+    // A body the parser refused (too large, malformed JSON) is the client's
+    // mistake, not ours; it used to surface as a 500.
+    const parserError = error as Error & { status?: number; expose?: boolean };
+    const status = parserError.expose && parserError.status ? parserError.status : 500;
+    if (status >= 400 && status < 500) {
+      res.status(status).json({ message: status === 413 ? 'That upload is too large.' : 'The request could not be read.' });
+      return;
+    }
     report('request.unhandled_error', error, { method: req.method, path: req.path });
     res.status(500).json({ message: 'Internal server error' });
   });

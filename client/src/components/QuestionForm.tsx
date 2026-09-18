@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Clock, Plus, Minus, Trophy } from 'lucide-react';
+import { X, Check, Clock, Plus, Minus, Trophy, ImagePlus } from 'lucide-react';
+import { uploadImage, imageSrc } from '../utils/uploadImage';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -28,6 +29,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
   const [correctOptions, setCorrectOptions] = useState<number[]>([]);
   const [timeLimit, setTimeLimit] = useState<number>(30);
   const [scored, setScored] = useState<'INHERIT' | 'YES' | 'NO'>('INHERIT');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const needsOptions = type === 'MCQ' || type === 'MULTI_SELECT' || type === 'RATING' || type === 'RANKING';
@@ -41,6 +44,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
       setCorrectOptions(initialData.correctOptions || []);
       setTimeLimit(initialData.timeLimit || 0);
       setScored(initialData.scored === 'YES' || initialData.scored === 'NO' ? initialData.scored : 'INHERIT');
+      setImageUrl(initialData.imageUrl || null);
     }
   }, [initialData]);
 
@@ -48,6 +52,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
     const next = [...options];
     next[index] = value;
     setOptions(next);
+  };
+
+  const handleImage = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      setImageUrl(await uploadImage(file, 'question'));
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +105,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                 : [],
         timeLimit,
         scored,
+        imageUrl,
       });
       onClose();
     } catch (error) {
@@ -154,6 +171,32 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
+          </div>
+
+          <div>
+            {imageUrl ? (
+              <div className="flex items-start gap-3">
+                <img src={imageSrc(imageUrl)} alt="" className="max-h-40 max-w-full object-contain rounded-2xl border border-gray-200" />
+                <button type="button" onClick={() => setImageUrl(null)} className="text-xs font-semibold text-gray-500">
+                  Remove image
+                </button>
+              </div>
+            ) : (
+              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent cursor-pointer">
+                <ImagePlus className="w-4 h-4" />
+                {uploading ? 'Uploading…' : 'Add an image (PNG, JPEG or WebP)'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    void handleImage(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           {needsOptions && (
@@ -300,7 +343,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
             <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 font-bold py-3.5 rounded-2xl">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="flex-1 gradient-btn text-white font-bold py-3.5 rounded-2xl disabled:opacity-50">
+            <button type="submit" disabled={loading || uploading} className="flex-1 gradient-btn text-white font-bold py-3.5 rounded-2xl disabled:opacity-50">
               {loading ? 'Saving...' : 'Save Question'}
             </button>
           </div>

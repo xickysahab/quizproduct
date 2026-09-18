@@ -16,6 +16,7 @@ import RoomPin from '../components/RoomPin';
 import type { EventDetail, EventSummary, LeaderboardRow, QuestionTally } from '../types/analytics';
 import { themeFor, themeLabel } from '../utils/sessionTheme';
 import { formatRoomCode } from '../utils/roomCode';
+import { imageSrc } from '../utils/uploadImage';
 
 const HostLive: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -423,6 +424,14 @@ const HostLive: React.FC = () => {
                 <h2 className="font-heading text-2xl md:text-3xl font-bold leading-snug mb-5">
                   {activeQuestion.text}
                 </h2>
+
+                {activeQuestion.imageUrl && (
+                  <img
+                    src={imageSrc(activeQuestion.imageUrl)}
+                    alt=""
+                    className="mb-5 max-h-56 max-w-full object-contain rounded-2xl"
+                  />
+                )}
 
                 {/* The host sees the answer key. The room does not, until a
                     reveal — that boundary is enforced on the server. */}

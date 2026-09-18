@@ -18,6 +18,7 @@ import { themeFor } from '../utils/sessionTheme';
 import { enqueue, flushQueue, onQueueChange, pendingCount, startAutoFlush } from '../utils/answerQueue';
 import { readRoomBranding, brandTint, type RoomBranding } from '../utils/branding';
 import { motion, AnimatePresence } from 'framer-motion';
+import { imageSrc } from '../utils/uploadImage';
 
 const LiveQuiz: React.FC = () => {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -282,7 +283,7 @@ const LiveQuiz: React.FC = () => {
             style={accent ? { backgroundColor: brandTint(accent, 0.15), color: accent } : undefined}
           >
             {branding?.logoUrl ? (
-              <img src={branding.logoUrl} alt="" className="w-10 h-10 object-contain" />
+              <img src={imageSrc(branding.logoUrl)} alt="" className="w-10 h-10 object-contain" />
             ) : (
               <Award className="w-8 h-8" />
             )}
@@ -493,9 +494,18 @@ const LiveQuiz: React.FC = () => {
                   </span>
 
                   {showQuestionOnPhone ? (
-                    <h2 className="font-heading text-2xl md:text-3xl font-bold text-white mt-1.5 leading-snug">
-                      {activeQuestion.text}
-                    </h2>
+                    <>
+                      <h2 className="font-heading text-2xl md:text-3xl font-bold text-white mt-1.5 leading-snug">
+                        {activeQuestion.text}
+                      </h2>
+                      {activeQuestion.imageUrl && (
+                        <img
+                          src={imageSrc(activeQuestion.imageUrl)}
+                          alt=""
+                          className="mt-4 w-full max-h-72 object-contain rounded-2xl bg-white/5"
+                        />
+                      )}
+                    </>
                   ) : (
                     /* The question deliberately is not here. In a Game-shaped
                        session the room should be looking at the shared screen,

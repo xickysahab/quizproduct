@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { currentPeriod, limitsFor, PlanName } from '../utils/plans';
 import { resolvePlanState, SubscriptionRow } from '../utils/subscription';
 import { validateLogoUrl } from '../utils/validation';
+import { isOwnImage } from '../utils/images';
 import { slog } from '../utils/slog';
 
 export const getMyOrganization = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -83,12 +84,21 @@ export const updateMyOrganization = async (req: AuthRequest, res: Response): Pro
         res.status(402).json({ message: 'Custom branding is available on Pro and Enterprise plans.' });
         return;
       }
-      if (logoUrl !== undefined) {
+      if (typeof logoUrl === 'string' && isOwnImage(logoUrl)) {
+        data.logoUrl = logoUrl;
+      } else if (logoUrl !== undefined) {
         // Was stored verbatim, whatever it was. This goes on the join screen
         // in front of a whole room.
         const checked = validateLogoUrl(logoUrl);
         if (!checked.ok) {
           res.status(400).json({ message: checked.message });
+          return;
+        }
+        // A new logo must be uploaded here: a hotlinked image lets its host log
+        // every participant who opens the join screen. A logo saved before
+        // uploads existed stays until it is changed.
+        if (checked.value && checked.value !== org.logoUrl) {
+          res.status(400).json({ message: 'Upload the logo here rather than linking to one elsewhere.' });
           return;
         }
         data.logoUrl = checked.value;

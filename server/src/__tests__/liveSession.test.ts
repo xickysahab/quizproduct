@@ -38,6 +38,7 @@ describe('participant question projection (BUG-01)', () => {
       options: ['Mumbai', 'Pune', 'Nagpur', 'Nashik'],
       order: 1,
       timeLimit: 30,
+      imageUrl: null,
     });
   });
 });

@@ -74,6 +74,7 @@ export interface LiveQuestion {
   options: string[];
   order: number;
   timeLimit: number | null;
+  imageUrl?: string | null;
 }
 
 /** A question as the host receives it, answer key included. */

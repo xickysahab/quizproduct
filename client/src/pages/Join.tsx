@@ -11,6 +11,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { imageSrc } from '../utils/uploadImage';
 
 const Join: React.FC = () => {
   const [roomCode, setRoomCode] = useState('');
@@ -142,7 +143,7 @@ const Join: React.FC = () => {
                 <div key="room" className="animate-cut-in">
                   {branding?.logoUrl && (
                     <img
-                      src={branding.logoUrl}
+                      src={imageSrc(branding.logoUrl)}
                       alt=""
                       className="h-9 mx-auto mb-3 object-contain"
                     />

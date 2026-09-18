@@ -1,3 +1,5 @@
+import { isOwnImage } from './images';
+
 export type QuestionType = 'MCQ' | 'MULTI_SELECT' | 'OPEN_TEXT' | 'WORD_CLOUD' | 'RATING' | 'RANKING';
 
 const QUESTION_TYPES: QuestionType[] = ['MCQ', 'MULTI_SELECT', 'OPEN_TEXT', 'WORD_CLOUD', 'RATING', 'RANKING'];
@@ -13,6 +15,7 @@ export interface NormalizedQuestion {
   timeLimit: number | null;
   /** Overrides the session's scoring switch for this question only. */
   scored: ScoredOverride;
+  imageUrl: string | null;
 }
 
 const asType = (value: unknown): QuestionType =>
@@ -60,6 +63,12 @@ export const normalizeQuestionInput = (
   const timeLimit = cleanTimeLimit(body.timeLimit);
   const scored = asScored(body.scored);
 
+  const rawImage = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
+  if (rawImage && !isOwnImage(rawImage)) {
+    return { error: 'Upload the image here rather than linking to one elsewhere.' };
+  }
+  const imageUrl = rawImage || null;
+
   if (type === 'OPEN_TEXT' || type === 'WORD_CLOUD') {
     return {
       value: {
@@ -70,6 +79,7 @@ export const normalizeQuestionInput = (
         correctOptions: [],
         timeLimit,
         scored,
+        imageUrl,
       },
     };
   }
@@ -109,6 +119,7 @@ export const normalizeQuestionInput = (
       correctOptions,
       timeLimit,
       scored,
+      imageUrl,
     },
   };
 };
@@ -121,6 +132,7 @@ export interface ParticipantSafeQuestion {
   options: string[];
   order: number;
   timeLimit: number | null;
+  imageUrl: string | null;
 }
 
 /**
@@ -139,6 +151,7 @@ export const toParticipantQuestion = (question: {
   options: string[];
   order: number;
   timeLimit: number | null;
+  imageUrl?: string | null;
 }): ParticipantSafeQuestion => ({
   id: question.id,
   eventId: question.eventId,
@@ -147,6 +160,7 @@ export const toParticipantQuestion = (question: {
   options: question.options,
   order: question.order,
   timeLimit: question.timeLimit,
+  imageUrl: question.imageUrl ?? null,
 });
 
 export const scoreAnswer = (

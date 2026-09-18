@@ -1,6 +1,7 @@
 import React from 'react';
 import Logo from './Logo';
 import { brandTint, type RoomBranding } from '../utils/branding';
+import { imageSrc } from '../utils/uploadImage';
 
 interface BrandedHeaderProps {
   branding: RoomBranding | null;
@@ -38,7 +39,7 @@ const BrandedHeader: React.FC<BrandedHeaderProps> = ({
       <div className="flex items-center gap-2.5 min-w-0">
         {branding?.logoUrl ? (
           <img
-            src={branding.logoUrl}
+            src={imageSrc(branding.logoUrl)}
             alt={branding.name || 'Organization'}
             className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100"
           />

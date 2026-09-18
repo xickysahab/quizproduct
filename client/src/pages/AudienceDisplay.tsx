@@ -13,6 +13,7 @@ import type { EventDetail, LeaderboardRow, QuestionTally } from '../types/analyt
 type ScoreboardRow = LeaderboardRow & { movement?: number | null; previousRank?: number | null };
 import { themeFor } from '../utils/sessionTheme';
 import { formatRoomCode } from '../utils/roomCode';
+import { imageSrc } from '../utils/uploadImage';
 
 /**
  * Projector / secondary-screen view — question + live tally only.
@@ -409,6 +410,14 @@ const AudienceDisplay: React.FC = () => {
                            text-[clamp(2rem,4.6vw,4.25rem)] max-w-5xl text-[color:var(--color-stage-ink)]">
               {activeQuestion.text}
             </h2>
+
+            {activeQuestion.imageUrl && (
+              <img
+                src={imageSrc(activeQuestion.imageUrl)}
+                alt=""
+                className="block mx-auto mb-10 max-h-[38vh] max-w-full object-contain rounded-2xl"
+              />
+            )}
 
             {revealed && liveResults ? (
               <div className="max-w-4xl mx-auto rounded-3xl bg-[color:var(--color-stage-2)] border border-[color:var(--color-stage-3)] p-8">

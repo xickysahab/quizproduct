@@ -435,6 +435,8 @@ model Question {
   timeLimit      Int?
   /// Overrides the session's scoring switch for this question only.
   scored         ScoredOverride @default(INHERIT)
+  /// `/images/<id>` — an Image row. Hotlinked URLs are refused; see utils/images.ts.
+  imageUrl       String?
   responses      Response[]
 
   @@index([eventId, order])
@@ -536,3 +538,13 @@ model ActivityLog {
   @@index([createdAt])
 }
 
+/// An uploaded image — a question picture or a workspace logo. Kept in the
+/// database rather than a bucket: one less service to run at this size. Capped
+/// at MAX_IMAGE_BYTES (utils/images.ts), and immutable, so it caches forever.
+model Image {
+  id          String   @id @default(uuid())
+  contentType String
+  data        Bytes
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+}
