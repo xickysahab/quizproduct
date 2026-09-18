@@ -203,6 +203,32 @@ const HostLive: React.FC = () => {
   };
 
   /**
+   * Presenter keys. A clicker sends Page Down / Page Up (or the arrows), and a
+   * host mid-sentence should not have to find a button: forward moves on,
+   * back goes back, R reveals the results. Ignored while typing.
+   */
+  const keys = useRef({ next: handleNextQuestion, prev: handlePrevQuestion, reveal: () => {} });
+  keys.current.next = handleNextQuestion;
+  keys.current.prev = handlePrevQuestion;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target : null;
+      if (e.metaKey || e.ctrlKey || e.altKey || el?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (['ArrowRight', 'PageDown', ' '].includes(e.key)) {
+        e.preventDefault();
+        keys.current.next();
+      } else if (['ArrowLeft', 'PageUp'].includes(e.key)) {
+        e.preventDefault();
+        keys.current.prev();
+      } else if (e.key === 'r' || e.key === 'R') {
+        keys.current.reveal();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /**
    * The between-question beat. Not a readout — a pause with a purpose: the room
    * looks up, sees who moved, reacts, and the host gets a moment to talk.
    */
@@ -291,6 +317,8 @@ const HostLive: React.FC = () => {
   const scored = event.scoringEnabled !== false;
   const answeredPct =
     participantCount > 0 ? Math.min(100, Math.round((responsesCount / participantCount) * 100)) : 0;
+  keys.current.reveal = handleRevealResults;
+
   const nextQuestion =
     currentQuestionIndex + 1 < total ? event.questions[currentQuestionIndex + 1] : null;
 
@@ -540,7 +568,7 @@ const HostLive: React.FC = () => {
           Pinned, because during a live session the host's hand is already here
           and hunting for a button mid-room is how a session stumbles. */}
       {!showFinalSummary && (
-        <div className="cockpit-bar fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface/95 backdrop-blur-sm">
+        <div className="cockpit-bar fixed bottom-0 left-0 right-0 z-40 border-t border-line/70 material-chrome pb-[env(safe-area-inset-bottom)]">
           <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-3 flex items-center gap-2 flex-wrap">
             <button
               onClick={handleEndQuiz}
@@ -589,7 +617,7 @@ const HostLive: React.FC = () => {
                 <button
                   onClick={handleRevealResults}
                   disabled={revealed}
-                  title="Show the distribution to everyone in the room"
+                  title="Show the distribution to everyone in the room (R)"
                   className="btn-quiet px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -598,6 +626,7 @@ const HostLive: React.FC = () => {
 
                 <button
                   onClick={handlePrevQuestion}
+                  title="Previous question (← or Page Up)"
                   disabled={currentQuestionIndex === 0}
                   className="btn-quiet px-3 py-2.5 rounded-xl text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -628,6 +657,7 @@ const HostLive: React.FC = () => {
                 ) : (
                   <button
                     onClick={handleNextQuestion}
+                    title="Next question (→ or Page Down)"
                     className="btn-primary px-6 py-2.5 rounded-xl text-sm flex items-center gap-2"
                   >
                     <span>Next</span>
