@@ -6,6 +6,7 @@ import prisma from '../../config/prisma';
 import { invalidatePlanCache } from '../../utils/plans';
 import { responseBatcher } from '../../utils/responseBatcher';
 import { truncateAll, seedPlans, testDatabaseUrl } from './setup';
+import { makeRevealer } from '../../socket';
 
 /**
  * Whether an answer is final, driven over HTTP.
@@ -263,5 +264,75 @@ describe('answers sent in parallel', () => {
 
     await responseBatcher.flushNow();
     expect(await prisma.response.count({ where: { questionId } })).toBe(1);
+  });
+});
+
+describe('answers close when the room can see the results', () => {
+  it('refuses a survey vote once the distribution is on screen', async () => {
+    const token = await signUp('survey-revealed@example.com');
+    const { questionId, participantToken } = await setUpSession(token, 'SURVEY');
+
+    // Open: a survey vote can still change.
+    await answer(participantToken, questionId, 0).expect(200);
+    await answer(participantToken, questionId, 1).expect(200);
+
+    // The host shows the room the split.
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: new Date() } });
+
+    // Closed: the numbers everyone just read must not move.
+    await answer(participantToken, questionId, 2).expect(409);
+  });
+
+  it('refuses a graded answer after the reveal too, for the same reason', async () => {
+    const token = await signUp('graded-revealed@example.com');
+    const { questionId, participantToken } = await setUpSession(token, 'GAME');
+
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: new Date() } });
+
+    await answer(participantToken, questionId, 2).expect(409);
+  });
+
+  it('re-opens the question when the host presents it again', async () => {
+    const token = await signUp('reveal-reopen@example.com');
+    const { questionId, participantToken } = await setUpSession(token, 'SURVEY');
+
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: new Date() } });
+    await answer(participantToken, questionId, 0).expect(409);
+
+    // What host:nextQuestion does when the same question goes back on screen.
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: null } });
+
+    await answer(participantToken, questionId, 0).expect(200);
+  });
+
+  it('re-opens every question when the host clears the room data', async () => {
+    const token = await signUp('reveal-cleared@example.com');
+    const { eventId, questionId, participantToken } = await setUpSession(token, 'SURVEY');
+
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: new Date() } });
+
+    await request(app).delete(`/events/${eventId}/clear-data`).set(auth(token)).expect(200);
+
+    const after = await prisma.question.findUnique({ where: { id: questionId } });
+    expect(after?.revealedAt).toBeNull();
+    void participantToken;
+  });
+});
+
+describe('the reveal itself', () => {
+  it('stamps the question as it broadcasts, so answers close on the real path', async () => {
+    const token = await signUp('reveal-path@example.com');
+    // A game reveals on the host's word; a survey preset never shows the split,
+    // so its votes stay open and there is nothing to stamp.
+    const { eventId, questionId, participantToken } = await setUpSession(token, 'GAME');
+
+    const sent: string[] = [];
+    const io = { to: () => ({ emit: (name: string) => sent.push(name) }) } as never;
+    await makeRevealer(io)(eventId, questionId);
+
+    expect(sent).toContain('participant:results');
+    expect((await prisma.question.findUnique({ where: { id: questionId } }))?.revealedAt).not.toBeNull();
+    // Their first answer, refused only because the key is now on screen.
+    await answer(participantToken, questionId, 2).expect(409);
   });
 });

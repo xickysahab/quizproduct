@@ -44,7 +44,7 @@ const tallyForQuestion = async (questionId: string) => {
  * paths cannot drift on what gets sent — particularly on whether the answer key
  * is attached, which is the one thing that must never leak early.
  */
-const makeRevealer = (io: Server) =>
+export const makeRevealer = (io: Pick<Server, 'to'>) =>
   async (eventId: string, questionId: string): Promise<boolean> => {
     const stored = await prisma.question.findUnique({
       where: { id: questionId },
@@ -74,6 +74,10 @@ const makeRevealer = (io: Server) =>
       correctOption: graded ? stored.correctOption : null,
       correctOptions: graded ? stored.correctOptions : [],
     };
+
+    // Stamped before the broadcast: once the room can see the split, the
+    // answers behind it stop moving (submitResponse refuses after this).
+    await prisma.question.update({ where: { id: questionId }, data: { revealedAt: new Date() } });
 
     io.to(`event-${eventId}`).emit('participant:results', revealPayload);
     // Secondary host screens (projector / audience display) stay in the host
@@ -327,6 +331,12 @@ export const initializeSocket = (io: Server) => {
       if (!stored || stored.eventId !== eventId) {
         socket.emit('host:unauthorized', { message: 'That question does not belong to this event.' });
         return;
+      }
+
+      // Putting a question back on screen re-opens it: a second run of the
+      // same deck is a new session for the room, not a continuation.
+      if (stored.revealedAt) {
+        await prisma.question.update({ where: { id: stored.id }, data: { revealedAt: null } });
       }
 
       // Captured before the pointer moves, so auto-reveal can push the results

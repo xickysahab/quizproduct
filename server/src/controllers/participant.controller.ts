@@ -274,6 +274,13 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
       return;
     }
 
+    // Answers close when the room is shown the split — for a survey vote, which
+    // is otherwise changeable, and for a graded answer, whose key is now public.
+    if (question.revealedAt) {
+      res.status(409).json({ message: 'The results for this question are already showing.' });
+      return;
+    }
+
     const selfPaced = question.event.selfPaced;
     if (selfPaced) {
       // Homework: any question, while the window is open, once.

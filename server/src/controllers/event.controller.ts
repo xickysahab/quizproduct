@@ -339,6 +339,8 @@ export const clearEventData = async (req: AuthRequest, res: Response): Promise<v
 
     // Delete participants. Because of onDelete: Cascade in schema, this will automatically delete all Responses.
     await prisma.participant.deleteMany({ where: { eventId: id } });
+    // A deck with no answers left in it should not still be refusing new ones.
+    await prisma.question.updateMany({ where: { eventId: id }, data: { revealedAt: null } });
 
     // Reset the whole live-session pointer, not just the question. Leaving
     // isLive true with a stale start time meant a re-run began mid-question

@@ -441,6 +441,11 @@ model Question {
   timeLimit      Int?
   /// Overrides the session's scoring switch for this question only.
   scored         ScoredOverride @default(INHERIT)
+  /// When the room was shown this question's results. Answers close at that
+  /// moment — a survey vote stays changeable right up until the distribution
+  /// is on screen, and not after. Cleared when the question is presented
+  /// again, so a re-run starts open.
+  revealedAt     DateTime?
   /// `/images/<id>` — an Image row. Hotlinked URLs are refused; see utils/images.ts.
   imageUrl       String?
   responses      Response[]
