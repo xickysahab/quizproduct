@@ -88,6 +88,7 @@ const TeamsPanel: React.FC<{ eventId: string; teams: { id: string; name: string 
             value={names}
             onChange={(e) => setNames(e.target.value)}
             placeholder={'Red\nBlue\nGreen'}
+            aria-label="Team names, one per line"
             rows={4}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm"
           />

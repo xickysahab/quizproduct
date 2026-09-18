@@ -90,10 +90,14 @@ const Field: React.FC<{
   children: React.ReactNode;
 }> = ({ label, hint, children }) => (
   <div>
-    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
-      {label}
+    {/* The control lives inside the label, so it is associated without needing an
+        id threaded through every caller — the same shape Signup's Field uses. */}
+    <label className="block">
+      <span className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+        {label}
+      </span>
+      {children}
     </label>
-    {children}
     {hint && <p className="text-xs text-faint mt-1">{hint}</p>}
   </div>
 );

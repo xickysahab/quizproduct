@@ -195,10 +195,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
       <Sheet open={modalOpen} onClose={() => setModalOpen(false)} title={`Add ${entityLabel}`} size="sm">
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Name</label>
+                  <label htmlFor="new-user-name" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Name</label>
                   <div className="relative">
                     <UserIcon className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
+                    <input id="new-user-name"
                       type="text"
                       required={!inviteMode}
                       value={form.name}
@@ -210,10 +210,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Email</label>
+                  <label htmlFor="new-user-email" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Email</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
+                    <input id="new-user-email"
                       type="email"
                       required
                       value={form.email}
@@ -225,10 +225,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Password</label>
+                  <label htmlFor="new-user-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Password</label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
+                    <input id="new-user-password"
                       type="password"
                       required={!inviteMode}
                       disabled={inviteMode}

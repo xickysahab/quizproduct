@@ -136,8 +136,8 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                   </div>
                   
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Result Text / Title</label>
-                    <textarea
+                    <label htmlFor="result-text" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Result Text / Title</label>
+                    <textarea id="result-text"
                       value={opt.text}
                       onChange={(e) => handleChange(idx, 'text', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-accent focus:border-accent transition-shadow placeholder:text-gray-400 shadow-sm"
@@ -146,8 +146,8 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Alert Badge / Subtitle</label>
-                    <input
+                    <label htmlFor="result-subtitle" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Alert Badge / Subtitle</label>
+                    <input id="result-subtitle"
                       type="text"
                       value={opt.alert}
                       onChange={(e) => handleChange(idx, 'alert', e.target.value)}

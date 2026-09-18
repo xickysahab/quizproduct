@@ -75,12 +75,12 @@ const Login: React.FC = () => {
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              <label htmlFor="login-email" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
+                <input id="login-email"
                   type="email"
                   required
                   autoComplete="email"
@@ -93,12 +93,12 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              <label htmlFor="login-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
                 Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
+                <input id="login-password"
                   type="password"
                   required
                   autoComplete="current-password"

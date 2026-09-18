@@ -83,10 +83,10 @@ const SettingsPage: React.FC = () => {
 
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+              <label htmlFor="current-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                 Current Password
               </label>
-              <input
+              <input id="current-password"
                 type="password"
                 required
                 value={currentPassword}
@@ -96,10 +96,10 @@ const SettingsPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                <label htmlFor="new-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                   New Password
                 </label>
-                <input
+                <input id="new-password"
                   type="password"
                   required
                   minLength={8}
@@ -109,10 +109,10 @@ const SettingsPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+                <label htmlFor="confirm-new-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                   Confirm New Password
                 </label>
-                <input
+                <input id="confirm-new-password"
                   type="password"
                   required
                   minLength={8}

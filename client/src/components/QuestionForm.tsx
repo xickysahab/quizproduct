@@ -162,10 +162,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <label htmlFor="question-title" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
               Question Title
             </label>
-            <input
+            <input id="question-title"
               type="text"
               required
               placeholder="E.g., What is the capital of France?"
@@ -204,9 +204,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
           {needsOptions && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                <span className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                   {type === 'RATING' ? 'Scale labels' : type === 'RANKING' ? 'Items to rank' : 'Answer Options'}
-                </label>
+                </span>
                 {!surveyMode && type !== 'RATING' && type !== 'RANKING' && (
                   <span className="text-xs text-accent italic font-medium">
                     {type === 'MULTI_SELECT' ? 'Tap to mark every correct answer' : 'Tap to mark the correct answer'}
@@ -302,11 +302,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
           )}
 
           <div>
-            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <label htmlFor="question-time-limit" className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
               <Clock className="w-3.5 h-3.5 text-accent" />
               <span>Time Limit</span>
             </label>
-            <select
+            <select id="question-time-limit"
               value={timeLimit}
               onChange={(e) => setTimeLimit(Number(e.target.value))}
               className="w-full px-5 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 font-medium outline-none"
@@ -322,11 +322,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, in
           {/* Per-question override — how one session holds unscored opinion
               polls next to scored quiz questions. */}
           <div>
-            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <label htmlFor="question-scoring" className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
               <Trophy className="w-3.5 h-3.5 text-accent" />
               <span>Scoring for this question</span>
             </label>
-            <select
+            <select id="question-scoring"
               value={scored}
               onChange={(e) => setScored(e.target.value as 'INHERIT' | 'YES' | 'NO')}
               className="w-full px-5 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 font-medium outline-none"

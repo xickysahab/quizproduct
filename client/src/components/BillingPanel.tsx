@@ -318,10 +318,10 @@ const BillingPanel: React.FC = () => {
 
         <form onSubmit={saveDetails} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="billing-country" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
               Country
             </label>
-            <select
+            <select id="billing-country"
               value={country === 'IN' ? 'IN' : 'OTHER'}
               onChange={(e) => setCountry(e.target.value === 'IN' ? 'IN' : 'US')}
               className="w-full px-4 py-3 rounded-xl border border-line bg-sunken text-ink text-sm outline-none"
@@ -339,10 +339,10 @@ const BillingPanel: React.FC = () => {
           {country === 'IN' && (
             <>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                <label htmlFor="billing-gstin" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                   GSTIN <span className="text-faint font-medium normal-case">(optional)</span>
                 </label>
-                <input
+                <input id="billing-gstin"
                   value={gstin}
                   onChange={(e) => setGstin(e.target.value.toUpperCase())}
                   maxLength={15}
@@ -355,7 +355,7 @@ const BillingPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+                <label htmlFor="billing-state" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
                   State{' '}
                   {gstApplies ? (
                     <span className="text-wrong font-medium normal-case">(required)</span>
@@ -363,7 +363,7 @@ const BillingPanel: React.FC = () => {
                     <span className="text-faint font-medium normal-case">(optional)</span>
                   )}
                 </label>
-                <select
+                <select id="billing-state"
                   value={effectiveState}
                   disabled={stateLockedByGstin}
                   onChange={(e) => setStateCode(e.target.value)}
@@ -386,10 +386,10 @@ const BillingPanel: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="billing-registered-name" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
               Registered name
             </label>
-            <input
+            <input id="billing-registered-name"
               value={billingName}
               onChange={(e) => setBillingName(e.target.value)}
               maxLength={120}
@@ -398,10 +398,10 @@ const BillingPanel: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
+            <label htmlFor="billing-address" className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5">
               Billing address
             </label>
-            <textarea
+            <textarea id="billing-address"
               value={billingAddress}
               onChange={(e) => setBillingAddress(e.target.value)}
               maxLength={400}
