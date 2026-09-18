@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import api from '../services/api';
 
 /** The server's cap. Photos are shrunk well below it before upload. */
@@ -31,7 +32,14 @@ const shrink = async (file: File, maxSide: number, keepAlpha: boolean): Promise<
   throw new Error('That image is too detailed to fit in 500 KB. Try a smaller or simpler one.');
 };
 
-/** Uploads an image and returns its `/images/<id>` path. */
+const size = (bytes: number): string =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/**
+ * Uploads an image and returns its `/images/<id>` path, then says how small it
+ * got — so a host who picked a 10 MB photo knows it was not sent as one, and
+ * learns that big photos are fine to pick.
+ */
 export const uploadImage = async (file: File, kind: 'question' | 'logo'): Promise<string> => {
   if (!TYPES.includes(file.type)) throw new Error('Use a PNG, JPEG or WebP image.');
   if (file.size > MAX_INPUT_BYTES) throw new Error('That file is over 20 MB. Choose a smaller image.');
@@ -39,6 +47,13 @@ export const uploadImage = async (file: File, kind: 'question' | 'logo'): Promis
   const blob = await shrink(file, kind === 'logo' ? 512 : 1600, kind === 'logo');
   try {
     const res = await api.post('/images', blob, { headers: { 'Content-Type': blob.type } });
+    toast.success(
+      blob.size < file.size
+        ? `Photo compressed: ${size(file.size)} → ${size(blob.size)}`
+        : `Photo added (${size(blob.size)})`,
+      // Long enough to read two numbers, not only notice a flash of green.
+      { id: 'image-compressed', duration: 4000 }
+    );
     return res.data.url;
   } catch (error) {
     const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
