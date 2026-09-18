@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CreditCard, Receipt, AlertTriangle, Check, Loader2, ShieldCheck, FileText } from 'lucide-react';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { formatRupees, formatRupeesShort } from '../utils/money';
@@ -115,6 +115,7 @@ const BillingPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [savingDetails, setSavingDetails] = useState(false);
   const [buyingPlan, setBuyingPlan] = useState<PlanId | null>(null);
+  const navigate = useNavigate();
 
   // Form state, seeded from the server and edited locally.
   const [country, setCountry] = useState('IN');
@@ -188,6 +189,7 @@ const BillingPanel: React.FC = () => {
 
   const upgrade = async (plan: PlanId) => {
     setBuyingPlan(plan);
+    let lastFailure: string | null = null;
     try {
       const res = await api.post('/billing/checkout', { plan });
       const session = res.data as CheckoutSession;
@@ -198,23 +200,23 @@ const BillingPanel: React.FC = () => {
           // as well means the customer sees their plan change now instead of
           // watching a spinner until Razorpay gets round to calling us.
           try {
-            await api.post('/billing/confirm', { paymentId });
-            toast.success('Payment received — your plan is active.');
+            const { data } = await api.post('/billing/confirm', { paymentId });
+            navigate('/payment/success', { state: { plan, paymentId, invoice: data.invoice } });
           } catch (error: any) {
-            toast.error(
-              error.response?.data?.message ||
-                'Payment went through, but we could not confirm it here. It will update shortly.'
-            );
-          } finally {
-            setBuyingPlan(null);
-            void load();
+            navigate('/payment/pending', {
+              state: { plan, paymentId, message: error.response?.data?.message },
+            });
           }
         },
-        onDismiss: () => setBuyingPlan(null),
+        // A declined card leaves the sheet open for another try, so the
+        // verdict waits until it closes: any failed attempt means "failed".
         onFailure: (message) => {
-          toast.error(message);
-          setBuyingPlan(null);
+          lastFailure = message;
         },
+        onDismiss: () =>
+          lastFailure
+            ? navigate('/payment/failed', { state: { plan, message: lastFailure } })
+            : navigate('/payment/cancelled', { state: { plan } }),
       });
     } catch (error: any) {
       setBuyingPlan(null);
