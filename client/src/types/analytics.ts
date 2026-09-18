@@ -32,6 +32,8 @@ export interface QuestionTally {
   words: WordCount[];
   /** Populated for RANKING only, ordered best-first. */
   ranking: RankAverage[];
+  /** Text answers with a word masked by the profanity filter. */
+  maskedCount?: number;
   correctOption?: number | null;
   correctOptions?: number[];
 }

@@ -5,6 +5,7 @@ import { ParticipantRequest } from '../middleware/participant.middleware';
 import { canAccessEvent } from '../utils/access';
 import { liveEvents } from '../utils/liveEvents';
 import { slog } from '../utils/slog';
+import { maskProfanity } from '../utils/profanity';
 
 /**
  * Audience Q&A.
@@ -35,8 +36,9 @@ const present = (
   viewer: Viewer
 ) => ({
   id: question.id,
-  text: question.text,
-  authorName: question.authorName,
+  // Also on the way out, for questions stored before the filter existed.
+  text: maskProfanity(question.text).text,
+  authorName: question.authorName ? maskProfanity(question.authorName).text : null,
   status: question.status,
   upvoteCount: question.upvoteCount,
   answeredAt: question.answeredAt,
@@ -113,7 +115,8 @@ export const submitQuestion = async (req: ParticipantRequest, res: Response): Pr
         // An anonymous question keeps no author name at all, rather than
         // storing one and relying on every read path to hide it.
         authorName: anonymous === true ? null : participant?.name?.trim() || null,
-        text: text.trim().slice(0, MAX_QUESTION_LENGTH),
+        // An approved question goes straight onto the projector.
+        text: maskProfanity(text.trim().slice(0, MAX_QUESTION_LENGTH)).text,
         status: event.qaModerated ? 'PENDING' : 'APPROVED',
       },
     });

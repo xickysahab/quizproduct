@@ -436,7 +436,15 @@ const HostLive: React.FC = () => {
                 {/* The host sees the answer key. The room does not, until a
                     reveal — that boundary is enforced on the server. */}
                 {liveResults ? (
-                  <QuestionResults tally={liveResults} revealCorrect={scored} compact />
+                  <>
+                    <QuestionResults tally={liveResults} revealCorrect={scored} compact />
+                    {!!liveResults.maskedCount && (
+                      <p className="mt-3 text-xs text-muted">
+                        {liveResults.maskedCount === 1 ? '1 answer' : `${liveResults.maskedCount} answers`} had a word
+                        masked before it reached the screen.
+                      </p>
+                    )}
+                  </>
                 ) : activeQuestion.options?.length ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {activeQuestion.options.map((option, index) => (

@@ -14,6 +14,7 @@ import { liveEvents } from '../utils/liveEvents';
 import { getLeaderboard, getParticipantStanding } from '../utils/leaderboard';
 import { isQuestionScored } from '../utils/sessionSettings';
 import { tallyQuestion } from '../utils/tally';
+import { maskProfanity } from '../utils/profanity';
 
 const MAX_NAME_LENGTH = 40;
 const MAX_ANSWER_TEXT = 280;
@@ -61,7 +62,8 @@ export const joinEvent = async (req: Request, res: Response): Promise<void> => {
     }
 
     const formattedCode = normalizeRoomCode(roomCode);
-    const trimmedName = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : '';
+    // A display name goes on the leaderboard and the podium, in front of the room.
+    const trimmedName = typeof name === 'string' ? maskProfanity(name.trim().slice(0, MAX_NAME_LENGTH)).text : '';
 
     if (!formattedCode) {
       res.status(400).json({ message: 'A room code is required.' });
@@ -277,7 +279,8 @@ export const submitResponse = async (req: ParticipantRequest, res: Response): Pr
         res.status(400).json({ message: 'A text answer is required.' });
         return;
       }
-      text = answerText.trim().slice(0, MAX_ANSWER_TEXT);
+      // Masked on the way in: open text and word clouds are projected.
+      text = maskProfanity(answerText.trim().slice(0, MAX_ANSWER_TEXT)).text;
     } else if (type === 'RANKING') {
       const raw = Array.isArray(rankedOptions) ? rankedOptions.map(Number) : [];
       // Every option exactly once, in some order — a partial or duplicated

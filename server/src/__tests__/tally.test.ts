@@ -184,3 +184,19 @@ describe('time limit clamping (BUG-10)', () => {
     expect('value' in parse('abc') && parse('abc').value.timeLimit).toBeNull();
   });
 });
+
+describe('profanity never reaches the projector', () => {
+  it('masks stored answers — even ones saved before the filter — and counts them for the host', () => {
+    const question = { id: 'q', text: 'One word for today', type: 'WORD_CLOUD', options: [], correctOption: null };
+    const answers = ['fun', 'fucking boring', 'चूतिया', 'bhosdike', 'fun', 'great class'];
+    const tally = tallyQuestion(
+      question,
+      answers.map((answerText) => ({ selectedOption: 0, selectedOptions: [], answerText }))
+    );
+
+    const projected = JSON.stringify([tally.textAnswers, tally.words]);
+    for (const insult of ['fucking', 'चूतिया', 'bhosdike']) expect(projected).not.toContain(insult);
+    expect(tally.maskedCount).toBe(3);
+    expect(tally.words[0]).toEqual({ word: 'fun', count: 2 });
+  });
+});

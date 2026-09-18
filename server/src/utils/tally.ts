@@ -1,3 +1,5 @@
+import { looksMasked, maskProfanity } from './profanity';
+
 /**
  * Response tallying for the results screens.
  *
@@ -47,6 +49,8 @@ export interface QuestionTally {
   words: WordCount[];
   /** Populated for RANKING only, ordered best-first. */
   ranking: RankAverage[];
+  /** Text answers with a word masked — for the host, so they know it happened. */
+  maskedCount: number;
 }
 
 /** Question types that collect free text instead of an option index. */
@@ -211,10 +215,12 @@ export const tallyQuestion = (
 ): QuestionTally => {
   const { totalResponses, optionCounts, percentages } = tallyOptions(question, responses);
 
+  // Masked again here, which also cleans answers stored before the filter.
   const textAnswers = isTextType(question.type)
     ? responses
         .map((response) => response.answerText)
         .filter((value): value is string => Boolean(value && value.trim()))
+        .map((value) => maskProfanity(value).text)
     : [];
 
   return {
@@ -228,6 +234,7 @@ export const tallyQuestion = (
     textAnswers,
     words: question.type === 'WORD_CLOUD' ? tallyWords(textAnswers) : [],
     ranking: question.type === 'RANKING' ? tallyRanking(question, responses) : [],
+    maskedCount: textAnswers.filter(looksMasked).length,
   };
 };
 
