@@ -92,8 +92,8 @@
      Kept separate from the accent so "correct" never changes meaning when the
      session mode does.
   */
-  --color-right: #1F7A4C;
-  --color-right-wash: #E3F2E9;
+  --color-correct: #1F7A4C;
+  --color-correct-wash: #E3F2E9;
   --color-wrong: #B3261E;
   --color-wrong-wash: #F9E8E6;
   --color-caution: #A66A00;
@@ -234,8 +234,8 @@
     --color-teal-100: color-mix(in oklab, #40C8E0 20%, transparent);
     --color-teal-700: #70D7E9;
 
-    --color-right: #30D158;
-    --color-right-wash: color-mix(in oklab, #30D158 16%, transparent);
+    --color-correct: #30D158;
+    --color-correct-wash: color-mix(in oklab, #30D158 16%, transparent);
     --color-wrong: #FF453A;
     --color-wrong-wash: color-mix(in oklab, #FF453A 16%, transparent);
     --color-caution: #FF9F0A;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Palette, RefreshCw, BarChart, PieChart, LayoutGrid } from 'lucide-react';
+import { RefreshCw, BarChart, PieChart, LayoutGrid } from 'lucide-react';
+import Sheet from './Sheet';
 import { QUIZPULSE_PRESET } from '../constants/presets';
 
 interface ConcludeSettingsModalProps {
@@ -51,42 +51,25 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        />
-        
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-5xl bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] border border-gray-200"
-        >
-          <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200 bg-gray-50">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 font-heading">
-                <Palette className="w-6 h-6 text-accent" />
-                Customize Results Screen
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">Configure the design, charts, and colors for the conclude screen.</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full transition-colors border border-transparent"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="p-8 overflow-y-auto flex-1">
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      eyebrow="Shown when the session ends"
+      title="Results screen"
+      size="xl"
+      footer={
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 h-11 rounded-full bg-gray-100 text-ink font-semibold">
+            Cancel
+          </button>
+          <button onClick={handleSave} className="px-5 h-11 rounded-full btn-primary">
+            Save
+          </button>
+        </div>
+      }
+    >
+          <div>
             
             {/* Chart Type Selector */}
             <div className="mb-10">
@@ -176,23 +159,6 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-200 bg-gray-100 border border-gray-200 rounded-xl transition-colors shadow-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white gradient-btn rounded-xl transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
-            >
-              <Save className="w-4 h-4" />
-              Save Configuration
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+    </Sheet>
   );
 }

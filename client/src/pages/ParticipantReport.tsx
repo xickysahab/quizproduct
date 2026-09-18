@@ -119,7 +119,7 @@ const ParticipantReport: React.FC = () => {
                     {q.imageUrl && <img src={imageSrc(q.imageUrl)} alt="" className="max-h-40 object-contain rounded-xl" />}
                     <p className="text-sm">
                       <span className="text-muted">Answered: </span>
-                      <span className={scored ? (ok ? 'text-[color:var(--color-right)] font-semibold' : 'text-wrong font-semibold') : 'text-ink'}>
+                      <span className={scored ? (ok ? 'text-[color:var(--color-correct)] font-semibold' : 'text-wrong font-semibold') : 'text-ink'}>
                         {chosen(q)}
                       </span>
                     </p>
@@ -132,7 +132,7 @@ const ParticipantReport: React.FC = () => {
                   </div>
                   {scored &&
                     (ok ? (
-                      <Check className="w-5 h-5 text-[color:var(--color-right)] shrink-0" aria-label="Correct" />
+                      <Check className="w-5 h-5 text-[color:var(--color-correct)] shrink-0" aria-label="Correct" />
                     ) : (
                       <X className="w-5 h-5 text-wrong shrink-0" aria-label="Missed" />
                     ))}

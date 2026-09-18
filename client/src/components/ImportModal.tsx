@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Download, FileSpreadsheet } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
+import Sheet from './Sheet';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -47,7 +48,8 @@ const readRows = (grid: unknown[][]): Row[] => {
     .filter((r) => r.type || r.question || r.options.length);
 };
 
-const ImportModal: React.FC<{ eventId: string; onClose: () => void; onImported: () => void }> = ({
+const ImportModal: React.FC<{ open: boolean; eventId: string; onClose: () => void; onImported: () => void }> = ({
+  open,
   eventId,
   onClose,
   onImported,
@@ -115,18 +117,7 @@ const ImportModal: React.FC<{ eventId: string; onClose: () => void; onImported: 
   const badCount = Object.keys(errors).length;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-3xl w-full p-8 shadow-xl border border-gray-200 my-8">
-        <div className="flex justify-between items-center pb-5 mb-6 border-b border-gray-200">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">Question bank</span>
-            <h2 className="font-heading text-2xl font-bold text-gray-900">Import from Excel</h2>
-          </div>
-          <button onClick={onClose} className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-400 rounded-full border border-gray-200">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Sheet open={open} onClose={onClose} eyebrow="Question bank" title="Import from Excel" size="lg">
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent">
@@ -191,8 +182,7 @@ const ImportModal: React.FC<{ eventId: string; onClose: () => void; onImported: 
                 : `Import ${rows.length || ''} questions`}
           </button>
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 };
 

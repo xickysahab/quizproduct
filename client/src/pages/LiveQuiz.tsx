@@ -644,8 +644,8 @@ const LiveQuiz: React.FC = () => {
                     {feedback?.scored && feedback.isCorrect ? (
                       <div className="animate-right rounded-[1.4rem] px-6 py-5 text-center border"
                            style={{
-                             background: 'color-mix(in oklab, var(--color-right) 20%, transparent)',
-                             borderColor: 'color-mix(in oklab, var(--color-right) 45%, transparent)',
+                             background: 'color-mix(in oklab, var(--color-correct) 20%, transparent)',
+                             borderColor: 'color-mix(in oklab, var(--color-correct) 45%, transparent)',
                            }}>
                         <CheckCircle2 className="w-8 h-8 mx-auto mb-1.5 text-white" />
                         <p className="font-heading text-2xl font-bold text-white">

@@ -10,7 +10,7 @@ const QuestionTools: React.FC<{
   onImported: () => void;
 }> = ({ eventId, onDrafts, onImported }) => {
   const [open, setOpen] = useState<'draft' | 'import' | null>(null);
-  const button = 'bg-white text-accent border border-accent-soft px-5 py-3 rounded-2xl font-semibold text-sm flex items-center gap-2';
+  const button = 'inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-[14px] font-semibold bg-gray-100 text-ink hover:bg-gray-200';
 
   return (
     <>
@@ -23,14 +23,13 @@ const QuestionTools: React.FC<{
         <span>Import from Excel</span>
       </button>
 
-      {open === 'draft' && (
-        <AiDraftModal
-          eventId={eventId}
-          onClose={() => setOpen(null)}
-          onDrafts={(list) => onDrafts(list.map((d, i) => ({ ...d, draftKey: `${Date.now()}-${i}` })))}
-        />
-      )}
-      {open === 'import' && <ImportModal eventId={eventId} onClose={() => setOpen(null)} onImported={onImported} />}
+      <AiDraftModal
+        open={open === 'draft'}
+        eventId={eventId}
+        onClose={() => setOpen(null)}
+        onDrafts={(list) => onDrafts(list.map((d, i) => ({ ...d, draftKey: `${Date.now()}-${i}` })))}
+      />
+      <ImportModal open={open === 'import'} eventId={eventId} onClose={() => setOpen(null)} onImported={onImported} />
     </>
   );
 };

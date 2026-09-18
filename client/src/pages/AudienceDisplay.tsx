@@ -528,7 +528,7 @@ const Movement: React.FC<{ value?: number | null }> = ({ value }) => {
   return (
     <span
       className="w-10 text-center font-mono text-lg tabular"
-      style={{ color: up ? 'var(--color-right)' : 'var(--color-wrong)' }}
+      style={{ color: up ? 'var(--color-correct)' : 'var(--color-wrong)' }}
       title={up ? `Up ${value}` : `Down ${Math.abs(value)}`}
     >
       {up ? '▲' : '▼'}

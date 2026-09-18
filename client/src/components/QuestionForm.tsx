@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Clock, Plus, Minus, Trophy, ImagePlus } from 'lucide-react';
+import { Check, Clock, Plus, Minus, Trophy, ImagePlus } from 'lucide-react';
 import { uploadImage, imageSrc } from '../utils/uploadImage';
-import { motion } from 'framer-motion';
+import Sheet from './Sheet';
 import toast from 'react-hot-toast';
 
 const TYPES = [
@@ -14,6 +14,7 @@ const TYPES = [
 ] as const;
 
 interface QuestionFormProps {
+  open: boolean;
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   initialData?: any;
@@ -21,7 +22,7 @@ interface QuestionFormProps {
   surveyMode?: boolean;
 }
 
-const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialData, surveyMode = false }) => {
+const QuestionForm: React.FC<QuestionFormProps> = ({ open, onClose, onSubmit, initialData, surveyMode = false }) => {
   const [type, setType] = useState<string>('MCQ');
   const [text, setText] = useState('');
   const [options, setOptions] = useState(['', '', '', '']);
@@ -35,18 +36,19 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
 
   const needsOptions = type === 'MCQ' || type === 'MULTI_SELECT' || type === 'RATING' || type === 'RANKING';
 
+  // The sheet stays mounted so it can animate away; each opening starts from
+  // the question being edited, or from a blank one.
   useEffect(() => {
-    if (initialData) {
-      setType(initialData.type || 'MCQ');
-      setText(initialData.text);
-      setOptions(initialData.options?.length ? initialData.options : ['', '', '', '']);
-      setCorrectOption(initialData.correctOption !== undefined ? initialData.correctOption : null);
-      setCorrectOptions(initialData.correctOptions || []);
-      setTimeLimit(initialData.timeLimit || 0);
-      setScored(initialData.scored === 'YES' || initialData.scored === 'NO' ? initialData.scored : 'INHERIT');
-      setImageUrl(initialData.imageUrl || null);
-    }
-  }, [initialData]);
+    if (!open) return;
+    setType(initialData?.type || 'MCQ');
+    setText(initialData?.text || '');
+    setOptions(initialData?.options?.length ? initialData.options : ['', '', '', '']);
+    setCorrectOption(initialData?.correctOption ?? null);
+    setCorrectOptions(initialData?.correctOptions || []);
+    setTimeLimit(initialData ? initialData.timeLimit || 0 : 30);
+    setScored(initialData?.scored === 'YES' || initialData?.scored === 'NO' ? initialData.scored : 'INHERIT');
+    setImageUrl(initialData?.imageUrl || null);
+  }, [open, initialData]);
 
   const handleOptionChange = (index: number, value: string) => {
     const next = [...options];
@@ -122,28 +124,28 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 15 }}
-        className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-xl border border-gray-200 relative my-8"
-      >
-        <div className="flex justify-between items-center pb-5 mb-6 border-b border-gray-200">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
-              Question Builder
-            </span>
-            <h2 className="font-heading text-3xl font-bold text-gray-900">
-              {initialData?.id ? 'Edit Question' : initialData ? 'Review Draft' : 'Craft New Question'}
-            </h2>
-          </div>
-          <button onClick={onClose} className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-400 rounded-full border border-gray-200">
-            <X className="w-5 h-5" />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      eyebrow="Question"
+      title={initialData?.id ? 'Edit question' : initialData ? 'Review draft' : 'New question'}
+      footer={
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 h-12 rounded-full bg-gray-100 text-ink font-semibold">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="question-form"
+            disabled={loading || uploading}
+            className="flex-1 h-12 rounded-full btn-primary disabled:opacity-50"
+          >
+            {loading ? 'Saving…' : 'Save'}
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+      }
+    >
+        <form id="question-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="flex flex-wrap gap-2">
             {TYPES.map((item) => (
               <button
@@ -151,7 +153,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
                 type="button"
                 onClick={() => setType(item.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                  type === item.id ? 'bg-accent text-white border-accent' : 'bg-white text-gray-600 border-gray-200'
+                  type === item.id ? 'bg-accent text-white border-accent' : 'bg-gray-100 text-ink-soft border-transparent'
                 }`}
               >
                 {item.label}
@@ -339,17 +341,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ onClose, onSubmit, initialD
             </p>
           </div>
 
-          <div className="pt-4 flex gap-4 border-t border-gray-200">
-            <button type="button" onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 font-bold py-3.5 rounded-2xl">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading || uploading} className="flex-1 gradient-btn text-white font-bold py-3.5 rounded-2xl disabled:opacity-50">
-              {loading ? 'Saving...' : 'Save Question'}
-            </button>
-          </div>
         </form>
-      </motion.div>
-    </div>
+    </Sheet>
   );
 };
 
