@@ -146,6 +146,12 @@ const Signup: React.FC = () => {
                   Sign in
                 </Link>
               </p>
+              <p className="text-center text-sm text-gray-500 mt-2">
+                Joining a class as a student?{' '}
+                <Link to="/student/signup" className="font-semibold text-accent hover:text-accent">
+                  Create a student account
+                </Link>
+              </p>
             </>
           )}
         </motion.div>

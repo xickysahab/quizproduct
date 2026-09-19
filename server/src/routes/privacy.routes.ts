@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateHost } from '../middleware/auth.middleware';
+import { authenticateHost, authenticateUser } from '../middleware/auth.middleware';
 import {
   listPurposes,
   recordConsent,
@@ -13,9 +13,10 @@ const router = Router();
 // Public: the signup form needs the purpose list before an account exists.
 router.get('/purposes', listPurposes);
 
-router.get('/consents', authenticateHost, getMyConsents);
-router.post('/consents', authenticateHost, recordConsent);
-router.post('/delete-account', authenticateHost, requestDeletion);
+// Students hold personal data too, so they can see consents and erase themselves.
+router.get('/consents', authenticateUser, getMyConsents);
+router.post('/consents', authenticateUser, recordConsent);
+router.post('/delete-account', authenticateUser, requestDeletion);
 router.post('/events/:id/anonymise', authenticateHost, anonymiseEventParticipants);
 
 export default router;

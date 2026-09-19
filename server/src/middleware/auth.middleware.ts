@@ -10,7 +10,8 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticateHost = async (
+/** Any signed-in account, students included. */
+export const authenticateUser = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -50,6 +51,28 @@ export const authenticateHost = async (
 
   req.user = { userId: decoded.userId, email: decoded.email, role: decoded.role };
   next();
+};
+
+/**
+ * Staff-side accounts only.
+ *
+ * Most host routes check nothing beyond "signed in" and then scope by
+ * ownership, so a student token reaching them would be one ownership bug away
+ * from reading a class's results. Refusing students here covers every one of
+ * those routes at once.
+ */
+export const authenticateHost = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  await authenticateUser(req, res, () => {
+    if (req.user!.role === 'STUDENT') {
+      res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+      return;
+    }
+    next();
+  });
 };
 
 export const authorizeRoles = (...allowedRoles: string[]) => {

@@ -279,6 +279,49 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+/**
+ * Student signup.
+ *
+ * A student belongs to nothing until they join a class with its code, so
+ * there is no organisation to create and nothing to verify before use. Signs
+ * them straight in: the next thing a student does is type a class code, and a
+ * detour through an inbox loses them.
+ *
+ * Unlike host signup this does say when an address is taken — a student with
+ * no way to tell "wrong address" from "already signed up" just gets stuck.
+ * The signup limiter bounds how fast anyone can probe with it.
+ */
+export const studentSignup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const parsed = validateNewUser(req.body);
+    if ('error' in parsed) {
+      res.status(400).json({ message: parsed.error });
+      return;
+    }
+
+    const { name, email, password } = parsed.value;
+
+    if (await prisma.user.findUnique({ where: { email } })) {
+      res.status(409).json({ message: 'An account with this email already exists. Sign in instead.' });
+      return;
+    }
+
+    const user = await prisma.user.create({
+      data: { name, email, password: await hashPassword(password), role: 'STUDENT' },
+    });
+
+    await logActivity(user.id, 'STUDENT_SIGNUP', 'User', user.id, { email: user.email });
+
+    res.status(201).json({
+      token: generateToken(user.id, user.email, user.role, user.tokenVersion),
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: null },
+    });
+  } catch (error) {
+    slog('error', 'auth.student_signup_failed', { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
   try {
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
