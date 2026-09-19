@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
+import { sendWelcomeMail } from '../utils/mailer';
 import { validateNewUser } from '../utils/validation';
 
 export const createSubAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -32,6 +33,7 @@ export const createSubAdmin = async (req: AuthRequest, res: Response): Promise<v
     });
 
     await logActivity(req.user!.userId, 'CREATE_SUBADMIN', 'User', subAdmin.id, { name, email });
+    await sendWelcomeMail({ name: subAdmin.name, email: subAdmin.email, role: subAdmin.role, password });
 
     res.status(201).json({
       message: 'SubAdmin created',

@@ -64,7 +64,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
         toast.success(`Invite sent to ${form.email}`);
       } else {
         await api.post(createUrl, form);
-        toast.success(`${entityLabel} created!`);
+        toast.success(`${entityLabel} created — login details emailed to ${form.email}`);
       }
       setForm({ name: '', email: '', password: '' });
       setModalOpen(false);
@@ -260,13 +260,12 @@ const UserManagement: React.FC<UserManagementProps> = ({ pageTitle, entityLabel,
                     <Lock className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
                     <input
                       type="password"
-                      required={!inviteMode}
                       disabled={inviteMode}
                       minLength={8}
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
                       className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all placeholder:text-gray-400 shadow-sm disabled:opacity-50"
-                      placeholder="Min. 8 characters"
+                      placeholder="Leave blank to auto-generate"
                     />
                   </div>
                 </div>

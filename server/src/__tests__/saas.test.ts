@@ -65,6 +65,14 @@ describe('validation', () => {
     const parsed = validateNewUser({ name: 'Ada', email: 'ada@example.com', password: 'short' });
     expect('error' in parsed).toBe(true);
   });
+
+  it('generates a temporary password when none is given', () => {
+    const a = validateNewUser({ name: 'Ada', email: 'ada@example.com' });
+    const b = validateNewUser({ name: 'Ada', email: 'ada@example.com', password: '' });
+    if ('error' in a || 'error' in b) throw new Error('expected a value');
+    expect(a.value.password.length).toBeGreaterThanOrEqual(12);
+    expect(a.value.password).not.toBe(b.value.password);
+  });
 });
 
 describe('tokens', () => {
