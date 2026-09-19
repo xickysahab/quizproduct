@@ -142,7 +142,24 @@ export const createApp = () => {
 
   // Express 5 forwards rejected promises here, so async controller failures no
   // longer hang the request.
-  app.use((error: Error, req: Request, res: Response, _next: NextFunction) => {
+  app.use((error: Error & { status?: number }, req: Request, res: Response, _next: NextFunction) => {
+    // The body parser rejects malformed or oversized JSON with a 4xx status.
+    // That is the client's mistake, not a crash: answer it as such, and keep
+    // it out of the error reporter so nobody can page the team by sending
+    // broken JSON.
+    const status = error.status;
+    if (status && status >= 400 && status < 500) {
+      res.status(status).json({
+        message:
+          status === 413
+            ? 'That request is too large.'
+            : status === 400
+              ? 'The request body is not valid JSON.'
+              : 'That request could not be read.',
+      });
+      return;
+    }
+
     // Was a bare console.error, which is invisible to anything aggregating logs
     // and reaches nobody. The path and method are what make a 500 findable.
     report('request.unhandled_error', error, { method: req.method, path: req.path });
