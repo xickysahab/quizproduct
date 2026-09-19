@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { CheckCircle2, Clock, XCircle, MinusCircle } from 'lucide-react';
+import { MotionConfig, motion } from 'framer-motion';
 import Logo from '../components/Logo';
 import { formatRupees } from '../utils/money';
 
@@ -68,61 +69,84 @@ const PaymentResult: React.FC = () => {
   const view = VIEWS[status as PaymentStatus];
   const Icon = view.icon;
 
+  const press = 'transition-transform duration-100 ease-out active:scale-[0.97]';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 font-sans">
-      <div className="max-w-md w-full bg-white rounded-3xl p-10 text-center shadow-sm border border-gray-200 space-y-5">
-        <Logo size={44} className="mx-auto" />
-
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${view.tone}`}>
-          <Icon className="w-7 h-7" />
-        </div>
-        <h1 className="font-heading text-2xl font-bold text-gray-900">{view.title}</h1>
-        <p className="text-sm text-gray-500">{state.message || view.body}</p>
-
-        {(state.plan || state.paymentId || state.invoice?.totalPaise != null) && (
-          <dl className="text-left text-sm bg-gray-50 rounded-2xl p-4 space-y-2">
-            {state.plan && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">Plan</dt>
-                <dd className="font-medium text-gray-900 capitalize">{state.plan.toLowerCase()}</dd>
-              </div>
-            )}
-            {state.invoice?.totalPaise != null && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">Amount paid</dt>
-                <dd className="font-medium text-gray-900">{formatRupees(state.invoice.totalPaise)}</dd>
-              </div>
-            )}
-            {state.paymentId && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-gray-500">Payment ID</dt>
-                <dd className="font-mono text-xs text-gray-900 break-all">{state.paymentId}</dd>
-              </div>
-            )}
-          </dl>
-        )}
-
-        <Link
-          to="/tenant/settings"
-          className="inline-block w-full py-3.5 rounded-2xl gradient-btn text-white font-medium text-sm"
+    // Critically damped throughout: a result page confirms, it does not celebrate with bounce.
+    <MotionConfig reducedMotion="user" transition={{ type: 'spring', bounce: 0, duration: 0.4 }}>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6 font-sans">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 text-center shadow-sm border border-gray-200 space-y-6"
         >
-          {view.cta}
-        </Link>
+          <Logo size={40} className="mx-auto" />
 
-        {state.invoice?.id && (
-          <Link to={`/invoice/${state.invoice.id}`} className="inline-block text-sm font-semibold text-accent">
-            View invoice{state.invoice.invoiceNumber ? ` ${state.invoice.invoiceNumber}` : ''}
-          </Link>
-        )}
+          <div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.5, delay: 0.08 }}
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${view.tone}`}
+            >
+              <Icon className="w-8 h-8" />
+            </motion.div>
+            <h1 className="mt-5 text-[1.625rem] leading-tight tracking-[-0.02em] font-bold text-gray-900">{view.title}</h1>
+            <p role={status === 'failed' ? 'alert' : undefined} className="mt-2 text-[15px] leading-relaxed text-gray-500">
+              {state.message || view.body}
+            </p>
+          </div>
 
-        {(status === 'failed' || status === 'pending') && (
-          <p className="text-xs text-gray-400">
-            Still stuck? <Link to="/legal/contact" className="underline">Contact us</Link>
-            {state.paymentId ? ' and quote the payment ID above.' : '.'}
-          </p>
-        )}
+          {(state.plan || state.paymentId || state.invoice?.totalPaise != null) && (
+            <dl className="text-left text-sm rounded-2xl bg-gray-50 divide-y divide-gray-200/70">
+              {state.plan && (
+                <div className="flex justify-between gap-4 px-4 py-3">
+                  <dt className="text-gray-500">Plan</dt>
+                  <dd className="font-medium text-gray-900 capitalize">{state.plan.toLowerCase()}</dd>
+                </div>
+              )}
+              {state.invoice?.totalPaise != null && (
+                <div className="flex justify-between gap-4 px-4 py-3">
+                  <dt className="text-gray-500">Amount paid</dt>
+                  <dd className="font-semibold text-gray-900 tabular-nums">{formatRupees(state.invoice.totalPaise)}</dd>
+                </div>
+              )}
+              {state.paymentId && (
+                <div className="flex justify-between gap-4 px-4 py-3">
+                  <dt className="text-gray-500">Payment ID</dt>
+                  <dd className="font-mono text-xs text-gray-900 break-all select-all">{state.paymentId}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+
+          <div className="space-y-3">
+            <Link
+              to="/tenant/settings"
+              className={`${press} block w-full py-3.5 rounded-2xl gradient-btn text-white font-semibold text-[15px]`}
+            >
+              {view.cta}
+            </Link>
+
+            {state.invoice?.id && (
+              <Link
+                to={`/invoice/${state.invoice.id}`}
+                className={`${press} block w-full py-3.5 rounded-2xl text-[15px] font-semibold text-accent bg-accent-wash`}
+              >
+                View invoice{state.invoice.invoiceNumber ? ` ${state.invoice.invoiceNumber}` : ''}
+              </Link>
+            )}
+          </div>
+
+          {(status === 'failed' || status === 'pending') && (
+            <p className="text-xs text-gray-400">
+              Still stuck? <Link to="/legal/contact" className="underline">Contact us</Link>
+              {state.paymentId ? ' and quote the payment ID above.' : '.'}
+            </p>
+          )}
+        </motion.div>
       </div>
-    </div>
+    </MotionConfig>
   );
 };
 
