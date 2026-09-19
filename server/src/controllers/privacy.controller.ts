@@ -147,6 +147,8 @@ export const requestDeletion = async (req: AuthRequest, res: Response): Promise<
     // records, reset tokens and activity logs.
     await prisma.$transaction([
       prisma.event.deleteMany({ where: { hostId: userId } }),
+      // A teacher's classes go with them; memberships cascade from the class.
+      prisma.classroom.deleteMany({ where: { teacherId: userId } }),
       prisma.user.delete({ where: { id: userId } }),
       prisma.dataDeletionRequest.update({
         where: { id: request.id },

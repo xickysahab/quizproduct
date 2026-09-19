@@ -18,6 +18,8 @@ import billingRoutes from './routes/billing.routes';
 import audienceQuestionRoutes from './routes/audienceQuestion.routes';
 import privacyRoutes from './routes/privacy.routes';
 import legalRoutes from './routes/legal.routes';
+import classroomRoutes from './routes/classroom.routes';
+import studentRoutes from './routes/student.routes';
 import { stripeWebhook, razorpayWebhook } from './controllers/billing.controller';
 import { corsOriginHandler } from './config/cors';
 import { apiLimiter } from './config/rateLimit';
@@ -135,6 +137,8 @@ export const createApp = () => {
   app.use('/questions-from-audience', audienceQuestionRoutes);
   app.use('/privacy', privacyRoutes);
   app.use('/legal', legalRoutes);
+  app.use('/classrooms', classroomRoutes);
+  app.use('/student', studentRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ message: 'Not found' });

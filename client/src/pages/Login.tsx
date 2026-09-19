@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -16,6 +16,9 @@ const Login: React.FC = () => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+  // Only same-site paths: `//evil.com` is a path to the browser but another host.
+  const nextParam = useSearchParams()[0].get('next');
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +32,7 @@ const Login: React.FC = () => {
       // Redirect based on role
       const role = response.data.user.role;
       const path = role ? `/${role.toLowerCase()}` : '/staff';
-      navigate(path);
+      navigate(next || path);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
     } finally {
@@ -114,12 +117,18 @@ const Login: React.FC = () => {
               disabled={loading}
               className="w-full gradient-btn text-white font-semibold py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group mt-4 disabled:opacity-50"
             >
-              <span>{loading ? 'Authenticating...' : 'Sign In as Host'}</span>
+              <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <p className="text-center text-sm text-gray-500">
               <Link to="/forgot-password" className="text-accent font-semibold">
                 Forgot password?
+              </Link>
+            </p>
+            <p className="text-center text-sm text-gray-500">
+              Student?{' '}
+              <Link to="/student/signup" className="text-accent font-semibold">
+                Create a student account
               </Link>
             </p>
           </form>

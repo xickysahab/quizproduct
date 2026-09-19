@@ -105,7 +105,7 @@ export const deleteManagedUser = async (req: AuthRequest, res: Response): Promis
         id: true,
         email: true,
         name: true,
-        _count: { select: { events: true, subUsers: true } },
+        _count: { select: { events: true, subUsers: true, classroomsTaught: true } },
       },
     });
 
@@ -124,6 +124,13 @@ export const deleteManagedUser = async (req: AuthRequest, res: Response): Promis
     if (target._count.events > 0) {
       res.status(409).json({
         message: `This user owns ${target._count.events} quiz(zes) with history. Deactivate the account instead to keep the results.`,
+      });
+      return;
+    }
+
+    if (target._count.classroomsTaught > 0) {
+      res.status(409).json({
+        message: `This user teaches ${target._count.classroomsTaught} class(es). Deactivate the account instead to keep the class history.`,
       });
       return;
     }

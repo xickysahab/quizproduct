@@ -31,6 +31,11 @@ const Terms = lazy(() => import('./pages/legal/Terms'));
 const Privacy = lazy(() => import('./pages/legal/Privacy'));
 const Refunds = lazy(() => import('./pages/legal/Refunds'));
 const Contact = lazy(() => import('./pages/legal/Contact'));
+const Classes = lazy(() => import('./pages/classes/Classes'));
+const ClassDetail = lazy(() => import('./pages/classes/ClassDetail'));
+const StudentHome = lazy(() => import('./pages/student/StudentHome'));
+const StudentSignup = lazy(() => import('./pages/student/StudentSignup'));
+const JoinClass = lazy(() => import('./pages/student/JoinClass'));
 
 const PageFallback = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-500">
@@ -190,6 +195,22 @@ function AppRoutes() {
         <Route path="/staff/settings" element={
           <ProtectedRoute allowedRoles={['STAFF']}><SettingsPage /></ProtectedRoute>
         } />
+
+        {/* Classes: teacher and student side, kept apart from the live quiz routes. */}
+        <Route path="/classes" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><Classes /></ProtectedRoute>
+        } />
+        <Route path="/classes/:id" element={
+          <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN', 'TENANT', 'STAFF']}><ClassDetail /></ProtectedRoute>
+        } />
+        <Route path="/student" element={
+          <ProtectedRoute allowedRoles={['STUDENT']}><StudentHome /></ProtectedRoute>
+        } />
+        <Route path="/student/settings" element={
+          <ProtectedRoute allowedRoles={['STUDENT']}><SettingsPage /></ProtectedRoute>
+        } />
+        <Route path="/student/signup" element={<PublicOnlyRoute><StudentSignup /></PublicOnlyRoute>} />
+        <Route path="/join-class/:code" element={<JoinClass />} />
 
         <Route path="/admin/logs" element={
           <ProtectedRoute allowedRoles={['SUPERADMIN', 'SUBADMIN']}><ActivityLogs /></ProtectedRoute>

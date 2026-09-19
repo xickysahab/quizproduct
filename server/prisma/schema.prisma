@@ -11,6 +11,9 @@ enum Role {
   SUBADMIN
   TENANT
   STAFF
+  /// Signs up alone and belongs to no organisation. Classes are joined by
+  /// code; a student never reaches host routes.
+  STUDENT
 }
 
 /// Plans used to be this enum. They are rows in PricingPlan now, because a
@@ -134,6 +137,7 @@ model Organization {
   events               Event[]
   invites              Invite[]
   usageMeters          UsageMeter[]
+  classrooms           Classroom[]
   invoices             Invoice[]
   /// Buyer tax details, for GST invoicing.
   gstin                String?
@@ -353,6 +357,8 @@ model User {
   passwordResets   PasswordResetToken[]
   emailVerifications EmailVerificationToken[]
   consents         ConsentRecord[]
+  classroomsTaught Classroom[]
+  classMemberships ClassroomMember[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -530,4 +536,39 @@ model ActivityLog {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/// A teacher's class. Students join with `joinCode` and stay until removed.
+model Classroom {
+  id             String            @id @default(uuid())
+  name           String
+  section        String?
+  /// Six characters from an alphabet with no 0/O or 1/I. Resetting it stops
+  /// new joins with the old code; members already in stay in.
+  joinCode       String            @unique
+  teacherId      String
+  teacher        User              @relation(fields: [teacherId], references: [id])
+  organizationId String?
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  members        ClassroomMember[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([teacherId])
+  @@index([organizationId])
+}
+
+model ClassroomMember {
+  id          String    @id @default(uuid())
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+  /// Set when the teacher removes the student. The row stays so the class's
+  /// history still shows who answered what; rejoining with the code clears it.
+  removedAt   DateTime?
+
+  @@unique([classroomId, studentId])
+  @@index([studentId])
 }

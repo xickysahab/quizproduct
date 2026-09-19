@@ -9,6 +9,11 @@ import prisma from '../config/prisma';
 export const getAccessibleHostIds = async (userId: string, role: string): Promise<string[] | null> => {
   if (role === 'SUPERADMIN') return null;
 
+  // Only the four staff roles own anything. Anything else — a student, or a
+  // role added later — sees nothing rather than falling into the SUBADMIN
+  // branch below.
+  if (role !== 'SUBADMIN' && role !== 'TENANT' && role !== 'STAFF') return [];
+
   if (role === 'STAFF') return [userId];
 
   if (role === 'TENANT') {

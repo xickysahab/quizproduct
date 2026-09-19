@@ -7,6 +7,7 @@ import {
   ListPlus,
   Presentation,
   Tag,
+  GraduationCap,
 } from 'lucide-react';
 import type { Role } from '../context/AuthContext';
 
@@ -24,6 +25,8 @@ export const dashboardTitleForRole = (role?: Role): string => {
       return 'SubAdmin Panel';
     case 'TENANT':
       return 'Tenant Organization';
+    case 'STUDENT':
+      return 'Student';
     default:
       return 'Staff Portal';
   }
@@ -55,12 +58,19 @@ export const sidebarForRole = (role?: Role): SidebarItem[] => {
         { name: 'Overview', href: '/tenant', icon: LayoutDashboard },
         { name: 'Staff', href: '/tenant/staff', icon: Users },
         { name: 'Quizzes', href: '/tenant/quizzes', icon: ListPlus },
+        { name: 'Classes', href: '/classes', icon: GraduationCap },
         { name: 'Settings', href: '/tenant/settings', icon: Settings },
+      ];
+    case 'STUDENT':
+      return [
+        { name: 'My Classes', href: '/student', icon: GraduationCap },
+        { name: 'Settings', href: '/student/settings', icon: Settings },
       ];
     default:
       return [
         { name: 'My Dashboard', href: '/staff', icon: LayoutDashboard },
         { name: 'My Quizzes', href: '/staff/quizzes', icon: Presentation },
+        { name: 'Classes', href: '/classes', icon: GraduationCap },
         { name: 'Settings', href: '/staff/settings', icon: Settings },
       ];
   }
