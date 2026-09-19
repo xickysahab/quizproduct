@@ -11,7 +11,7 @@ const Footer: React.FC = () => {
           <div className="flex items-center gap-3">
             <Logo size={32} />
             <span className="font-heading text-xl font-bold tracking-tight text-[color:var(--color-stage-ink)]">
-              QuizPulse
+              Raisehand
             </span>
           </div>
           <p className="text-[#64748B] text-sm leading-relaxed max-w-sm">
@@ -69,7 +69,7 @@ const Footer: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto pt-8 border-t border-[#1E293B] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#475569]">
-        <p>© {new Date().getFullYear()} QuizPulse. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Raisehand. All rights reserved.</p>
         <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
           <Link to="/legal/terms" className="hover:text-[#A78BFA] transition-colors">
             Terms

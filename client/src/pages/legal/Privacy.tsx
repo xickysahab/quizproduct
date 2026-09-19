@@ -18,7 +18,7 @@ import { useCompanyDetails } from '../../utils/legal';
 const Privacy: React.FC = () => {
   const details = useCompanyDetails();
   const entity = details?.entity;
-  const name = entity?.legalName ?? 'the operator of QuizPulse';
+  const name = entity?.legalName ?? 'the operator of Raisehand';
   const retention = details?.privacy.retentionDays;
 
   return (

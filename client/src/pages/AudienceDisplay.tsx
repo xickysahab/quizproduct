@@ -287,7 +287,7 @@ const AudienceDisplay: React.FC = () => {
           {/* The code never leaves the screen — people arrive late. */}
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--color-stage-muted)]">
-              Join at quizpulse · code
+              Join at raisehand · code
             </p>
             <p className="code-display text-2xl text-[color:var(--accent-lift)]">
               {formatRoomCode(event.roomCode)}

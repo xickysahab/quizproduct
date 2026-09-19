@@ -19,7 +19,7 @@ const Refunds: React.FC = () => {
     <LegalLayout title="Refunds & cancellation" updated="24 August 2026" details={details}>
       <Clause title="What you are buying">
         <p>
-          A QuizPulse plan is a monthly subscription for one workspace, priced per workspace rather
+          A Raisehand plan is a monthly subscription for one workspace, priced per workspace rather
           than per person. Payment covers one month from the date it is taken.
         </p>
       </Clause>

@@ -55,7 +55,7 @@ const Pricing: React.FC = () => {
       <div className="flex-1 max-w-5xl w-full mx-auto px-5 py-12">
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted mb-8">
           <ArrowLeft className="w-4 h-4" />
-          Back to QuizPulse
+          Back to Raisehand
         </Link>
 
         <header className="text-center max-w-2xl mx-auto mb-12">

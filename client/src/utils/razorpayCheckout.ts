@@ -86,7 +86,7 @@ export const openRazorpayCheckout = async (
     order_id: session.orderId,
     amount: session.amountPaise,
     currency: session.currency,
-    name: 'QuizPulse',
+    name: 'Raisehand',
     description: `${session.plan} plan${session.organizationName ? ` — ${session.organizationName}` : ''}`,
     prefill: session.prefill || {},
     notes: { plan: session.plan },

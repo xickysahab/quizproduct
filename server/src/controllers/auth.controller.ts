@@ -157,7 +157,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     const resetUrl = `${publicAppUrl()}/reset-password?token=${token}`;
     await sendMail({
       to: user.email,
-      subject: 'Reset your QuizPulse password',
+      subject: 'Reset your Raisehand password',
       text: `Hi ${user.name},\n\nReset your password using this link (valid for 1 hour):\n${resetUrl}\n\nIf you did not ask for this, you can ignore the email.`,
     });
   } catch (error) {
@@ -263,8 +263,8 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
     await sendMail({
       to: user.email,
-      subject: 'Confirm your QuizPulse address',
-      text: `Hi ${user.name},\n\nConfirm your email to finish setting up QuizPulse (valid 24 hours):\n${publicAppUrl()}/verify-email?token=${token}\n`,
+      subject: 'Confirm your Raisehand address',
+      text: `Hi ${user.name},\n\nConfirm your email to finish setting up Raisehand (valid 24 hours):\n${publicAppUrl()}/verify-email?token=${token}\n`,
     });
 
     await logActivity(user.id, 'SIGNUP', 'User', user.id, { email: user.email });
