@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
+import { sendWelcomeMail } from '../utils/mailer';
 import { validateNewUser } from '../utils/validation';
 
 export const createStaff = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -37,6 +38,7 @@ export const createStaff = async (req: AuthRequest, res: Response): Promise<void
     });
 
     await logActivity(req.user!.userId, 'CREATE_STAFF', 'User', staff.id, { name, email });
+    await sendWelcomeMail({ name: staff.name, email: staff.email, role: staff.role, password });
 
     res.status(201).json({ message: 'Staff created', user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role } });
   } catch (error) {

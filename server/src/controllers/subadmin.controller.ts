@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/prisma';
 import { hashPassword } from '../utils/auth';
 import { logActivity } from '../utils/logger';
+import { sendWelcomeMail } from '../utils/mailer';
 import { getAccessibleHostIds } from '../utils/access';
 import { validateNewUser } from '../utils/validation';
 import { createOrganization } from '../utils/org';
@@ -36,6 +37,7 @@ export const createTenant = async (req: AuthRequest, res: Response): Promise<voi
     });
 
     await logActivity(req.user!.userId, 'CREATE_TENANT', 'User', tenant.id, { name, email });
+    await sendWelcomeMail({ name: tenant.name, email: tenant.email, role: tenant.role, password });
 
     res.status(201).json({ message: 'Tenant created', user: { id: tenant.id, name: tenant.name, email: tenant.email, role: tenant.role } });
   } catch (error) {

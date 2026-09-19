@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export const MIN_PASSWORD_LENGTH = 8;
 const MAX_NAME_LENGTH = 80;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -15,6 +17,9 @@ export interface NewUserInput {
   password: string;
 }
 
+/** 12 URL-safe characters: typeable from an email, and unguessable. */
+export const generateTempPassword = (): string => crypto.randomBytes(9).toString('base64url');
+
 /** Returns an error message for the caller, or null when the input is usable. */
 export const validateNewUser = (body: unknown): { error: string } | { value: NewUserInput } => {
   const { name, email, password } = (body ?? {}) as Record<string, unknown>;
@@ -31,7 +36,10 @@ export const validateNewUser = (body: unknown): { error: string } | { value: New
     return { error: 'A valid email address is required.' };
   }
 
-  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+  // Blank means "make one up": the welcome email carries it to the user, who
+  // changes it from Settings.
+  const blank = password === undefined || password === null || password === '';
+  if (!blank && (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH)) {
     return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
   }
 
@@ -39,7 +47,7 @@ export const validateNewUser = (body: unknown): { error: string } | { value: New
     value: {
       name: name.trim(),
       email: normalizeEmail(email),
-      password,
+      password: blank ? generateTempPassword() : (password as string),
     },
   };
 };
