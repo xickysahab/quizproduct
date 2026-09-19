@@ -8,6 +8,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { sidebarForRole, dashboardTitleForRole } from '../../config/sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { Motion, SkeletonCards } from '../../components/classroom/ui';
+import { Morph } from 'cube-motion/react';
 import { field, label, press, rise, spring } from '../../components/classroom/style';
 
 /**
@@ -80,7 +81,7 @@ const Classes: React.FC = () => {
                 <motion.span animate={{ rotate: formOpen ? 45 : 0 }} className="inline-flex">
                   <Plus className="w-4 h-4" />
                 </motion.span>
-                {formOpen ? 'Cancel' : 'New class'}
+                <Morph active={formOpen} off="New class" on="Cancel" />
               </button>
             )}
           </header>
@@ -128,7 +129,7 @@ const Classes: React.FC = () => {
                       disabled={saving || !name.trim()}
                       className={`${press} gradient-btn text-white px-6 py-3 rounded-xl text-sm font-semibold disabled:opacity-40 disabled:active:scale-100`}
                     >
-                      {saving ? 'Creating…' : 'Create class'}
+                      <Morph active={saving} off="Create class" on="Creating…" />
                     </button>
                   </div>
                 </div>

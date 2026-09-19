@@ -11,6 +11,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Reveal } from 'cube-motion/react';
 
 const Join: React.FC = () => {
   const [roomCode, setRoomCode] = useState('');
@@ -269,7 +270,7 @@ const Join: React.FC = () => {
                 Polls, quizzes and audience questions — in the language the room speaks.
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 stagger">
+              <Reveal targets="children" className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {[
                   {
                     icon: <Zap className="w-4 h-4" />,
@@ -297,7 +298,7 @@ const Join: React.FC = () => {
                     <p className="text-sm text-muted leading-relaxed">{feature.body}</p>
                   </div>
                 ))}
-              </div>
+              </Reveal>
             </div>
           </section>
         )}

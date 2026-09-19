@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { CheckCircle2, Clock, XCircle, MinusCircle } from 'lucide-react';
-import { MotionConfig, motion } from 'framer-motion';
+import { Rise } from 'cube-motion/react';
 import Logo from '../components/Logo';
 import { formatRupees } from '../utils/money';
 
@@ -72,25 +72,18 @@ const PaymentResult: React.FC = () => {
   const press = 'transition-transform duration-100 ease-out active:scale-[0.97]';
 
   return (
-    // Critically damped throughout: a result page confirms, it does not celebrate with bounce.
-    <MotionConfig reducedMotion="user" transition={{ type: 'spring', bounce: 0, duration: 0.4 }}>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6 font-sans">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
+        {/* The card's rows rise in order: logo, verdict, details, actions. */}
+        <Rise
+          targets="children"
           className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 text-center shadow-sm border border-gray-200 space-y-6"
         >
           <Logo size={40} className="mx-auto" />
 
           <div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'spring', bounce: 0, duration: 0.5, delay: 0.08 }}
-              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${view.tone}`}
-            >
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${view.tone}`}>
               <Icon className="w-8 h-8" />
-            </motion.div>
+            </div>
             <h1 className="mt-5 text-[1.625rem] leading-tight tracking-[-0.02em] font-bold text-gray-900">{view.title}</h1>
             <p role={status === 'failed' ? 'alert' : undefined} className="mt-2 text-[15px] leading-relaxed text-gray-500">
               {state.message || view.body}
@@ -144,9 +137,8 @@ const PaymentResult: React.FC = () => {
               {state.paymentId ? ' and quote the payment ID above.' : '.'}
             </p>
           )}
-        </motion.div>
+        </Rise>
       </div>
-    </MotionConfig>
   );
 };
 

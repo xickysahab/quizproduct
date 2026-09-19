@@ -8,6 +8,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { sidebarForRole, dashboardTitleForRole } from '../../config/sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { Motion, SkeletonCards } from '../../components/classroom/ui';
+import { Morph } from 'cube-motion/react';
 import { initials, isClassCode, label, normalizeClassCode, press, rise, spring } from '../../components/classroom/style';
 
 interface MyClass {
@@ -109,7 +110,7 @@ const StudentHome: React.FC = () => {
                 disabled={joining || !valid}
                 className={`${press} inline-flex items-center justify-center gap-2 gradient-btn text-white px-6 py-3.5 rounded-xl text-sm font-semibold disabled:opacity-40 disabled:active:scale-100`}
               >
-                {joining ? 'Joining…' : 'Join class'}
+                <Morph active={joining} off="Join class" on="Joining…" />
                 {!joining && <ArrowRight className="w-4 h-4" />}
               </button>
             </div>
