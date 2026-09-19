@@ -19,7 +19,7 @@ const Contact: React.FC = () => {
     <LegalLayout title="Contact" updated="24 August 2026" details={details}>
       <Clause title="Who we are">
         <p className="text-base font-semibold text-ink">
-          {entity?.legalName ?? 'The operator of QuizPulse'}
+          {entity?.legalName ?? 'The operator of Raisehand'}
         </p>
 
         {entity?.address && (

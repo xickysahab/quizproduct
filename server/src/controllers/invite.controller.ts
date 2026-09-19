@@ -58,8 +58,8 @@ export const createInvite = async (req: AuthRequest, res: Response): Promise<voi
     const url = `${publicAppUrl()}/accept-invite?token=${token}`;
     await sendMail({
       to: email,
-      subject: `You are invited to QuizPulse as ${role}`,
-      text: `${actor?.name || 'An admin'} invited you to QuizPulse.\n\nAccept the invite (valid 7 days):\n${url}\n`,
+      subject: `You are invited to Raisehand as ${role}`,
+      text: `${actor?.name || 'An admin'} invited you to Raisehand.\n\nAccept the invite (valid 7 days):\n${url}\n`,
     });
 
     await logActivity(req.user!.userId, 'INVITE_USER', 'Invite', invite.id, { email, role });

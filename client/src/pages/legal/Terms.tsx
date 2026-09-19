@@ -16,13 +16,13 @@ import { useCompanyDetails } from '../../utils/legal';
 const Terms: React.FC = () => {
   const details = useCompanyDetails();
   const entity = details?.entity;
-  const name = entity?.legalName ?? 'the operator of QuizPulse';
+  const name = entity?.legalName ?? 'the operator of Raisehand';
 
   return (
     <LegalLayout title="Terms of service" updated="24 August 2026" details={details}>
       <Clause title="Who these terms are with">
         <p>
-          QuizPulse is operated by <strong>{name}</strong>
+          Raisehand is operated by <strong>{name}</strong>
           {entity?.address ? `, ${entity.address}` : ''}
           {entity?.gstin ? ` (GSTIN ${entity.gstin})` : ''}. In these terms, "we" and "us" mean{' '}
           {name}, and "you" means the person or organisation holding an account.
@@ -35,7 +35,7 @@ const Terms: React.FC = () => {
 
       <Clause title="What the service is">
         <p>
-          QuizPulse hosts live quizzes, polls and audience questions. A host creates a session,
+          Raisehand hosts live quizzes, polls and audience questions. A host creates a session,
           participants join it with a room code, and answers are collected and shown in real time.
         </p>
         <p>

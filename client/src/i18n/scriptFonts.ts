@@ -61,7 +61,7 @@ export const loadScriptFont = (code: LanguageCode): void => {
  *
  * Latin glyphs still come from Public Sans — the Noto face only supplies the
  * characters the Latin font has no coverage for, which keeps mixed strings like
- * "QuizPulse — हिन्दी" from switching typeface mid-sentence.
+ * "Raisehand — हिन्दी" from switching typeface mid-sentence.
  */
 const applyStack = (code: LanguageCode): void => {
   const face = STACK[code];

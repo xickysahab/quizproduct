@@ -12,7 +12,7 @@ interface BrandedHeaderProps {
 }
 
 /**
- * Shared join/live chrome. Falls back to QuizPulse when the org has no logo.
+ * Shared join/live chrome. Falls back to Raisehand when the org has no logo.
  */
 const BrandedHeader: React.FC<BrandedHeaderProps> = ({
   branding,
@@ -50,7 +50,7 @@ const BrandedHeader: React.FC<BrandedHeaderProps> = ({
             stage ? 'text-white' : 'text-gray-900'
           }`}
         >
-          {branding?.name || 'QuizPulse'}
+          {branding?.name || 'Raisehand'}
         </span>
       </div>
       {trailing ? <div className="flex items-center gap-3 text-xs shrink-0">{trailing}</div> : null}

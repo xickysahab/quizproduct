@@ -97,7 +97,7 @@ export default function ConcludeSettingsModal({ isOpen, onClose, onSave, initial
                   className="flex items-center gap-2 px-4 py-2 bg-accent-wash text-accent rounded-xl font-bold hover:bg-accent-wash transition-colors text-sm border border-accent-soft"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Load QuizPulse Preset
+                  Load Raisehand Preset
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

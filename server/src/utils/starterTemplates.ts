@@ -76,7 +76,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     questions: [
       {
         type: 'MCQ',
-        text: 'What does a room PIN do in QuizPulse?',
+        text: 'What does a room PIN do in Raisehand?',
         options: [
           'Lets the audience join the live session',
           'Resets every password',

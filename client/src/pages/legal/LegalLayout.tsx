@@ -40,7 +40,7 @@ const LegalLayout: React.FC<Props> = ({ title, updated, details, children }) => 
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted mb-8"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to QuizPulse
+        Back to Raisehand
       </Link>
 
       <h1 className="font-heading text-3xl font-bold text-ink mb-1">{title}</h1>

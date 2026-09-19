@@ -17,7 +17,7 @@ import { isValidGstin, isValidStateCode, SELLER_STATE_CODE, stateNameFor } from 
 const read = (name: string): string | undefined => process.env[name]?.trim() || undefined;
 
 export const seller = {
-  legalName: read('SELLER_LEGAL_NAME') || 'QuizPulse',
+  legalName: read('SELLER_LEGAL_NAME') || 'Raisehand',
   gstin: read('SELLER_GSTIN'),
   address: read('SELLER_ADDRESS'),
   email: read('SELLER_EMAIL'),

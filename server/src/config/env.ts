@@ -45,7 +45,7 @@ export const env = {
   answerGracePeriodSeconds: readInt(process.env.ANSWER_GRACE_PERIOD_SECONDS, 3),
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   resendApiKey: process.env.RESEND_API_KEY?.trim() || undefined,
-  mailFrom: process.env.MAIL_FROM?.trim() || 'QuizPulse <noreply@quizpulse.app>',
+  mailFrom: process.env.MAIL_FROM?.trim() || 'Raisehand <noreply@raisehand.app>',
   stripeSecretKey: process.env.STRIPE_SECRET_KEY?.trim() || undefined,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() || undefined,
   stripePricePro: process.env.STRIPE_PRICE_PRO?.trim() || undefined,

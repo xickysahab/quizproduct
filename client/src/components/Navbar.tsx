@@ -39,7 +39,7 @@ const Navbar: React.FC = () => {
           <Logo size={38} className="group-hover:scale-105 transition-transform duration-300" />
           <div className="flex flex-col">
             <span className="font-heading text-xl font-bold tracking-tight text-gray-900 group-hover:text-accent transition-colors">
-              QuizPulse
+              Raisehand
             </span>
             <span className="text-[9px] tracking-[0.2em] text-gray-500 uppercase font-medium -mt-0.5">
               Live Engagement
