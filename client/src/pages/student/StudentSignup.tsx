@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import api from '../../services/api';
 import Logo from '../../components/Logo';
 import { useAuth } from '../../context/AuthContext';
-import { Motion } from '../../components/classroom/ui';
+import { Morph, Rise } from 'cube-motion/react';
 import { field, label, press } from '../../components/classroom/style';
 
 /**
@@ -62,12 +61,12 @@ const StudentSignup: React.FC = () => {
   };
 
   return (
-    <Motion>
+    <>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6 font-sans">
-        <motion.form
+        <Rise
+          as="form"
           onSubmit={submit}
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
+          targets="children"
           className="max-w-md w-full bg-white rounded-3xl p-7 sm:p-10 shadow-sm border border-gray-200 space-y-5"
         >
           <div className="text-center">
@@ -129,7 +128,7 @@ const StudentSignup: React.FC = () => {
             disabled={loading}
             className={`${press} w-full py-3.5 rounded-2xl gradient-btn text-white font-semibold text-[15px] disabled:opacity-50`}
           >
-            {loading ? 'Creating account…' : code ? 'Create account and join' : 'Create account'}
+            <Morph active={loading} off={code ? 'Create account and join' : 'Create account'} on="Creating account…" />
           </button>
 
           <p className="text-center text-sm text-gray-500">
@@ -141,9 +140,9 @@ const StudentSignup: React.FC = () => {
               Sign in
             </Link>
           </p>
-        </motion.form>
+        </Rise>
       </div>
-    </Motion>
+    </>
   );
 };
 

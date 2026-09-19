@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
 import { GraduationCap } from 'lucide-react';
 import api from '../../services/api';
 import Logo from '../../components/Logo';
 import { useAuth } from '../../context/AuthContext';
-import { Motion } from '../../components/classroom/ui';
+import { Morph, Rise } from 'cube-motion/react';
 import { press } from '../../components/classroom/style';
 
 /**
@@ -40,11 +39,10 @@ const JoinClass: React.FC = () => {
   const next = encodeURIComponent(`/join-class/${code}`);
 
   return (
-    <Motion>
+    <>
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6 font-sans">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
+        <Rise
+          targets="children"
           className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 text-center shadow-sm border border-gray-200 space-y-6"
         >
           <Logo size={40} className="mx-auto" />
@@ -69,7 +67,7 @@ const JoinClass: React.FC = () => {
               disabled={joining}
               className={`${press} w-full py-3.5 rounded-2xl gradient-btn text-white font-semibold text-[15px] disabled:opacity-50`}
             >
-              {joining ? 'Joining…' : `Join as ${user?.name}`}
+              <Morph active={joining} off={`Join as ${user?.name}`} on="Joining…" />
             </button>
           ) : (
             <div className="space-y-3">
@@ -87,9 +85,9 @@ const JoinClass: React.FC = () => {
               </Link>
             </div>
           )}
-        </motion.div>
+        </Rise>
       </div>
-    </Motion>
+    </>
   );
 };
 

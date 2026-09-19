@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { Morph } from 'cube-motion/react';
 import { press, spring } from './style';
 
 /** Honours the OS "reduce motion" setting for everything inside. */
@@ -38,7 +39,7 @@ export const CopyButton: React.FC<{ text: string; children: React.ReactNode; ico
       }`}
     >
       {copied ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-      {copied ? 'Copied' : children}
+      <Morph active={copied} off={children} on="Copied" />
     </button>
   );
 };
